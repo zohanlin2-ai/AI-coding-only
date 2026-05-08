@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Professional Sequence Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body { background: white; margin: 0; display: flex; justify-content: center; padding: 50px; }
+        #container { width: 1600px; }
+    </style>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            sequence: { useMaxWidth: true }
+        });
+    </script>
+</head>
+<body>
+    <div id="container">
+        <pre class="mermaid">
+sequenceDiagram
+    participant DMX as Demux Thread
+    participant VQ as Video Pkt Queue
+    participant AQ as Audio Pkt Queue
+    participant VDEC as Video Decoder
+    participant ADEC as Audio Decoder
+    participant REND as SDL Render / Audio Out
+
+    loop Read Loop
+        DMX->>DMX: av_read_frame()
+        alt is Video
+            DMX->>VQ: Enqueue Packet
+        else is Audio
+            DMX->>AQ: Enqueue Packet
+        end
+    end
+
+    par Video Processing
+        VDEC->>VQ: Dequeue Packet
+        VDEC->>VDEC: avcodec_send_packet()
+        VDEC->>VDEC: avcodec_receive_frame()
+        VDEC->>REND: SDL_RenderCopy (Synced to Audio)
+    and Audio Processing
+        ADEC->>AQ: Dequeue Packet
+        ADEC->>ADEC: avcodec_send_packet()
+        ADEC->>ADEC: avcodec_receive_frame()
+        ADEC->>REND: SDL_QueueAudio
+    end
+        </pre>
+    </div>
+</body>
+</html>

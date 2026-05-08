@@ -1,0 +1,13 @@
+# Compiled binaries
+*.exe
+*.o
+*.obj
+bin/
+
+# Temporary files
+*.swp
+*.log
+
+# VS Code or other IDE files
+.vscode/
+.idea/

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ultra HD Sequence Diagram Renderer</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body { 
+            background-color: white; 
+            margin: 0; 
+            padding: 200px;
+            width: 8000px; /* 超寬畫布 */
+            height: 4000px;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+        }
+        #hd-container {
+            display: inline-block;
+            background: white;
+            padding: 150px;
+            /* border: 2px solid #000; */
+        }
+        /* 強化 SVG 渲染品質 */
+        svg {
+            shape-rendering: geometricPrecision;
+            text-rendering: optimizeLegibility;
+            image-rendering: -webkit-optimize-contrast;
+            width: 6000px !important; /* 強制向量展開 */
+            height: auto !important;
+        }
+        /* 深度覆蓋 Mermaid 字體 */
+        .mermaid text {
+            font-family: 'Inter', sans-serif !important;
+            font-size: 32px !important;
+        }
+        .mermaid .actor text {
+            font-size: 36px !important;
+            font-weight: 700 !important;
+        }
+        .mermaid .messageText {
+            font-size: 32px !important;
+        }
+    </style>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            sequence: {
+                showSequenceNumbers: true,
+                actorMargin: 200,    // 增加 Actor 間距
+                messageMargin: 120,   // 增加訊息間距
+                boxMargin: 30,
+                boxTextMargin: 15,
+                noteMargin: 20,
+                useMaxWidth: false,   // 關閉自動寬度限制
+                mirrorActors: false
+            }
+        });
+    </script>
+</head>
+<body>
+    <div id="hd-container">
+        <pre class="mermaid">
+sequenceDiagram
+    participant DMX as Demux Thread
+    participant VQ as Video Pkt Queue
+    participant AQ as Audio Pkt Queue
+    participant VDEC as Video Decoder
+    participant ADEC as Audio Decoder
+    participant REND as SDL Render / Audio Out
+
+    loop Read Loop
+        DMX->>DMX: av_read_frame()
+        alt is Video
+            DMX->>VQ: Enqueue Packet
+        else is Audio
+            DMX->>AQ: Enqueue Packet
+        end
+    end
+
+    par Video Processing
+        VDEC->>VQ: Dequeue Packet
+        VDEC->>VDEC: avcodec_send_packet()
+        VDEC->>VDEC: avcodec_receive_frame()
+        VDEC->>REND: SDL_RenderCopy (Synced to Audio)
+    and Audio Processing
+        ADEC->>AQ: Dequeue Packet
+        ADEC->>ADEC: avcodec_send_packet()
+        ADEC->>ADEC: avcodec_receive_frame()
+        ADEC->>REND: SDL_QueueAudio
+    end
+        </pre>
+    </div>
+</body>
+</html>
