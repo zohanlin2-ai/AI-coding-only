@@ -10,7 +10,7 @@ This repository is used to store various projects developed with AI assistance.
 - **Status**: Initial version uploaded.
 
 ### 2. [Rubik_s_cude](./Rubik_s_cude)
-- **Description**: A project focused on Rubik's Cube solving logic and simulations.
+- **Description**: A project focused on 2x2 Rubik's Cube solving logic and simulations.
 - **Key Features**: Includes core cube logic, solving algorithms (such as Ortega Method, BFS), and various testing tools.
 - **Status**: Initial version uploaded.
 
