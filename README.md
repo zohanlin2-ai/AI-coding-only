@@ -4,24 +4,24 @@ This repository is used to store various projects developed with AI assistance.
 
 ## Project List
 
-### 1. [Rubik_s_cude](./Rubik_s_cude)
+### 1. [mouse-maze](./mouse-maze)
+- **Description**: A dynamic maze generation and pathfinding simulation game built with React and Vite.
+- **Key Features**: Procedural maze generation, A* and BFS pathfinding visualization, and interactive mouse controls.
+- **Status**: Initial version uploaded.
+
+### 2. [Rubik_s_cude](./Rubik_s_cude)
 - **Description**: A project focused on Rubik's Cube solving logic and simulations.
 - **Key Features**: Includes core cube logic, solving algorithms (such as Ortega Method, BFS), and various testing tools.
 - **Status**: Initial version uploaded.
 
-### 2. [c_player](./c_player)
+### 3. [c_player](./c_player)
 - **Description**: A C-based video player using FFmpeg and SDL2, featuring multi-threaded architecture and audio-video synchronization.
 - **Key Features**: FFmpeg decoding, SDL2 rendering/audio output, multi-threaded processing, and smooth sync.
 - **Status**: Initial version uploaded.
 
-### 3. [face_detect](./face_detect)
+### 4. [face_detect](./face_detect)
 - **Description**: A facial recognition and detection project using Python.
 - **Key Features**: Face detection, encoding generation, and real-time recognition capabilities.
-- **Status**: Initial version uploaded.
-
-### 4. [mouse-maze](./mouse-maze)
-- **Description**: A dynamic maze generation and pathfinding simulation game built with React and Vite.
-- **Key Features**: Procedural maze generation, A* and BFS pathfinding visualization, and interactive mouse controls.
 - **Status**: Initial version uploaded.
 
 ### 5. [Q](./Q)
