@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../viewmodels/settings_viewmodel.dart';
-import 'package:url_launcher/url_launcher.dart'; // We'll need this package later to open browser
+import 'package:url_launcher/url_launcher.dart'; // To open external links in the browser
 
 class SettingsView extends ConsumerWidget {
   const SettingsView({super.key});

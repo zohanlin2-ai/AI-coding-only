@@ -5,7 +5,7 @@ class TTSService {
 
   Future<void> init() async {
     await _flutterTts.setVolume(1.0);
-    await _flutterTts.setSpeechRate(0.5); // 稍微慢一點，適合寶寶
+    await _flutterTts.setSpeechRate(0.5); // Slightly slower, suitable for infants
     await _flutterTts.setPitch(1.0);
   }
 

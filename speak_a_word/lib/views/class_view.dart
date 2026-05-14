@@ -151,7 +151,7 @@ class _ClassViewState extends State<ClassView> {
                         if (_pageController.page!.toInt() < _words.length - 1) {
                           _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
                         } else {
-                          // 循環播放：回到第一張
+                          // Looping playback: Go back to the first card
                           _pageController.animateToPage(0, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('已回到第一張，繼續加油！'), duration: Duration(seconds: 1)),

@@ -1,9 +1,9 @@
 class WordItem {
   final String id;
-  final String word; // 想要教的字或詞 (如: 蘋果)
-  final String language; // 語言 (如: zh-TW, en-US, ja-JP)
-  final String imagePath; // 儲存的圖片路徑 (本地路徑)
-  final int exposureCount; // 曝光次數 (供記憶學習演算法參考)
+  final String word; // The word to teach (e.g., Apple)
+  final String language; // Language code (e.g., zh-TW, en-US, ja-JP)
+  final String imagePath; // Local path to the stored image
+  final int exposureCount; // Number of times the word has been shown (for learning algorithm)
   final bool isLearned;
   final bool isSelected;
 
