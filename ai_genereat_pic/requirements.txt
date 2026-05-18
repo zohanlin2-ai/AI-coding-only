@@ -1,0 +1,8 @@
+PySide6
+diffusers
+transformers
+accelerate
+torch
+pillow
+deep-translator
+

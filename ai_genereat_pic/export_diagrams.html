@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Architecture Diagrams — Local AI Image Generator</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #E0E0E0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 40px;
+        }
+        header {
+            max-width: 1200px;
+            margin: 0 auto 40px auto;
+            border-bottom: 1px solid #333;
+            padding-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 {
+            color: #FFFFFF;
+            font-size: 28px;
+            margin: 0 0 8px 0;
+        }
+        p {
+            color: #888888;
+            margin: 0;
+            font-size: 15px;
+        }
+        .diagram-container {
+            max-width: 1200px;
+            margin: 0 auto 60px auto;
+            background-color: #1A1A1A;
+            border: 1px solid #333333;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #2A2A2A;
+            padding-bottom: 15px;
+        }
+        .section-title {
+            color: #FFFFFF;
+            font-size: 22px;
+            margin: 0;
+            border-left: 4px solid #3D5AFE;
+            padding-left: 12px;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        .btn-export {
+            background-color: #2A2A2A;
+            color: #FFFFFF;
+            border: 1px solid #444444;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-export:hover {
+            background-color: #3D5AFE;
+            border-color: #536DFE;
+        }
+        .mermaid {
+            text-align: center;
+            overflow-x: auto;
+            padding: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>System Architecture & Hardware Workflow</h1>
+            <p>Local AI Image Generator (v1.5.0) — High-Resolution Vector Diagrams</p>
+        </div>
+    </header>
+
+    <!-- 1. Sequence Diagram -->
+    <div class="diagram-container">
+        <div class="header-bar">
+            <div class="section-title">1. System Interaction Sequence Diagram</div>
+            <div class="action-buttons">
+                <button class="btn-export" onclick="exportPNG('seq-diagram', 'sequence_diagram.png')">⬇️ Download PNG</button>
+                <button class="btn-export" onclick="exportSVG('seq-diagram', 'sequence_diagram.svg')">⬇️ Download SVG</button>
+            </div>
+        </div>
+        <div id="seq-diagram" class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant UI as MainWindow (PySide6 UI)
+    participant Worker as GenerationWorker (QThread)
+    participant Engine as AIEngine (Backend Manager)
+    participant Translator as GoogleTranslator
+    participant GPU as Diffusers Pipeline (NVIDIA GPU)
+    participant Disk as Local File System (outputs/)
+
+    User->>UI: 1. Input prompt, select model & safety check, click 'Start Generation'
+    UI->>UI: 2. Lock UI controls to prevent concurrent clicks
+    UI->>Worker: 3. Create & start background worker thread (QThread)
+    Worker->>Engine: 4. Call generate(user_prompt, model_key, enable_safety)
+    
+    rect rgb(24, 24, 36)
+        Note over Engine, Translator: Smart Parsing & Auto-Translation Phase
+        Engine->>Engine: 5. Regex parse custom resolution (WxH) & image format (png/jpg)
+        Engine->>Translator: 6. Check for Chinese characters & request translation
+        Translator-->>Engine: 7. Return precise English prompt
+    end
+
+    rect rgb(30, 20, 30)
+        Note over Engine, GPU: Hardware Scheduling & VRAM Cache Management Phase
+        Engine->>Engine: 8. Verify if target model is currently active
+        opt Target Model Switched
+            Engine->>GPU: 9. Unload active model pipeline (del pipe)
+            Engine->>GPU: 10. Execute torch.cuda.empty_cache() to clear VRAM
+            Engine->>GPU: 11. Load new model pipeline (AutoPipelineForText2Image)
+            Engine->>GPU: 12. Preemptively cast VAE decoder to float32 (prevents black screen)
+            Engine->>GPU: 13. Enable Attention Slicing & xformers memory optimization
+        end
+        Engine->>GPU: 14. Attach or detach safety_checker dynamically based on toggle
+    end
+
+    rect rgb(20, 35, 30)
+        Note over Engine, GPU: Two-Stage Decoupled Generation Architecture
+        Engine->>GPU: 15. Stage 1: Execute UNet denoising loop under torch.autocast('cuda') (16-bit)
+        GPU-->>Engine: 16. Return 16-bit latent feature matrix (fp16 Latents)
+        Engine->>GPU: 17. Stage 2: Exit autocast, convert Latents & VAE to float32 for clean decoding
+        GPU-->>Engine: 18. Return high-fidelity RGB PIL Image
+    end
+
+    Engine->>Disk: 19. Save formatted image file to disk (gen_timestamp.format)
+    Disk-->>Engine: 20. Return absolute file path
+    Engine-->>Worker: 21. Return (filepath, translated_prompt)
+    Worker-->>UI: 22. Emit finished signal (QThread inter-thread communication)
+    
+    UI->>UI: 23. Unlock UI controls & update status bar
+    UI->>UI: 24. Load and scale image into QLabel display area
+    UI-->>User: 25. Render high-quality generated image
+    
+    opt User clicks image to inspect original resolution
+        User->>UI: 26. Click on image display area
+        UI->>Disk: 27. Call os.startfile() to launch system image viewer
+        Disk-->>User: 28. Open original high-resolution image in native OS viewer
+    end
+        </div>
+    </div>
+
+    <!-- 2. Activity Diagram -->
+    <div class="diagram-container">
+        <div class="header-bar">
+            <div class="section-title">2. Hardware Execution Activity Diagram</div>
+            <div class="action-buttons">
+                <button class="btn-export" onclick="exportPNG('act-diagram', 'activity_diagram.png')">⬇️ Download PNG</button>
+                <button class="btn-export" onclick="exportSVG('act-diagram', 'activity_diagram.svg')">⬇️ Download SVG</button>
+            </div>
+        </div>
+        <div id="act-diagram" class="mermaid">
+flowchart TD
+    Start(["Start Generation Request"]) --> Mkdir["Ensure outputs/ directory exists"]
+    Mkdir --> GetConfig["Resolve model configuration (Steps, Guidance Scale, Default Dimensions)"]
+    GetConfig --> ParsePrompt["Regex Parse Prompt: Extract dimensions WxH & format jpg/png"]
+    
+    ParsePrompt --> TransCheck{"Contains Chinese characters?"}
+    TransCheck -- "Yes" --> Translate["Call deep-translator (GoogleTranslator)"]
+    Translate --> ValidateTrans{"Valid & non-empty translation?"}
+    ValidateTrans -- "Valid" --> PromptOK["Adopt translated English prompt"]
+    ValidateTrans -- "Failed/Empty" --> PromptFallback["Fallback: Use original input prompt"]
+    TransCheck -- "No" --> PromptOK
+    PromptFallback --> PromptOK
+
+    PromptOK --> CheckModel{"Target Model == Active GPU Model?"}
+    
+    CheckModel -- "Switched" --> DelOld["Unload active model pipeline from VRAM"]
+    DelOld --> EmptyCache["Execute torch.cuda.empty_cache() to reclaim memory"]
+    EmptyCache --> LoadNew["Load AutoPipelineForText2Image onto GPU"]
+    LoadNew --> UpcastVAE["Cast VAE decoder explicitly to float32"]
+    UpcastVAE --> OptXformers["Enable Attention Slicing & xformers optimization"]
+    OptXformers --> CheckSafety
+    
+    CheckModel -- "Same" --> CheckSafety{"Is Safety Filter enabled?"}
+    
+    CheckSafety -- "True" --> EnSafety["pipe.safety_checker = Saved Safety Checker"] --> Stage1
+    CheckSafety -- "False" --> DisSafety["pipe.safety_checker = None (Bypass safety check)"] --> Stage1
+    
+    subgraph DecoupledGeneration ["Two-Stage Decoupled Generation Architecture"]
+        Stage1["Stage 1: UNet Denoising Loop under torch.autocast('cuda') (fp16)"] --> RawLatents["Generate 16-bit latent matrix (fp16 Latents)"]
+        RawLatents --> CastLatents["Exit autocast, convert Latents to float32"]
+        CastLatents --> Stage2["Stage 2: VAE Decoding in pure float32 precision"]
+    end
+    
+    Stage2 --> GetPIL["Acquire high-fidelity RGB PIL Image"]
+    GetPIL --> SaveDisk["Save image to disk (gen_YYYYMMDD_HHMMSS.format)"]
+    SaveDisk --> End(["Return absolute filepath & English prompt to UI"])
+    
+    style Start fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
+    style End fill:#1565c0,stroke:#0d47a1,stroke-width:2px,color:#fff
+    style DecoupledGeneration fill:#1e1e24,stroke:#3d5afe,stroke-width:2px,color:#fff
+    style EmptyCache fill:#b71c1c,stroke:#7f0000,stroke-width:2px,color:#fff
+    style UpcastVAE fill:#e65100,stroke:#e65100,stroke-width:2px,color:#fff
+        </div>
+    </div>
+
+    <!-- Import Mermaid.js CDN -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+    </script>
+
+    <!-- Client-side SVG & PNG Export Logic -->
+    <script>
+        function getSVGElement(containerId) {
+            const container = document.getElementById(containerId);
+            const svg = container.querySelector('svg');
+            if (!svg) {
+                alert("Diagram is still rendering, please wait a second...");
+                return null;
+            }
+            return svg;
+        }
+
+        function exportSVG(containerId, filename) {
+            const svg = getSVGElement(containerId);
+            if (!svg) return;
+
+            // Clone SVG to ensure clean export
+            const clone = svg.cloneNode(true);
+            clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+            
+            const serializer = new XMLSerializer();
+            let source = serializer.serializeToString(clone);
+            
+            const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function exportPNG(containerId, filename) {
+            const svg = getSVGElement(containerId);
+            if (!svg) return;
+
+            const clone = svg.cloneNode(true);
+            clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+            const serializer = new XMLSerializer();
+            const source = serializer.serializeToString(clone);
+            const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const bbox = svg.getBoundingClientRect();
+                
+                // Scale 2x for crisp high resolution
+                canvas.width = bbox.width * 2;
+                canvas.height = bbox.height * 2;
+                const ctx = canvas.getContext("2d");
+                
+                // Fill premium dark background
+                ctx.fillStyle = "#1A1A1A";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.scale(2, 2);
+                ctx.drawImage(img, 0, 0);
+                
+                const dataUrl = canvas.toDataURL("image/png");
+                const a = document.createElement("a");
+                a.href = dataUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            img.src = url;
+        }
+    </script>
+</body>
+</html>
