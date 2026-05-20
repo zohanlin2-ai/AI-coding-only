@@ -97,7 +97,9 @@
     }
 
     .diagram-section {
-      display: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       width: 100%;
       background-color: var(--color-card);
       border-radius: 12px;
@@ -105,12 +107,8 @@
       padding: 30px;
       box-sizing: border-box;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    }
-
-    .diagram-section.active {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      margin-bottom: 40px;
+      scroll-margin-top: 20px;
     }
 
     .section-header {
@@ -192,14 +190,14 @@
     <p class="subtitle">System architecture and logic flow documentation, conforming to strict system architecture standards.</p>
     
     <div class="nav-tabs">
-      <button class="tab-btn active" onclick="switchTab('seq-section', this)">System Sequence Diagram</button>
-      <button class="tab-btn" onclick="switchTab('act-section', this)">Solver Activity Flow</button>
+      <button class="tab-btn" onclick="scrollToSection('seq-section')">System Sequence Diagram</button>
+      <button class="tab-btn" onclick="scrollToSection('act-section')">Solver Activity Flow</button>
     </div>
   </header>
 
   <main>
     <!-- Sequence Diagram Section -->
-    <section id="seq-section" class="diagram-section active">
+    <section id="seq-section" class="diagram-section">
       <div class="section-header">
         <h2 class="section-title">Component Interaction & Animation Sequence</h2>
         <div class="export-group">
@@ -218,22 +216,22 @@
           sequenceDiagram
               autonumber
               actor User as User
-              participant UI as UI Dashboard (main.ts)
-              participant Queue as Animation Queue (main.ts)
-              participant Cube as Cube State (cubeState.ts)
-              participant Solver as LBL Solver (solver.ts)
+              participant UI as UI Dashboard - main.ts
+              participant Queue as Animation Queue - main.ts
+              participant Cube as Cube State - cubeState.ts
+              participant Solver as LBL Solver - solver.ts
 
-              User->>UI: Click 'Auto Solve'
-              UI->>Solver: solveCube(cubeState)
+              User->>UI: Click Auto Solve
+              UI->>Solver: solveCube
               activate Solver
-              Note over Solver: Runs LBL Phases 1-5
-              Solver-->>UI: Return moves sequence (e.g. [U, R, U', R'])
+              Note over Solver: Runs LBL Phases 1 to 5
+              Solver-->>UI: Return moves sequence (e.g. U R U-prime R-prime)
               deactivate Solver
 
               UI->>Queue: Push moves sequence to Queue
               
               rect rgb(31, 40, 51)
-                  Note over Queue, Cube: Animation Loop (runs on requestAnimationFrame)
+                  Note over Queue, Cube: Animation Loop
                   loop While Queue is not empty
                       Queue->>Queue: Dequeue activeMove
                       activate Queue
@@ -241,12 +239,12 @@
                           Queue->>UI: Interpolate rotation angle
                           UI->>UI: Render rotating layer in 3D (CSS transforms)
                       end
-                      Queue->>Cube: cube.move(activeMove) [Logical Update]
-                      Queue->>UI: updateCubeRender() [Sync DOM Colors & static transforms]
+                      Queue->>Cube: cube.move - Logical Update
+                      Queue->>UI: updateCubeRender - Sync DOM Colors
                       deactivate Queue
                   end
               end
-              UI-->>User: Visual 'Solved' State (Confetti & badge update)
+              UI-->>User: Visual Solved State - Confetti and badge update
         </div>
       </div>
     </section>
@@ -269,56 +267,65 @@
       <div class="diagram-viewport" id="act-viewport">
         <div class="mermaid">
           flowchart TD
-              Start(["Start Solver - solveCube"]) --> CheckSolved{"Is Cube Solved?"}
+              NodeStart("Start Solver - solveCube") --> NodeCheckSolved{"Is Cube Solved"}
               
-              CheckSolved -->|Yes| ReturnEmpty["Return Empty Moves"]
-              CheckSolved -->|No| P1["Phase 1: White Cross<br/>Orient and align 4 white edges to side centers"]
+              NodeCheckSolved -->|Yes| NodeReturnEmpty["Return Empty Moves"]
+              NodeCheckSolved -->|No| NodeP1["Phase 1: White Cross - Orient and align 4 white edges to side centers"]
               
-              P1 --> P2["Phase 2: White Corners<br/>Place 4 white corner pieces to complete 1st layer"]
-              P2 --> P3["Phase 3: Middle Edges<br/>Insert 4 middle edge pieces to complete F2L"]
+              NodeP1 --> NodeP2["Phase 2: White Corners - Place 4 white corner pieces to complete 1st layer"]
+              NodeP2 --> NodeP3["Phase 3: Middle Edges - Insert 4 middle edge pieces to complete F2L"]
               
-              P3 --> P4_Edges{"Orient Yellow Edges<br/>White Cross opposite"}
+              NodeP3 --> NodeP4Edges{"Orient Yellow Edges - White Cross opposite"}
               
-              P4_Edges -->|Cross not formed| ApplyK["Apply K_MOVE Macro<br/>F prime R prime D prime R D F"]
-              ApplyK --> P4_Edges
+              NodeP4Edges -->|Cross not formed| NodeApplyK["Apply K_MOVE Macro - F prime R prime D prime R D F"]
+              NodeApplyK --> NodeP4Edges
               
-              P4_Edges -->|Cross formed| P4_Corners{"Orient Yellow Corners<br/>Top face yellow"}
+              NodeP4Edges -->|Cross formed| NodeP4Corners{"Orient Yellow Corners - Top face yellow"}
               
-              P4_Corners -->|Corners not oriented| ApplyS["Apply S_MOVE Macro Sune<br/>R D R prime D R D2 R prime"]
-              ApplyS --> P4_Corners
+              NodeP4Corners -->|Corners not oriented| NodeApplyS["Apply S_MOVE Macro Sune - R D R prime D R D2 R prime"]
+              NodeApplyS --> NodeP4Corners
               
-              P4_Corners -->|Top face fully yellow| P5_Corners{"Permute Yellow Corners"}
+              NodeP4Corners -->|Top face fully yellow| NodeP5Corners{"Permute Yellow Corners"}
               
-              P5_Corners -->|Corners not aligned| ApplyP["Apply P_MOVE Macro<br/>R F prime R B2 R prime F R B2 R2"]
-              ApplyP --> P5_Corners
+              NodeP5Corners -->|Corners not aligned| NodeApplyP["Apply P_MOVE Macro - R F prime R B2 R prime F R B2 R2"]
+              NodeApplyP --> NodeP5Corners
               
-              P5_Corners -->|Corners aligned| P5_Edges{"Permute Yellow Edges"}
+              NodeP5Corners -->|Corners aligned| NodeP5Edges{"Permute Yellow Edges"}
               
-              P5_Edges -->|Edges not aligned| ApplyU["Apply U_PERM Macro<br/>R2 D R D R prime D prime R prime D prime R prime D R prime"]
-              ApplyU --> P5_Edges
+              NodeP5Edges -->|Edges not aligned| NodeApplyU["Apply U_PERM Macro - R2 D R D R prime D prime R prime D prime R prime D R prime"]
+              NodeApplyU --> NodeP5Edges
               
-              P5_Edges -->|All faces match center colors| SolvedCheck{"Is Final State Solved?"}
+              NodeP5Edges -->|All faces match center colors| NodeSolvedCheck{"Is Final State Solved"}
               
-              SolvedCheck -->|Yes| Success["Return Compiled Move List"]
-              Success --> End(["End"])
+              NodeSolvedCheck -->|Yes| NodeSuccess["Return Compiled Move List"]
+              NodeSuccess --> NodeEnd("End")
               
-              SolvedCheck -->|No| Fail["Throw Solver Error - Limit Exceeded"]
-              Fail --> End
+              NodeSolvedCheck -->|No| NodeFail["Throw Solver Error - Limit Exceeded"]
+              NodeFail --> NodeEnd
               
-              ReturnEmpty --> End
+              NodeReturnEmpty --> NodeEnd
 
               %% Styling
-              classDef stepStyle fill:#1f2833,stroke:#c5a059,color:#c5a059,stroke-width:2px
-              classDef decisionStyle fill:#0b0c10,stroke:#ffea00,color:#fff,stroke-width:2px
-              classDef macroStyle fill:#14532d,stroke:#22c55e,color:#fff,stroke-width:1px
-              classDef termStyle fill:#0b0c10,stroke:#c5a059,color:#fff,stroke-width:2px
-              classDef errorStyle fill:#7f1d1d,stroke:#ef4444,color:#fff,stroke-width:2px
-
-              class Start,End termStyle
-              class P1,P2,P3 stepStyle
-              class CheckSolved,P4_Edges,P4_Corners,P5_Corners,P5_Edges,SolvedCheck decisionStyle
-              class ApplyK,ApplyS,ApplyP,ApplyU macroStyle
-              class Fail errorStyle
+              style NodeStart fill:#0b0c10,stroke:#c5a059,color:#fff,stroke-width:2px
+              style NodeEnd fill:#0b0c10,stroke:#c5a059,color:#fff,stroke-width:2px
+              
+              style NodeP1 fill:#1f2833,stroke:#c5a059,color:#c5a059,stroke-width:2px
+              style NodeP2 fill:#1f2833,stroke:#c5a059,color:#c5a059,stroke-width:2px
+              style NodeP3 fill:#1f2833,stroke:#c5a059,color:#c5a059,stroke-width:2px
+              
+              style NodeCheckSolved fill:#0b0c10,stroke:#ffea00,color:#fff,stroke-width:2px
+              style NodeP4Edges fill:#0b0c10,stroke:#ffea00,color:#fff,stroke-width:2px
+              style NodeP4Corners fill:#0b0c10,stroke:#ffea00,color:#fff,stroke-width:2px
+              style NodeP5Corners fill:#0b0c10,stroke:#ffea00,color:#fff,stroke-width:2px
+              style NodeP5Edges fill:#0b0c10,stroke:#ffea00,color:#fff,stroke-width:2px
+              style NodeSolvedCheck fill:#0b0c10,stroke:#ffea00,color:#fff,stroke-width:2px
+              
+              style NodeApplyK fill:#14532d,stroke:#22c55e,color:#fff,stroke-width:1px
+              style NodeApplyS fill:#14532d,stroke:#22c55e,color:#fff,stroke-width:1px
+              style NodeApplyP fill:#14532d,stroke:#22c55e,color:#fff,stroke-width:1px
+              style NodeApplyU fill:#14532d,stroke:#22c55e,color:#fff,stroke-width:1px
+              
+              style NodeFail fill:#7f1d1d,stroke:#ef4444,color:#fff,stroke-width:2px
         </div>
       </div>
     </section>
@@ -334,12 +341,8 @@
   </script>
 
   <script>
-    function switchTab(sectionId, btn) {
-      document.querySelectorAll('.diagram-section').forEach(sec => sec.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      
-      document.getElementById(sectionId).classList.add('active');
-      btn.classList.add('active');
+    function scrollToSection(sectionId) {
+      document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
     }
 
     function getSVGElement(containerId) {
