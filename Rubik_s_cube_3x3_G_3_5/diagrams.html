@@ -269,47 +269,56 @@
       <div class="diagram-viewport" id="act-viewport">
         <div class="mermaid">
           flowchart TD
-              Start(["Start Solver (solveCube)"]) --> CheckSolved{"Is Cube Solved?"}
+              Start(["Start Solver - solveCube"]) --> CheckSolved{"Is Cube Solved?"}
               
-              CheckSolved -- "Yes" --> ReturnEmpty["Return Empty Moves"]
-              CheckSolved -- "No"  --> P1["Phase 1: White Cross<br/>Orient and align 4 white edges to side centers"]
+              CheckSolved -->|Yes| ReturnEmpty["Return Empty Moves"]
+              CheckSolved -->|No| P1["Phase 1: White Cross<br/>Orient and align 4 white edges to side centers"]
               
               P1 --> P2["Phase 2: White Corners<br/>Place 4 white corner pieces to complete 1st layer"]
               P2 --> P3["Phase 3: Middle Edges<br/>Insert 4 middle edge pieces to complete F2L"]
               
-              P3 --> P4_Edges{"Orient Yellow Edges<br/>(White Cross opposite)"}
-              P4_Edges -- "Cross not formed" --> ApplyK["Apply K_MOVE Macro<br/>(F' R' D' R D F)"]
+              P3 --> P4_Edges{"Orient Yellow Edges<br/>White Cross opposite"}
+              
+              P4_Edges -->|Cross not formed| ApplyK["Apply K_MOVE Macro<br/>F prime R prime D prime R D F"]
               ApplyK --> P4_Edges
-              P4_Edges -- "Cross formed" --> P4_Corners{"Orient Yellow Corners<br/>(Top face yellow)"}
               
-              P4_Corners -- "Corners not oriented" --> ApplyS["Apply S_MOVE Macro (Sune)<br/>(R D R' D R D2 R')"]
+              P4_Edges -->|Cross formed| P4_Corners{"Orient Yellow Corners<br/>Top face yellow"}
+              
+              P4_Corners -->|Corners not oriented| ApplyS["Apply S_MOVE Macro Sune<br/>R D R prime D R D2 R prime"]
               ApplyS --> P4_Corners
-              P4_Corners -- "Top face fully yellow" --> P5_Corners{"Permute Yellow Corners"}
               
-              P5_Corners -- "Corners not aligned" --> ApplyP["Apply P_MOVE Macro<br/>(R F' R B2 R' F R B2 R2)"]
+              P4_Corners -->|Top face fully yellow| P5_Corners{"Permute Yellow Corners"}
+              
+              P5_Corners -->|Corners not aligned| ApplyP["Apply P_MOVE Macro<br/>R F prime R B2 R prime F R B2 R2"]
               ApplyP --> P5_Corners
-              P5_Corners -- "Corners aligned" --> P5_Edges{"Permute Yellow Edges"}
               
-              P5_Edges -- "Edges not aligned" --> ApplyU["Apply U_PERM Macro<br/>(R2 D R D R' D' R' D' R' D R')"]
+              P5_Corners -->|Corners aligned| P5_Edges{"Permute Yellow Edges"}
+              
+              P5_Edges -->|Edges not aligned| ApplyU["Apply U_PERM Macro<br/>R2 D R D R prime D prime R prime D prime R prime D R prime"]
               ApplyU --> P5_Edges
-              P5_Edges -- "All faces match center colors" --> SolvedCheck{"Is Final State Solved?"}
               
-              SolvedCheck -- "Yes" --> Success["Return Compiled Move List"] --> End(["End"])
-              SolvedCheck -- "No"  --> Fail["Throw Solver Error (Limit Exceeded)"] --> End
+              P5_Edges -->|All faces match center colors| SolvedCheck{"Is Final State Solved?"}
+              
+              SolvedCheck -->|Yes| Success["Return Compiled Move List"]
+              Success --> End(["End"])
+              
+              SolvedCheck -->|No| Fail["Throw Solver Error - Limit Exceeded"]
+              Fail --> End
+              
               ReturnEmpty --> End
 
               %% Styling
-              classDef step fill:#1f2833,stroke:#c5a059,color:#c5a059,stroke-width:2px;
-              classDef decision fill:#0b0c10,stroke:#ffea00,color:#fff,stroke-width:2px;
-              classDef macro fill:#14532d,stroke:#22c55e,color:#fff,stroke-width:1px;
-              classDef term fill:#0b0c10,stroke:#c5a059,color:#fff,stroke-width:2px;
-              classDef error fill:#7f1d1d,stroke:#ef4444,color:#fff,stroke-width:2px;
+              classDef stepStyle fill:#1f2833,stroke:#c5a059,color:#c5a059,stroke-width:2px
+              classDef decisionStyle fill:#0b0c10,stroke:#ffea00,color:#fff,stroke-width:2px
+              classDef macroStyle fill:#14532d,stroke:#22c55e,color:#fff,stroke-width:1px
+              classDef termStyle fill:#0b0c10,stroke:#c5a059,color:#fff,stroke-width:2px
+              classDef errorStyle fill:#7f1d1d,stroke:#ef4444,color:#fff,stroke-width:2px
 
-              class Start,End term;
-              class P1,P2,P3 step;
-              class CheckSolved,P4_Edges,P4_Corners,P5_Corners,P5_Edges,SolvedCheck decision;
-              class ApplyK,ApplyS,ApplyP,ApplyU macro;
-              class Fail error;
+              class Start,End termStyle
+              class P1,P2,P3 stepStyle
+              class CheckSolved,P4_Edges,P4_Corners,P5_Corners,P5_Edges,SolvedCheck decisionStyle
+              class ApplyK,ApplyS,ApplyP,ApplyU macroStyle
+              class Fail errorStyle
         </div>
       </div>
     </section>
