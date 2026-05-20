@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3x3 Rubik's Cube 3D Simulator & LBL Solver</title>
+    <!-- Google Fonts Outfit & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app">
+      <!-- Sidebar / Control Panel -->
+      <aside class="control-panel">
+        <header class="app-header">
+          <div class="logo-area">
+            <span class="logo-cube"></span>
+            <h1>Rubik's 3D</h1>
+          </div>
+          <p class="subtitle">LBL Self-Developed Solver</p>
+        </header>
+
+        <!-- Main Action Buttons -->
+        <div class="panel-section">
+          <h2>Actions</h2>
+          <div class="action-grid">
+            <button id="btn-scramble" class="btn btn-primary" title="Scramble cube randomly with 20 moves">
+              <span class="icon">🌀</span> Scramble
+            </button>
+            <button id="btn-solve" class="btn btn-success" title="Calculate LBL solution and play">
+              <span class="icon">🚀</span> Solve LBL
+            </button>
+            <button id="btn-reset" class="btn btn-danger" title="Instantly reset cube to solved state">
+              <span class="icon">⚡</span> Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- Manual Controls -->
+        <div class="panel-section">
+          <h2>Manual Rotations</h2>
+          <div class="manual-grid">
+            <button class="btn btn-manual" data-move="U">U</button>
+            <button class="btn btn-manual" data-move="U'">U'</button>
+            <button class="btn btn-manual" data-move="D">D</button>
+            <button class="btn btn-manual" data-move="D'">D'</button>
+            <button class="btn btn-manual" data-move="L">L</button>
+            <button class="btn btn-manual" data-move="L'">L'</button>
+            <button class="btn btn-manual" data-move="R">R</button>
+            <button class="btn btn-manual" data-move="R'">R'</button>
+            <button class="btn btn-manual" data-move="F">F</button>
+            <button class="btn btn-manual" data-move="F'">F'</button>
+            <button class="btn btn-manual" data-move="B">B</button>
+            <button class="btn btn-manual" data-move="B'">B'</button>
+          </div>
+        </div>
+
+        <!-- Solver Steps & Playback (Active when solving) -->
+        <div id="playback-panel" class="panel-section playback-section hidden">
+          <h2>Solver Playback</h2>
+          <div class="solver-status">
+            <div class="status-badge" id="solve-status-badge">Ready</div>
+            <div id="solve-progress" class="solve-progress-text">Step 0/0</div>
+          </div>
+          
+          <div class="moves-stream-container">
+            <div id="moves-stream" class="moves-stream">
+              <!-- Moves will be rendered here dynamically -->
+            </div>
+          </div>
+
+          <div class="playback-controls">
+            <button id="btn-prev" class="btn btn-ctrl" title="Previous Step">⏮️</button>
+            <button id="btn-play-pause" class="btn btn-ctrl btn-play" title="Play / Pause">▶️ Play</button>
+            <button id="btn-next" class="btn btn-ctrl" title="Next Step">⏭️</button>
+          </div>
+
+          <div class="speed-control">
+            <label for="speed-slider">Speed: <span id="speed-val">300</span>ms</label>
+            <input type="range" id="speed-slider" min="100" max="1000" step="50" value="300">
+          </div>
+        </div>
+
+        <!-- Info / Details -->
+        <footer class="app-footer">
+          <div class="divider"></div>
+          <p class="guide-tip">🖱️ Left-drag cube to rotate camera</p>
+          <p class="copyright">&copy; 2026 Antigravity Cube G-3-5</p>
+        </footer>
+      </aside>
+
+      <!-- 3D Viewport Area -->
+      <main class="viewport-area">
+        <div class="scene-container">
+          <div class="scene" id="scene">
+            <div class="cube-container" id="cube-container">
+              <!-- 27 cubies will be rendered here dynamically -->
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
