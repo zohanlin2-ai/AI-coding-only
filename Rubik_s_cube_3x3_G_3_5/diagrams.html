@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rubik's Cube Solver - System Architecture Diagrams</title>
+  <style>
+    :root {
+      --color-bg: #0b0c10;
+      --color-card: #1f2833;
+      --color-primary: #c5a059;
+      --color-text-main: #e0e0e0;
+      --color-text-muted: #8f9aa6;
+      --color-border: #45a29e;
+      --color-hover: #573b12;
+    }
+
+    body {
+      background-color: var(--color-bg);
+      color: var(--color-text-main);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1200px;
+      padding: 30px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border-bottom: 1px solid rgba(197, 160, 89, 0.2);
+      text-align: center;
+    }
+
+    h1 {
+      color: var(--color-primary);
+      margin: 0 0 10px 0;
+      font-size: 2.2rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .subtitle {
+      color: var(--color-text-muted);
+      margin: 0;
+      font-size: 1.1rem;
+      max-width: 800px;
+      line-height: 1.6;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 15px;
+      margin: 30px 0;
+    }
+
+    .tab-btn {
+      background-color: var(--color-card);
+      color: var(--color-text-main);
+      border: 1px solid rgba(197, 160, 89, 0.3);
+      padding: 12px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .tab-btn:hover {
+      border-color: var(--color-primary);
+      background-color: rgba(197, 160, 89, 0.05);
+    }
+
+    .tab-btn.active {
+      background-color: var(--color-primary);
+      color: #000;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 15px rgba(197, 160, 89, 0.4);
+    }
+
+    main {
+      width: 100%;
+      max-width: 1200px;
+      padding: 0 20px 60px 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .diagram-section {
+      display: none;
+      width: 100%;
+      background-color: var(--color-card);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 30px;
+      box-sizing: border-box;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .diagram-section.active {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .section-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 15px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 1.5rem;
+      color: var(--color-primary);
+    }
+
+    .export-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-export {
+      background-color: rgba(255, 255, 255, 0.05);
+      color: var(--color-text-main);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-export:hover {
+      background-color: var(--color-primary);
+      color: #000;
+      border-color: var(--color-primary);
+    }
+
+    .diagram-viewport {
+      width: 100%;
+      background-color: #121212;
+      border-radius: 8px;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .mermaid {
+      width: 100%;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    .mermaid[data-processed="true"] {
+      opacity: 1;
+    }
+
+    /* Adjust sequence diagram note colors for high-contrast dark theme */
+    .noteText {
+      fill: #fff !important;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Rubik's Cube Solver</h1>
+    <p class="subtitle">System architecture and logic flow documentation, conforming to strict system architecture standards.</p>
+    
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('seq-section', this)">System Sequence Diagram</button>
+      <button class="tab-btn" onclick="switchTab('act-section', this)">Solver Activity Flow</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Sequence Diagram Section -->
+    <section id="seq-section" class="diagram-section active">
+      <div class="section-header">
+        <h2 class="section-title">Component Interaction & Animation Sequence</h2>
+        <div class="export-group">
+          <button class="btn-export" onclick="exportSVG('seq-viewport', 'sequence_diagram.svg')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Export SVG
+          </button>
+          <button class="btn-export" onclick="exportPNG('seq-viewport', 'sequence_diagram.png')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Export 2x PNG
+          </button>
+        </div>
+      </div>
+      <div class="diagram-viewport" id="seq-viewport">
+        <div class="mermaid">
+          sequenceDiagram
+              autonumber
+              actor User as User
+              participant UI as UI Dashboard (main.ts)
+              participant Queue as Animation Queue (main.ts)
+              participant Cube as Cube State (cubeState.ts)
+              participant Solver as LBL Solver (solver.ts)
+
+              User->>UI: Click 'Auto Solve'
+              UI->>Solver: solveCube(cubeState)
+              activate Solver
+              Note over Solver: Runs LBL Phases 1-5
+              Solver-->>UI: Return moves sequence (e.g. [U, R, U', R'])
+              deactivate Solver
+
+              UI->>Queue: Push moves sequence to Queue
+              
+              rect rgb(31, 40, 51)
+                  Note over Queue, Cube: Animation Loop (runs on requestAnimationFrame)
+                  loop While Queue is not empty
+                      Queue->>Queue: Dequeue activeMove
+                      activate Queue
+                      loop For each frame (t from 0 to 1)
+                          Queue->>UI: Interpolate rotation angle
+                          UI->>UI: Render rotating layer in 3D (CSS transforms)
+                      end
+                      Queue->>Cube: cube.move(activeMove) [Logical Update]
+                      Queue->>UI: updateCubeRender() [Sync DOM Colors & static transforms]
+                      deactivate Queue
+                  end
+              end
+              UI-->>User: Visual 'Solved' State (Confetti & badge update)
+        </div>
+      </div>
+    </section>
+
+    <!-- Activity Diagram Section -->
+    <section id="act-section" class="diagram-section">
+      <div class="section-header">
+        <h2 class="section-title">LBL Solver Decision & Phase Flow</h2>
+        <div class="export-group">
+          <button class="btn-export" onclick="exportSVG('act-viewport', 'solver_activity_diagram.svg')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Export SVG
+          </button>
+          <button class="btn-export" onclick="exportPNG('act-viewport', 'solver_activity_diagram.png')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Export 2x PNG
+          </button>
+        </div>
+      </div>
+      <div class="diagram-viewport" id="act-viewport">
+        <div class="mermaid">
+          flowchart TD
+              Start(["Start Solver (solveCube)"]) --> CheckSolved{"Is Cube Solved?"}
+              
+              CheckSolved -- "Yes" --> ReturnEmpty["Return Empty Moves"]
+              CheckSolved -- "No"  --> P1["Phase 1: White Cross<br/>Orient and align 4 white edges to side centers"]
+              
+              P1 --> P2["Phase 2: White Corners<br/>Place 4 white corner pieces to complete 1st layer"]
+              P2 --> P3["Phase 3: Middle Edges<br/>Insert 4 middle edge pieces to complete F2L"]
+              
+              P3 --> P4_Edges{"Orient Yellow Edges<br/>(White Cross opposite)"}
+              P4_Edges -- "Cross not formed" --> ApplyK["Apply K_MOVE Macro<br/>(F' R' D' R D F)"]
+              ApplyK --> P4_Edges
+              P4_Edges -- "Cross formed" --> P4_Corners{"Orient Yellow Corners<br/>(Top face yellow)"}
+              
+              P4_Corners -- "Corners not oriented" --> ApplyS["Apply S_MOVE Macro (Sune)<br/>(R D R' D R D2 R')"]
+              ApplyS --> P4_Corners
+              P4_Corners -- "Top face fully yellow" --> P5_Corners{"Permute Yellow Corners"}
+              
+              P5_Corners -- "Corners not aligned" --> ApplyP["Apply P_MOVE Macro<br/>(R F' R B2 R' F R B2 R2)"]
+              ApplyP --> P5_Corners
+              P5_Corners -- "Corners aligned" --> P5_Edges{"Permute Yellow Edges"}
+              
+              P5_Edges -- "Edges not aligned" --> ApplyU["Apply U_PERM Macro<br/>(R2 D R D R' D' R' D' R' D R')"]
+              ApplyU --> P5_Edges
+              P5_Edges -- "All faces match center colors" --> SolvedCheck{"Is Final State Solved?"}
+              
+              SolvedCheck -- "Yes" --> Success["Return Compiled Move List"] --> End(["End"])
+              SolvedCheck -- "No"  --> Fail["Throw Solver Error (Limit Exceeded)"] --> End
+              ReturnEmpty --> End
+
+              %% Styling
+              classDef step fill:#1f2833,stroke:#c5a059,color:#c5a059,stroke-width:2px;
+              classDef decision fill:#0b0c10,stroke:#ffea00,color:#fff,stroke-width:2px;
+              classDef macro fill:#14532d,stroke:#22c55e,color:#fff,stroke-width:1px;
+              classDef term fill:#0b0c10,stroke:#c5a059,color:#fff,stroke-width:2px;
+              classDef error fill:#7f1d1d,stroke:#ef4444,color:#fff,stroke-width:2px;
+
+              class Start,End term;
+              class P1,P2,P3 step;
+              class CheckSolved,P4_Edges,P4_Corners,P5_Corners,P5_Edges,SolvedCheck decision;
+              class ApplyK,ApplyS,ApplyP,ApplyU macro;
+              class Fail error;
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      securityLevel: 'loose'
+    });
+  </script>
+
+  <script>
+    function switchTab(sectionId, btn) {
+      document.querySelectorAll('.diagram-section').forEach(sec => sec.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      
+      document.getElementById(sectionId).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    function getSVGElement(containerId) {
+      const container = document.getElementById(containerId);
+      const svg = container.querySelector('svg');
+      if (!svg) {
+        alert("Diagram is still rendering, please wait a moment.");
+        return null;
+      }
+      return svg;
+    }
+
+    function exportSVG(containerId, filename) {
+      const svg = getSVGElement(containerId);
+      if (!svg) return;
+
+      // Clone nodes to avoid modifying the screen DOM
+      const clonedSvg = svg.cloneNode(true);
+      clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+      const source = new XMLSerializer().serializeToString(clonedSvg);
+      const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    }
+
+    function exportPNG(containerId, filename) {
+      const svg = getSVGElement(containerId);
+      if (!svg) return;
+
+      const source = new XMLSerializer().serializeToString(svg);
+      const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const bbox = svg.getBoundingClientRect();
+
+        // 2x Supersampling for sharp rendering on high-DPI screens
+        canvas.width = bbox.width * 2;
+        canvas.height = bbox.height * 2;
+        const ctx = canvas.getContext("2d");
+
+        // Solid background fill matching card bg (#1f2833) to prevent black labels on transparent background
+        ctx.fillStyle = "#121212";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.scale(2, 2);
+        ctx.drawImage(img, 0, 0);
+
+        const a = document.createElement("a");
+        a.href = canvas.toDataURL("image/png");
+        a.download = filename;
+        a.click();
+
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+      };
+      img.src = url;
+    }
+  </script>
+</body>
+</html>

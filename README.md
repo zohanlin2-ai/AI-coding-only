@@ -44,7 +44,7 @@ This repository is used to store various projects developed with AI assistance.
 
 ### 8. [3D 3x3 Rubik's Cube Simulator & Solver (Rubik_s_cube_3x3_G_3_5)](./Rubik_s_cube_3x3_G_3_5)
 - **Description**: An interactive 3D 3x3 Rubik's Cube Simulator and Layer-By-Layer (LBL) Auto-Solver built with TypeScript, HTML5, and Vanilla CSS 3D transforms.
-- **Key Features**: Zero third-party visual engine dependencies (pure CSS 3D), fully responsive premium UI, coordinate-based solver logic with 100% correct automatic playback controls, and complete Vitest suite verifying 100 random scrambles.
+- **Key Features**: Zero third-party visual engine dependencies (pure CSS 3D), fully responsive premium UI, coordinate-based solver logic with 100% correct automatic playback controls, complete Vitest suite verifying 100 random scrambles, and embedded Mermaid-based interactive UML System Sequence and Activity diagrams with 2x high-resolution PNG/SVG export capabilities.
 - **Status**: Production-ready initial version uploaded.
 
 ---
