@@ -362,7 +362,7 @@ export const App: React.FC = () => {
       <header className="app-header">
         <div className="brand-section">
           <div className="brand-logo" />
-          <h1 className="brand-title">碁鋒 Go App</h1>
+          <h1 className="brand-title">碁 Go App</h1>
         </div>
         {gameState !== 'SETUP' && (
           <button className="btn btn-secondary" onClick={() => setGameState('SETUP')}>

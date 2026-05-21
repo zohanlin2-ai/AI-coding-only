@@ -1,4 +1,4 @@
-# 碁鋒 Go App (The Game of Go)
+# 碁 Go App (The Game of Go)
 
 A premium, highly-responsive, and modern web-based Go (圍棋) board game application built with React, Vite, and TypeScript. The application supports multiple board sizes, rule variants, handicap placements, SGF file serialization/deserialization, and intelligent cloud LLM AIs as well as a local fallback heuristic AI.
 
