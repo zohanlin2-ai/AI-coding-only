@@ -47,5 +47,11 @@ This repository is used to store various projects developed with AI assistance.
 - **Key Features**: Zero third-party visual engine dependencies (pure CSS 3D), fully responsive premium UI, coordinate-based solver logic with 100% correct automatic playback controls, complete Vitest suite verifying 100 random scrambles, and embedded Mermaid-based interactive UML System Sequence and Activity diagrams with 2x high-resolution PNG/SVG export capabilities.
 - **Status**: Production-ready initial version uploaded.
 
+### 9. [碁鋒 Go App (the_game_of_Go)](./the_game_of_Go)
+- **Description**: A premium, highly-responsive, and modern web-based Go (圍棋) board game application built with React, Vite, and TypeScript.
+- **Key Features**: Multiple board size support (9x9, 13x13, 19x19), Chinese/Japanese scoring rules, handicap stone configurations, SGF serialization/deserialization, local offline engines (Heuristic & Monte Carlo Tree Search with progressive bias and capture-biased playouts), online cloud LLM integrations (Gemini, Groq, OpenRouter, OpenAI, Anthropic) with custom proxy and key validation, and high-DPI Canvas scaling. Includes professional embedded interactive Mermaid-based UML Sequence and Activity diagrams with client-side high-resolution PNG/SVG export capabilities.
+- **Status**: Production-ready initial version uploaded.
+
 ---
 *Generated and maintained in strict adherence to AI-coding-only SKILL specifications.*
+

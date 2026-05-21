@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Board Game App — System Architecture UML Diagrams</title>
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 50%, #1e1b4b 100%);
+            --panel-bg: rgba(17, 24, 39, 0.7);
+            --card-bg: rgba(31, 41, 55, 0.45);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --accent-primary: #6366f1;
+            --accent-secondary: #a855f7;
+            --accent-glow: rgba(99, 102, 241, 0.15);
+            
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --success: #10b981;
+            --warning: #f59e0b;
+            
+            --font-display: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Glowing Orbs */
+        .orb {
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            filter: blur(160px);
+            z-index: -1;
+            opacity: 0.25;
+            pointer-events: none;
+        }
+        .orb-left {
+            top: 10%;
+            left: -150px;
+            background: var(--accent-primary);
+        }
+        .orb-right {
+            bottom: 15%;
+            right: -150px;
+            background: var(--accent-secondary);
+        }
+
+        header {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 50px 20px 30px 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #ffffff, #c7d2fe, #f3e8ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.03em;
+            margin-bottom: 12px;
+        }
+
+        .subtitle {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        main {
+            max-width: 1300px;
+            margin: 0 auto 60px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 45px;
+            position: relative;
+        }
+
+        /* Diagrams Container Card */
+        .diagram-card {
+            background: var(--panel-bg);
+            border-radius: 24px;
+            border: 1px solid var(--border-color);
+            padding: 35px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(16px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding-bottom: 18px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .card-title {
+            font-family: var(--font-display);
+            font-size: 1.6rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card-title svg {
+            color: var(--accent-secondary);
+        }
+
+        /* Action Buttons */
+        .actions-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%);
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.35) 0%, rgba(168, 85, 247, 0.35) 100%);
+            border-color: rgba(99, 102, 241, 0.6);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        /* Mermaid Wrapper */
+        .diagram-viewport {
+            background: #151b26;
+            border-radius: 16px;
+            padding: 24px;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+        }
+
+        .mermaid {
+            width: 100%;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .mermaid[data-processed="true"] {
+            opacity: 1;
+        }
+
+        /* Documentation & Explanation Panel */
+        .docs-section {
+            background: rgba(17, 24, 39, 0.5);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            backdrop-filter: blur(12px);
+        }
+
+        .docs-title {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            border-left: 4px solid var(--accent-primary);
+            padding-left: 12px;
+        }
+
+        .docs-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .docs-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .doc-card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            padding: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .doc-card h3 {
+            font-family: var(--font-display);
+            font-size: 1.2rem;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .doc-card h3 svg {
+            color: var(--accent-secondary);
+        }
+
+        .doc-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 14px;
+        }
+
+        .doc-card ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .doc-card li {
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+            margin-bottom: 8px;
+            padding-left: 18px;
+            position: relative;
+        }
+
+        .doc-card li::before {
+            content: "•";
+            position: absolute;
+            left: 5px;
+            color: var(--accent-primary);
+            font-weight: bold;
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(17, 24, 39, 0.9);
+            color: var(--text-primary);
+            padding: 12px 24px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--accent-primary);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-icon {
+            color: var(--success);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="orb orb-left"></div>
+    <div class="orb orb-right"></div>
+
+    <header>
+        <h1>Go App — System Architecture UML Diagrams</h1>
+        <div class="subtitle">Comprehensive system walk-through detailing the Game Loop Interactions, the Entire App Lifecycle, and the local Monte Carlo Tree Search (MCTS) AI Engine. All diagrams are rendered simultaneously to prevent UI initialization rendering bugs.</div>
+    </header>
+
+    <main>
+        <!-- 1. SEQUENCE DIAGRAM CARD -->
+        <div class="diagram-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Go Game Loop & AI Interaction (Sequence Diagram)</span>
+                </div>
+                <div class="actions-group">
+                    <button class="btn" onclick="triggerSVGExport('sequence-mermaid-code', 'go_game_sequence_diagram.svg')">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Export SVG
+                    </button>
+                    <button class="btn btn-primary" onclick="triggerPNGExport('sequence-mermaid-code', 'go_game_sequence_diagram.png')">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Export High-Res PNG
+                    </button>
+                </div>
+            </div>
+            <div class="diagram-viewport" id="sequence-mermaid-code">
+                <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User as User (Human Player)
+    participant UI as Board UI (GoBoard Canvas)
+    participant App as Orchestrator (App.tsx)
+    participant Engine as Rules Engine (goEngine.ts)
+    participant AI as AI Service (aiService.ts)
+
+    rect rgb(26, 32, 44)
+        Note over User, UI: Phase 1: Human Player Turn
+        User->>UI: Click intersection (row, col)
+        UI->>App: onPlayMove(row, col)
+        App->>Engine: checkMoveLegality(board, r, c, player, history)
+        activate Engine
+        Engine-->>App: { legal: true/false, reason?: string }
+        deactivate Engine
+
+        alt Move is Legal
+            App->>Engine: playMove(board, r, c, player, history)
+            activate Engine
+            Engine-->>App: { board: newBoard, captured: Point[] }
+            deactivate Engine
+            App->>App: Update React state (board, history, captured, currentPlayer)
+            App->>UI: Redraw board, render stones, play move sound
+        else Move is Illegal (Suicide / Ko / Occupied)
+            App->>UI: Show invalid move warning & flash board
+        end
+    end
+
+    opt Next turn player is AI (B_is_AI or W_is_AI enabled)
+        rect rgb(20, 26, 38)
+            Note over App, AI: Phase 2: AI Decision and Move Execution
+            App->>UI: Show thinking loader animation
+            App->>AI: getAiMove(board, player, history, config)
+            activate AI
+            
+            alt config.provider == 'local' (Heuristic)
+                AI->>AI: computeLocalHeuristicMove()
+            else config.provider == 'mcts' (MCTS Offline)
+                AI->>AI: computeMctsMove()
+            else config.provider is Cloud LLM (Gemini/Groq/OpenAI/Claude/OpenRouter)
+                AI->>AI: Serialize board state to text grid & list legal moves
+                AI->>AI: Send HTTP POST request (fetchWithTimeout)
+            end
+            
+            AI-->>App: Return selected coordinate (Point) or 'PASS'
+            deactivate AI
+            App->>UI: Hide thinking loader animation
+            
+            alt AI selects PASS
+                App->>App: Update consecutive passes counter
+                App->>UI: Display PASS notification
+            else AI selects legal coordinate
+                App->>App: Reset consecutive passes counter
+                App->>Engine: playMove(board, r, c, player, history)
+                activate Engine
+                Engine-->>App: { board: newBoard, captured: Point[] }
+                deactivate Engine
+                App->>App: Update React state (board, history, captured)
+                App->>UI: Redraw board & render stone
+            end
+        end
+    end
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. OVERALL APP ACTIVITY DIAGRAM CARD -->
+        <div class="diagram-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM4 21a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z"/></svg>
+                    <span>Overall App Lifecycle & Game Loop (Activity Diagram)</span>
+                </div>
+                <div class="actions-group">
+                    <button class="btn" onclick="triggerSVGExport('app-activity-mermaid-code', 'go_app_overall_activity_diagram.svg')">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Export SVG
+                    </button>
+                    <button class="btn btn-primary" onclick="triggerPNGExport('app-activity-mermaid-code', 'go_app_overall_activity_diagram.png')">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Export High-Res PNG
+                    </button>
+                </div>
+            </div>
+            <div class="diagram-viewport" id="app-activity-mermaid-code">
+                <div class="mermaid">
+flowchart TD
+    Start(["Start Game App"]) --> ShowSetup["Display Pre-game Setup Panel"]
+    ShowSetup --> ConfigGame["Configure settings:<br/>1. Board Size (9x9 / 13x13 / 19x19)<br/>2. Rules (Chinese / Japanese)<br/>3. Handicap Stones (0 to 9)<br/>4. Player Modes (Human vs Human, Human vs AI, AI vs AI)"]
+    
+    ConfigGame --> CheckAiConfig{"Is AI enabled for<br/>Black or White?"}
+    CheckAiConfig -- "Yes" --> SelectAiProvider["Select AI Provider<br/>(Local Heuristic / MCTS / Gemini / Groq / OpenAI / Anthropic / OpenRouter)"]
+    SelectAiProvider --> InputKeyProxy["Input API Key & Optional Custom Proxy URL"]
+    InputKeyProxy --> ValidateKey["Validate credentials via direct browser REST request"]
+    ValidateKey --> KeyValid{"Is Key Valid?"}
+    KeyValid -- "No" --> ShowError["Show verification error status"] --> InputKeyProxy
+    KeyValid -- "Yes" --> ShowSuccess["Show success status & save details to localStorage"] --> TriggerStart
+    CheckAiConfig -- "No" --> TriggerStart["Click 'Start Game' Button"]
+    
+    TriggerStart --> InitGame["Initialize Board State:<br/>1. Set empty grid<br/>2. Place handicap stones if selected<br/>3. Set currentPlayer = 'B'<br/>4. Reset captured count & move history"]
+    
+    InitGame --> CheckActivePlayer{"Is currentPlayer<br/>Human or AI?"}
+    
+    %% Human Turn Flow
+    CheckActivePlayer -- "Human" --> WaitInput["Wait for User Input<br/>(Board click, Pass, or Resign)"]
+    WaitInput --> UserAction{"Determine Action"}
+    UserAction -- "Resign" --> EndGameResign["Set status to Resigned"] --> ScoringPhase
+    UserAction -- "Pass" --> ApplyPass["Register Pass move<br/>Add PASS hash to history"] --> CheckPassCount
+    UserAction -- "Board Click" --> CheckLegals["Validate coordinates in goEngine.ts<br/>(Check occupied, suicide, Ko rules)"]
+    CheckLegals --> IsLegalMove{"Is move legal?"}
+    IsLegalMove -- "No" --> ShowWarn["Flash board & display invalid move warning"] --> WaitInput
+    IsLegalMove -- "Yes" --> ApplyMove["Place stone on board,<br/>Remove captured opponent stones,<br/>Append board state hash to history"] --> ResetPassCount["Reset consecutive passes count to 0"] --> SwitchTurn
+    
+    %% AI Turn Flow
+    CheckActivePlayer -- "AI" --> ShowSpinner["Show AI Thinking Loader"]
+    ShowSpinner --> DispatchAi["Dispatch move selection based on Provider"]
+    DispatchAi --> ProviderChoice{"Determine Provider"}
+    ProviderChoice -- "Local Heuristic / MCTS" --> RunLocal["Execute offline heuristic or MCTS tree search"] --> ProcessAiDecision
+    ProviderChoice -- "Cloud LLM APIs" --> CallRest["1. Format board to text grid<br/>2. Compile active legal moves list<br/>3. Fetch API response asynchronously with timeout"] --> ProcessAiDecision
+    
+    ProcessAiDecision["Get decision: Coordinate or PASS"] --> HideSpinner["Hide AI Thinking Loader"]
+    HideSpinner --> DecisionType{"Determine Decision"}
+    DecisionType -- "PASS" --> ApplyPass
+    DecisionType -- "Coordinate" --> ApplyMove
+    
+    %% Game loop conditions
+    CheckPassCount{"Two consecutive passes?"}
+    CheckPassCount -- "No" --> SwitchTurn["Toggle currentPlayer<br/>(B &lt;-&gt; W)"]
+    SwitchTurn --> CheckActivePlayer
+    
+    CheckPassCount -- "Yes" --> ScoringPhase["Enter Game Scoring Mode:<br/>1. Calculate territories automatically<br/>2. Display interactive score overlays on board"]
+    
+    ScoringPhase --> WaitDeadStones["Wait for user to toggle dead/alive stones interactively"]
+    WaitDeadStones --> ApplyScoringRules["Calculate final scores based on Ruleset:<br/>- Chinese: Stones + Territory + 7.5 Komi<br/>- Japanese: Territory - Prisoners + 6.5 Komi"]
+    
+    ApplyScoringRules --> DisplayWinner["Display Winner HUD & detailed score breakdown"]
+    DisplayWinner --> FinalActions{"Select Action"}
+    FinalActions -- "Save SGF" --> ExportSgf["Serialize moves & headers to .sgf file<br/>Trigger browser download"] --> FinalActions
+    FinalActions -- "Reset / New Game" --> ShowSetup
+    
+    %% Styles
+    style Start fill:#3b82f6,stroke:#1d4ed8,color:#fff
+    style ShowSetup fill:#1f2937,stroke:#4b5563,color:#fff
+    style TriggerStart fill:#10b981,stroke:#047857,color:#fff
+    style CheckActivePlayer fill:#f97316,stroke:#c2410c,color:#fff
+    style UserAction fill:#f97316,stroke:#c2410c,color:#fff
+    style IsLegalMove fill:#f97316,stroke:#c2410c,color:#fff
+    style ProviderChoice fill:#f97316,stroke:#c2410c,color:#fff
+    style DecisionType fill:#f97316,stroke:#c2410c,color:#fff
+    style CheckPassCount fill:#f97316,stroke:#c2410c,color:#fff
+    style FinalActions fill:#f97316,stroke:#c2410c,color:#fff
+    style CheckAiConfig fill:#f97316,stroke:#c2410c,color:#fff
+    style KeyValid fill:#f97316,stroke:#c2410c,color:#fff
+    style SwitchTurn fill:#a855f7,stroke:#7e22ce,color:#fff
+    style ScoringPhase fill:#ec4899,stroke:#be185d,color:#fff
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. MCTS ACTIVITY DIAGRAM CARD -->
+        <div class="diagram-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    <span>MCTS Decision-Making Algorithm (Activity Diagram)</span>
+                </div>
+                <div class="actions-group">
+                    <button class="btn" onclick="triggerSVGExport('activity-mermaid-code', 'go_mcts_activity_diagram.svg')">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Export SVG
+                    </button>
+                    <button class="btn btn-primary" onclick="triggerPNGExport('activity-mermaid-code', 'go_mcts_activity_diagram.png')">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Export High-Res PNG
+                    </button>
+                </div>
+            </div>
+            <div class="diagram-viewport" id="activity-mermaid-code">
+                <div class="mermaid">
+flowchart TD
+    Start(["Start MCTS Search"]) --> InitRoot["Initialize Root Node<br/>(UntriedMoves = All legal moves + PASS)"]
+    
+    InitRoot --> LoopStart{"Iteration Count &lt; Limit?<br/>(9x9: 300, 13x13: 150, 19x19: 80)"}
+    
+    subgraph Selection_Expansion ["Selection & Expansion Phases"]
+        SelectionPhase["Selection: Traverse tree from root<br/>using UCB1 + Heuristic Bias"]
+        SelectionCriteria{"Does node have<br/>untried moves?"}
+        SelectBestChild["Select child with highest UCB1 score"]
+        
+        ExpansionPhase{"Is untried moves list empty?"}
+        ExpandNode["Expansion:<br/>1. Evaluate untried moves via heuristic<br/>2. Select best move by heuristic score<br/>3. Create child node with played state<br/>4. Remove from untried list"]
+    end
+    
+    subgraph Playout_Simulation ["Monte Carlo Playout Simulation"]
+        PlayoutInit["Get expanded child state & player"]
+        Simulation["Simulation (Playout):<br/>Play moves rapidly until game end or max depth"]
+        GetLegals["Get all legal moves for current player"]
+        CheckCaptures{"Are there any moves<br/>that capture opponent stones?"}
+        ProbabilisticSelect{"60% chance to select capture?<br/>(Capture Bias)"}
+        ChooseCapture["Select capture move randomly"]
+        ChooseRandom["Select any legal move randomly (or PASS)"]
+        ApplyMove["Apply move to temporary board,<br/>update board state & history"]
+        CheckTerm{"Two consecutive passes<br/>or max depth reached?"}
+        NextPlayer["Switch player turn"]
+    end
+    
+    subgraph Backpropagation_Scoring ["Scoring & Backpropagation"]
+        ScoreBoard["Scoring: Apply Chinese Area Scoring<br/>(Stones + Territory + Komi)"]
+        DetermineWinner{"Determine Winner<br/>(Black vs White)"}
+        Backpropagation["Backpropagation:<br/>Increment visits for all nodes in path,<br/>increment wins if node player == winner"]
+    end
+
+    LoopStart -- "Yes" --> SelectionPhase
+    SelectionPhase --> SelectionCriteria
+    SelectionCriteria -- "No" --> SelectBestChild
+    SelectBestChild --> SelectionPhase
+    
+    SelectionCriteria -- "Yes" --> ExpansionPhase
+    ExpansionPhase -- "Yes" --> ExpandNode
+    ExpansionPhase -- "No" --> PlayoutInit
+    ExpandNode --> PlayoutInit
+    
+    PlayoutInit --> Simulation
+    Simulation --> GetLegals
+    GetLegals --> CheckCaptures
+    CheckCaptures -- "Yes" --> ProbabilisticSelect
+    ProbabilisticSelect -- "Yes" --> ChooseCapture
+    ProbabilisticSelect -- "No" --> ChooseRandom
+    CheckCaptures -- "No" --> ChooseRandom
+    
+    ChooseCapture --> ApplyMove
+    ChooseRandom --> ApplyMove
+    
+    ApplyMove --> CheckTerm
+    CheckTerm -- "No" --> NextPlayer
+    NextPlayer --> GetLegals
+    
+    CheckTerm -- "Yes" --> ScoreBoard
+    ScoreBoard --> DetermineWinner
+    DetermineWinner --> Backpropagation
+    Backpropagation --> IncrementCounter["Increment iteration counter"]
+    IncrementCounter --> LoopStart
+    
+    LoopStart -- "No" --> SelectFinalMove["Select child of root<br/>with the most visits"]
+    SelectFinalMove --> End(["Return selected move / 'PASS'"])
+
+    %% Styles
+    style Start fill:#3b82f6,stroke:#1d4ed8,color:#fff
+    style End fill:#3b82f6,stroke:#1d4ed8,color:#fff
+    style LoopStart fill:#f97316,stroke:#c2410c,color:#fff
+    style SelectionCriteria fill:#f97316,stroke:#c2410c,color:#fff
+    style ExpansionPhase fill:#f97316,stroke:#c2410c,color:#fff
+    style CheckCaptures fill:#f97316,stroke:#c2410c,color:#fff
+    style ProbabilisticSelect fill:#f97316,stroke:#c2410c,color:#fff
+    style CheckTerm fill:#f97316,stroke:#c2410c,color:#fff
+    style DetermineWinner fill:#f97316,stroke:#c2410c,color:#fff
+    
+    style SelectionPhase fill:#10b981,stroke:#047857,color:#fff
+    style ExpandNode fill:#10b981,stroke:#047857,color:#fff
+    style Simulation fill:#8b5cf6,stroke:#6d28d9,color:#fff
+    style ScoreBoard fill:#ec4899,stroke:#be185d,color:#fff
+    style Backpropagation fill:#06b6d4,stroke:#0891b2,color:#fff
+                </div>
+            </div>
+        </div>
+
+        <!-- DOCUMENTATION SECTION -->
+        <section class="docs-section">
+            <h2 class="docs-title">UML Architecture Details & Decision Rationale</h2>
+            <div class="docs-grid">
+                <div class="doc-card">
+                    <h3>
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        Sequence & Activity Diagram Rationale
+                    </h3>
+                    <p>Both models represent distinct dimensions of the system design to make cross-component interactions and internal logic understandable:</p>
+                    <ul>
+                        <li><strong>Go Game Loop Sequence Diagram</strong>: Details how events flow asynchronously between the UI rendering surface (`GoBoard.tsx`), game orchestrator state (`App.tsx`), rules engine validator (`goEngine.ts`), and external API client integrations (`aiService.ts`).</li>
+                        <li><strong>Overall App Lifecycle Activity Diagram</strong>: Captures the system's complete behavioral pipeline from pre-game configuration, live coordinate validations, turn switching logic, up to scoring overlay and SGF file serialization.</li>
+                        <li><strong>MCTS Algorithm Activity Diagram</strong>: Formally models the iterative Monte Carlo Tree Search optimization workflow, emphasizing progressive heuristic node evaluation and randomized, capture-biased rollout simulations.</li>
+                    </ul>
+                </div>
+                <div class="doc-card">
+                    <h3>
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        Advanced Offline MCTS Techniques
+                    </h3>
+                    <p>The client-side search engine implements advanced heuristics to enable strong play in browser JS within 1-2 seconds per move:</p>
+                    <ul>
+                        <li><strong>Progressive Bias Formula</strong>: Integrates domain-specific heuristics `heuristicScore / (10 * (visits + 1))` into UCB1 selection. Guides early search iterations towards high-value shape intersections before raw simulations are accumulated.</li>
+                        <li><strong>Capture-Biased Playouts</strong>: During randomized simulations (playouts), the agent detects state capture opportunities, triggering capturing moves with a 60% probability check to improve evaluation accuracy.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <svg class="toast-icon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span id="toast-message">Export Successful</span>
+    </div>
+
+    <!-- Mermaid CDN ESM Loader -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        
+        // Initialize Mermaid with dark theme and loose security config for complex syntax
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            securityLevel: 'loose',
+            themeVariables: {
+                background: '#151b26',
+                primaryColor: '#1e293b',
+                primaryTextColor: '#f3f4f6',
+                lineColor: '#4b5563',
+                actorBkg: '#1f2937',
+                actorBorder: '#4b5563',
+                actorTextColor: '#f3f4f6',
+                noteBkgColor: '#2d3748',
+                noteTextColor: '#f3f4f6'
+            }
+        });
+        
+        window.mermaid = mermaid;
+    </script>
+
+    <!-- High-Res Supersampled Canvas Export Engine -->
+    <script>
+        // Lossless SVG Vector Export Function
+        function triggerSVGExport(containerId, filename) {
+            try {
+                const container = document.getElementById(containerId);
+                const svgNode = container.querySelector('svg');
+                if (!svgNode) {
+                    showToast('Please wait for diagram rendering to complete.', true);
+                    return;
+                }
+
+                // Deep clone SVG and configure Namespace
+                const svgClone = svgNode.cloneNode(true);
+                svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                svgClone.style.backgroundColor = "#151b26";
+                
+                const serializer = new XMLSerializer();
+                const svgString = serializer.serializeToString(svgClone);
+                
+                const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                showToast('Lossless SVG exported successfully!');
+            } catch (err) {
+                console.error(err);
+                showToast('SVG export failed: ' + err.message, true);
+            }
+        }
+
+        // 2x Supersampled High-Res PNG Rasterizer
+        function triggerPNGExport(containerId, filename) {
+            try {
+                const container = document.getElementById(containerId);
+                const svgNode = container.querySelector('svg');
+                if (!svgNode) {
+                    showToast('Please wait for diagram rendering to complete.', true);
+                    return;
+                }
+
+                showToast('Rasterizing high-res PNG...', false);
+
+                const svgClone = svgNode.cloneNode(true);
+                svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                const serializer = new XMLSerializer();
+                const svgString = serializer.serializeToString(svgClone);
+                
+                const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const bbox = svgNode.getBoundingClientRect();
+                    const scale = 2; // 2x Scale Factor
+                    
+                    canvas.width = bbox.width * scale;
+                    canvas.height = bbox.height * scale;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#151b26';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    ctx.scale(scale, scale);
+                    ctx.drawImage(img, 0, 0, bbox.width, bbox.height);
+                    
+                    URL.revokeObjectURL(url);
+                    
+                    const pngUrl = canvas.toDataURL('image/png');
+                    const link = document.createElement('a');
+                    link.href = pngUrl;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    showToast('High-Res PNG downloaded successfully!');
+                };
+                
+                img.onerror = function() {
+                    showToast('PNG rasterization failed. Try exporting SVG.', true);
+                };
+                
+                img.src = url;
+            } catch (err) {
+                console.error(err);
+                showToast('PNG export failed: ' + err.message, true);
+            }
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            toastMsg.innerText = message;
+            
+            if (isError) {
+                toast.style.borderColor = '#ef4444';
+                toast.querySelector('.toast-icon').style.color = '#ef4444';
+            } else {
+                toast.style.borderColor = 'var(--accent-primary)';
+                toast.querySelector('.toast-icon').style.color = 'var(--success)';
+            }
+            
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
