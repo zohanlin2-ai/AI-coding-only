@@ -1,5 +1,21 @@
 # CHANGELOG.md
 
+## [1.4.0] - 2026-05-22
+
+### Added
+- **Ollama Local AI Integration**:
+  - Integrated local Ollama models (defaulting to `gemma4:latest`) in the backend request pipeline.
+  - Added Ollama connection verification and status tracking in the UI.
+  - Optimized local model queries with a 120-second timeout, 1024 max tokens, and disabled thinking mode (`extra_body={"think": False}`) for direct replies.
+- **Post-Dialogue State Machine**:
+  - Implemented 5 post-dialogue options (continue/restart with or without parameter adjustments, or end session) displayed when dialogue halts or times out.
+- **Andrej Karpathy Guidelines**:
+  - Formally documented the coding guidelines in `CLAUDE.md`.
+
+### Fixed
+- **Parameter Synchronization**:
+  - Added synchronization logic so that editing after dialogue preserves the actual latest configuration instead of reverting to default values.
+
 ## [1.3.1] - 2026-05-22
 
 ### Fixed

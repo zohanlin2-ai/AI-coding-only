@@ -14,6 +14,7 @@
    - **xAI Grok** (預設 `grok-2-1212`)
    - **Groq Cloud** (預設 `gemma2-9b-it`)
    - **GitHub Models** (預設 `gpt-4o-mini`)
+   - **Ollama 本地端 AI** (預設 `gemma4:latest`，可自訂 API 位址，特別針對思考模型優化)
    - **Mock 模式**：完全不需要 API 金鑰與網路連線，透過隨機模板拼接產生生動、擬真的模擬對話，方便調試與測試。
 5. **對話時間控制**：可設定對話時長（1 至 120 分鐘）與發言間隔（1 至 15 秒），提供即時倒數計時與進度條，並可隨時手動終止對話。
 6. **三種發言順序邏輯**：
@@ -46,6 +47,7 @@ pip install -r requirements.txt
   XAI_API_KEY=your_grok_key_here
   GROQ_API_KEY=your_groq_key_here
   GITHUB_TOKEN=your_github_token_here
+  OLLAMA_BASE_URL=http://localhost:11434
   ```
 
 ### 3. 啟動應用程式
