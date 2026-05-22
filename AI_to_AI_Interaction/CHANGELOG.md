@@ -12,7 +12,7 @@
 - **UML Diagrams**:
   - Added interactive system Sequence Diagram illustrating the UI-Agent-Orchestrator-LLM asynchronous dialogue flow.
   - Added Activity Diagram mapping the Streamlit session state machine, including the five post-dialogue options.
-  - Placed the diagrams in `uml.html` / `uml.xml` directly under `AI_to_AI_Interaction`.
+  - Placed the diagrams in `uml.html` directly under `AI_to_AI_Interaction`.
 - **Andrej Karpathy Guidelines**:
   - Formally documented the coding guidelines in `CLAUDE.md`.
 

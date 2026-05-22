@@ -76,4 +76,4 @@ python -m unittest test_app.py
 - [test_app.py](test_app.py): Automated unit tests.
 - [CLAUDE.md](CLAUDE.md): Developer guidelines and commands.
 - [requirements.txt](requirements.txt): Python dependency list.
-- [uml.html](uml.html) / [uml.xml](uml.xml): UML system Sequence and Activity diagrams with interactive Mermaid rendering and high-resolution export tools.
+- [uml.html](uml.html): UML system Sequence and Activity diagrams with interactive Mermaid rendering and high-resolution export tools.
