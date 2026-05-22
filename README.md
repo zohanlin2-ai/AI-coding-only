@@ -52,6 +52,12 @@ This repository is used to store various projects developed with AI assistance.
 - **Key Features**: Multiple board size support (9x9, 13x13, 19x19), Chinese/Japanese scoring rules, handicap stone configurations, SGF serialization/deserialization, local offline engines (Heuristic & Monte Carlo Tree Search with progressive bias and capture-biased playouts), online cloud LLM integrations (Gemini, Groq, OpenRouter, OpenAI, Anthropic) with custom proxy and key validation, and high-DPI Canvas scaling. Includes professional embedded interactive Mermaid-based UML Sequence and Activity diagrams with client-side high-resolution PNG/SVG export capabilities.
 - **Status**: Production-ready initial version uploaded.
 
+### 10. [AI-to-AI Dialogue Observer (AI_to_AI_Interaction)](./AI_to_AI_Interaction)
+- **Description**: An interactive multi-agent dialogue observation web application built with Streamlit and Python.
+- **Key Features**: Supports 1 to 4 customizable AI agents running concurrently, synchronous API key validation for Gemini, OpenAI, Claude, DeepSeek, Grok, Groq Cloud, and GitHub Models. Integrates real-time countdown timer, adjustable pacing delay, speaker-nomination, sequential, or orchestrator turn-taking, interactive randomizers for naming and roles, and markdown transcript export with provider attributions.
+- **Status**: Production-ready initial version uploaded.
+
 ---
 *Generated and maintained in strict adherence to AI-coding-only SKILL specifications.*
+
 
