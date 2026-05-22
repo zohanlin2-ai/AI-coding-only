@@ -297,6 +297,70 @@ class TestAIToAIDialogue(unittest.TestCase):
             max_tokens=250
         )
 
+    @patch('openai.resources.chat.completions.Completions.create')
+    @patch('openai.OpenAI')
+    def test_ollama_api_call(self, mock_openai_client, mock_create):
+        """Test Ollama API client integrates correctly under mock."""
+        # Setup mock completion
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "這是模擬的 Ollama 回覆。"
+        mock_create.return_value = mock_response
+        
+        # Setup OpenAI instance mock behavior
+        mock_client_instance = MagicMock()
+        mock_client_instance.chat.completions.create = mock_create
+        mock_openai_client.return_value = mock_client_instance
+        
+        agent = AIAgent(0, "小明", "哲學家", "Ollama", "gemma4:latest")
+        api_keys = {"ollama": "http://localhost:11434"}
+        
+        result = agent.get_response(self.topic, [], [agent], api_keys)
+        
+        self.assertEqual(result, "這是模擬的 Ollama 回覆。")
+        mock_openai_client.assert_called_once_with(
+            api_key="ollama",
+            base_url="http://localhost:11434/v1",
+            timeout=120.0
+        )
+        mock_create.assert_called_once_with(
+            model="gemma4:latest",
+            messages=unittest.mock.ANY,
+            max_tokens=1024,
+            extra_body={"think": False}
+        )
+
+
+    @patch('openai.resources.chat.completions.Completions.create')
+    @patch('openai.OpenAI')
+    def test_orchestrator_ollama(self, mock_openai_client, mock_create):
+        """Test orchestrator next speaker selection using Ollama."""
+        # Setup mock completion returning "1"
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "1"
+        mock_create.return_value = mock_response
+        
+        # Setup OpenAI client mock behavior
+        mock_client_instance = MagicMock()
+        mock_client_instance.chat.completions.create = mock_create
+        mock_openai_client.return_value = mock_client_instance
+        
+        api_keys = {"ollama": "http://localhost:11434"}
+        
+        next_speaker = get_next_speaker(
+            mode="Orchestrator",
+            current_index=0,
+            agents=self.agents,
+            last_message_text="今天天氣很好。",
+            topic=self.topic,
+            conversation_history=[],
+            api_keys=api_keys
+        )
+        
+        self.assertEqual(next_speaker, 1)
+        mock_openai_client.assert_called_once_with(api_key="ollama", base_url="http://localhost:11434/v1")
+
     @patch('google.generativeai.list_models')
     @patch('google.generativeai.configure')
     def test_verify_api_key_gemini(self, mock_configure, mock_list_models):
@@ -422,6 +486,34 @@ class TestAIToAIDialogue(unittest.TestCase):
         success, msg = verify_api_key("GitHub", "invalid-key")
         self.assertFalse(success)
         self.assertIn("Invalid GitHub Token", msg)
+
+    @patch('urllib.request.urlopen')
+    def test_verify_api_key_ollama_success(self, mock_urlopen):
+        # 1. Success case
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+        
+        success, msg = verify_api_key("Ollama", "http://localhost:11434")
+        self.assertTrue(success)
+        self.assertEqual(msg, "驗證成功")
+
+    @patch('urllib.request.urlopen')
+    def test_verify_api_key_ollama_failure(self, mock_urlopen):
+        # 2. Failure case (bad status)
+        mock_response = MagicMock()
+        mock_response.status = 500
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+        
+        success, msg = verify_api_key("Ollama", "http://localhost:11434")
+        self.assertFalse(success)
+        self.assertIn("Ollama 回傳錯誤代碼: 500", msg)
+
+        # 3. Connection exception case
+        mock_urlopen.side_effect = Exception("Connection refused")
+        success, msg = verify_api_key("Ollama", "http://localhost:11434")
+        self.assertFalse(success)
+        self.assertIn("無法連線至 Ollama", msg)
 
     def test_app_syntax(self):
         """Verify app.py has correct syntax using py_compile."""

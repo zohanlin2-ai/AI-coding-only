@@ -75,7 +75,7 @@ def get_next_speaker(
         active_key = None
         
         # Look for any configured API key to make the orchestrator call
-        for provider in ["Gemini", "OpenAI", "DeepSeek", "Claude", "Grok", "Groq", "GitHub"]:
+        for provider in ["Gemini", "OpenAI", "DeepSeek", "Claude", "Grok", "Groq", "GitHub", "Ollama"]:
             if api_keys.get(provider.lower()):
                 active_provider = provider
                 active_key = api_keys[provider.lower()]
@@ -116,7 +116,7 @@ def get_next_speaker(
                     match = re.search(r'\d+', res_text)
                     if match:
                         decision_idx = int(match.group())
-                elif active_provider in ["OpenAI", "DeepSeek", "Grok", "Groq", "GitHub"]:
+                elif active_provider in ["OpenAI", "DeepSeek", "Grok", "Groq", "GitHub", "Ollama"]:
                     from openai import OpenAI
                     if active_provider == "DeepSeek":
                         base_url = "https://api.deepseek.com"
@@ -130,10 +130,13 @@ def get_next_speaker(
                     elif active_provider == "GitHub":
                         base_url = "https://models.github.ai/inference"
                         model_name = "gpt-4o-mini"
+                    elif active_provider == "Ollama":
+                        base_url = f"{active_key.rstrip('/')}/v1"
+                        model_name = "gemma4:latest"
                     else:
                         base_url = None
                         model_name = "gpt-4o-mini"
-                    client = OpenAI(api_key=active_key, base_url=base_url)
+                    client = OpenAI(api_key="ollama" if active_provider == "Ollama" else active_key, base_url=base_url)
                     response = client.chat.completions.create(
                         model=model_name,
                         messages=[

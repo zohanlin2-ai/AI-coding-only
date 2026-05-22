@@ -57,10 +57,25 @@ def verify_api_key(provider: str, api_key: str) -> tuple[bool, str]:
         (True, "驗證成功") or (False, "錯誤訊息")
     """
     key = api_key.strip()
-    if not key:
+    if not key and provider != "Ollama":
         return False, "金鑰不可為空"
     
-    if provider == "Gemini":
+    if provider == "Ollama":
+        try:
+            import urllib.request
+            import json
+            base_url = key if key else "http://localhost:11434"
+            base_url = base_url.rstrip("/")
+            req = urllib.request.Request(f"{base_url}/api/tags")
+            with urllib.request.urlopen(req, timeout=3) as response:
+                if response.status == 200:
+                    return True, "驗證成功"
+                else:
+                    return False, f"Ollama 回傳錯誤代碼: {response.status}"
+        except Exception as e:
+            return False, f"無法連線至 Ollama: {str(e)}，請確保 Ollama 已啟動且位址正確。"
+            
+    elif provider == "Gemini":
         try:
             import google.generativeai as genai
             genai.configure(api_key=key)
@@ -397,5 +412,39 @@ class AIAgent:
                 return response.choices[0].message.content.strip()
             except Exception as e:
                 return f"【GitHub Models 錯誤】: {str(e)}"
+
+        elif self.model_provider == "Ollama":
+            base_url = api_keys.get("ollama", "").strip()
+            if not base_url:
+                base_url = "http://localhost:11434"
+            base_url = base_url.rstrip("/")
+            try:
+                from openai import OpenAI
+                # Use a longer timeout for local models which can be slow (especially thinking models)
+                client = OpenAI(api_key="ollama", base_url=f"{base_url}/v1", timeout=120.0)
+                model_name = self.model_name if self.model_name else "gemma4:latest"
+                messages = [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": prompt}
+                ]
+                # Disable thinking mode on models like gemma4 to get direct replies.
+                # Thinking tokens consume max_tokens budget, leaving content empty.
+                # We also raise max_tokens to 1024 as a safety net if think mode is not supported.
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    max_tokens=1024,
+                    extra_body={"think": False}
+                )
+                result = response.choices[0].message.content
+                if result:
+                    return result.strip()
+                # Fallback: if content is empty, try fetching from reasoning_content (some Ollama versions)
+                reasoning = getattr(response.choices[0].message, "reasoning_content", None)
+                if reasoning:
+                    return reasoning.strip()
+                return "（模型未回覆，請確認 Ollama 版本或嘗試更換模型）"
+            except Exception as e:
+                return f"【Ollama 錯誤】: {str(e)}"
 
         return "【系統錯誤】未知的模型提供商。"

@@ -11,6 +11,22 @@ import streamlit as st
 from ai_agent import AIAgent, get_random_topic, get_random_name, get_random_role, verify_api_key
 from orchestrator import get_next_speaker
 
+def fetch_ollama_models(base_url: str = "http://localhost:11434") -> List[str]:
+    import urllib.request
+    import json
+    url = base_url.rstrip("/") + "/api/tags"
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=2) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode('utf-8'))
+                models = [m["name"] for m in data.get("models", [])]
+                if models:
+                    return models
+    except Exception:
+        pass
+    return ["gemma4:latest"] # fallback
+
 # Set page config
 st.set_page_config(
     page_title="AI-to-AI 對話觀測站",
@@ -90,10 +106,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Initialize Session State
+if "session_status" not in st.session_state:
+    st.session_state.session_status = "setup"
+if "post_dialogue_reason" not in st.session_state:
+    st.session_state.post_dialogue_reason = ""
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "is_running" not in st.session_state:
     st.session_state.is_running = False
+st.session_state.is_running = (st.session_state.session_status == "running")
 if "current_speaker_index" not in st.session_state:
     st.session_state.current_speaker_index = 0
 if "start_time" not in st.session_state:
@@ -113,11 +134,14 @@ if "turn_mode" not in st.session_state:
 if "api_keys" not in st.session_state:
     st.session_state.api_keys = {}
 if "verified_keys" not in st.session_state:
-    st.session_state.verified_keys = {"gemini": "", "openai": "", "claude": "", "deepseek": "", "grok": "", "groq": "", "github": ""}
+    st.session_state.verified_keys = {"gemini": "", "openai": "", "claude": "", "deepseek": "", "grok": "", "groq": "", "github": "", "ollama": ""}
 if "verification_results" not in st.session_state:
-    st.session_state.verification_results = {"gemini": "unverified", "openai": "unverified", "claude": "unverified", "deepseek": "unverified", "grok": "unverified", "groq": "unverified", "github": "unverified"}
+    st.session_state.verification_results = {"gemini": "unverified", "openai": "unverified", "claude": "unverified", "deepseek": "unverified", "grok": "unverified", "groq": "unverified", "github": "unverified", "ollama": "unverified"}
 if "verification_errors" not in st.session_state:
-    st.session_state.verification_errors = {"gemini": "", "openai": "", "claude": "", "deepseek": "", "grok": "", "groq": "", "github": ""}
+    st.session_state.verification_errors = {"gemini": "", "openai": "", "claude": "", "deepseek": "", "grok": "", "groq": "", "github": "", "ollama": ""}
+if "ollama_models" not in st.session_state:
+    st.session_state.ollama_models = ["gemma4:latest"]
+
 
 # Setup initial values for input elements in session state to allow programatic updates
 if "input_topic" not in st.session_state:
@@ -144,6 +168,7 @@ env_deepseek = os.getenv("DEEPSEEK_API_KEY", "")
 env_grok = os.getenv("XAI_API_KEY", os.getenv("GROK_API_KEY", ""))
 env_groq = os.getenv("GROQ_API_KEY", "")
 env_github = os.getenv("GITHUB_TOKEN", os.getenv("GITHUB_PAT", ""))
+env_ollama = os.getenv("OLLAMA_HOST", os.getenv("OLLAMA_API_BASE", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")))
 
 # Helper to handle key validation state transitions
 def update_key_state(provider: str, key_val: str):
@@ -278,11 +303,54 @@ else:
                 st.session_state.verification_errors["github"] = msg
                 st.sidebar.error(f"🔴 {msg}")
 
+# 8. Ollama Local Endpoint
+ollama_url = st.sidebar.text_input("Ollama API 位址", value=env_ollama)
+update_key_state("ollama", ollama_url)
+if not ollama_url.strip():
+    st.sidebar.markdown("👉 本地預設位址: `http://localhost:11434`")
+else:
+    # Automatic check at startup if unverified
+    if st.session_state.verification_results["ollama"] == "unverified":
+        success, msg = verify_api_key("Ollama", ollama_url)
+        if success:
+            st.session_state.verification_results["ollama"] = "verified"
+            st.session_state.verification_errors["ollama"] = ""
+            st.session_state.ollama_models = fetch_ollama_models(ollama_url)
+        else:
+            st.session_state.verification_results["ollama"] = "failed"
+            st.session_state.verification_errors["ollama"] = msg
+
+    if st.sidebar.button("驗證 Ollama 連線", key="btn_verify_ollama"):
+        with st.sidebar.spinner("驗證中..."):
+            success, msg = verify_api_key("Ollama", ollama_url)
+            if success:
+                st.session_state.verification_results["ollama"] = "verified"
+                st.session_state.verification_errors["ollama"] = ""
+                st.sidebar.success("🟢 Ollama 連線成功！")
+                st.session_state.ollama_models = fetch_ollama_models(ollama_url)
+            else:
+                st.session_state.verification_results["ollama"] = "failed"
+                st.session_state.verification_errors["ollama"] = msg
+                st.sidebar.error(f"🔴 {msg}")
+
 # API Status indicators
 st.sidebar.markdown('<div class="sidebar-header">📡 API 連線狀態</div>', unsafe_allow_html=True)
 
 def show_status(name: str, provider_key: str, key_val: str):
     status = st.session_state.verification_results.get(provider_key, "unverified")
+    if provider_key == "ollama":
+        if not key_val.strip():
+            st.sidebar.markdown(f"**{name}**: <span class='status-badge status-missing'>🔴 未配置</span>", unsafe_allow_html=True)
+        elif status == "verified":
+            st.sidebar.markdown(f"**{name}**: <span class='status-badge status-ok'>🟢 連線成功</span>", unsafe_allow_html=True)
+        elif status == "failed":
+            err_msg = st.session_state.verification_errors.get(provider_key, "")
+            st.sidebar.markdown(f"**{name}**: <span class='status-badge status-missing'>❌ 連線失敗</span>", unsafe_allow_html=True)
+            st.sidebar.caption(f"⚠️ {err_msg}")
+        else:
+            st.sidebar.markdown(f"**{name}**: <span class='status-badge status-warning'>🟡 已配置 (未驗證)</span>", unsafe_allow_html=True)
+        return
+
     if not key_val.strip():
         st.sidebar.markdown(f"**{name}**: <span class='status-badge status-missing'>🔴 未配置</span>", unsafe_allow_html=True)
     elif status == "verified":
@@ -301,6 +369,7 @@ show_status("DeepSeek", "deepseek", deepseek_key)
 show_status("Grok", "grok", grok_key)
 show_status("Groq", "groq", groq_key)
 show_status("GitHub Models", "github", github_key)
+show_status("Ollama (本地)", "ollama", ollama_url)
 
 # Update session API keys
 st.session_state.api_keys = {
@@ -310,7 +379,8 @@ st.session_state.api_keys = {
     "deepseek": deepseek_key,
     "grok": grok_key,
     "groq": groq_key,
-    "github": github_key
+    "github": github_key,
+    "ollama": ollama_url
 }
 
 # Sidebar: Simulation settings
@@ -409,15 +479,31 @@ def randomize_all():
 # Helper to list non-failed providers
 def get_available_providers():
     providers = ["Mock"]
-    for p in ["Gemini", "OpenAI", "Claude", "DeepSeek", "Grok", "Groq", "GitHub"]:
+    for p in ["Gemini", "OpenAI", "Claude", "DeepSeek", "Grok", "Groq", "GitHub", "Ollama"]:
         key_val = st.session_state.api_keys.get(p.lower(), "")
         status = st.session_state.verification_results.get(p.lower(), "unverified")
         if key_val.strip() and status != "failed":
             providers.append(p)
     return providers
 
+def sync_inputs_from_agents():
+    """Sync input form fields from the currently running agents.
+    
+    Call this before entering any editing state so the form always reflects
+    the actual parameters used in the last dialogue, not stale form state.
+    """
+    agents = st.session_state.get("agents", [])
+    st.session_state.input_topic = st.session_state.get("topic", "")
+    st.session_state.num_ais = len(agents) if agents else st.session_state.get("num_ais", 2)
+    for i, agent in enumerate(agents):
+        n = i + 1
+        st.session_state[f"input_ai{n}_name"] = agent.name
+        st.session_state[f"input_ai{n}_role"] = agent.role
+        st.session_state[f"input_ai{n}_provider"] = agent.model_provider
+        st.session_state[f"input_ai{n}_model_name"] = agent.model_name
+
 # ------------------- VIEW: CONFIGURATION PANEL -------------------
-if not st.session_state.is_running:
+if st.session_state.session_status in ["setup", "editing_continue", "editing_restart"]:
     
     st.subheader("📝 第一步：設定主題與 AI 人數")
     
@@ -483,7 +569,8 @@ if not st.session_state.is_running:
                 "DeepSeek": ["deepseek-chat", "deepseek-reasoner"],
                 "Grok": ["grok-2-1212", "grok-beta"],
                 "Groq": ["gemma2-9b-it", "llama-3.1-8b-instant", "llama-3.3-70b-versatile"],
-                "GitHub": ["gpt-4o-mini", "gpt-4o", "meta-llama-3.1-8b-instruct", "cohere-command-r-plus"]
+                "GitHub": ["gpt-4o-mini", "gpt-4o", "meta-llama-3.1-8b-instruct", "cohere-command-r-plus"],
+                "Ollama": st.session_state.ollama_models
             }
             
             # Safety check: in case model name is out of sync with selected provider
@@ -517,7 +604,8 @@ if not st.session_state.is_running:
         st.button("🔄 隨機重設所有配置", on_click=randomize_all, use_container_width=True)
         
     with btn_col3:
-        start_btn = st.button("🚀 開始對話", type="primary", use_container_width=True)
+        button_label = "🚀 繼續對話" if st.session_state.session_status == "editing_continue" else "🚀 開始對話"
+        start_btn = st.button(button_label, type="primary", use_container_width=True)
         
     if start_btn:
         # Check and handle blanks before starting
@@ -565,9 +653,16 @@ if not st.session_state.is_running:
         # Initialize running states
         st.session_state.topic = final_topic
         st.session_state.agents = final_agents
-        st.session_state.chat_history = []
-        st.session_state.current_speaker_index = 0
+        
+        if st.session_state.session_status == "editing_continue":
+            if final_agents:
+                st.session_state.current_speaker_index = st.session_state.current_speaker_index % len(final_agents)
+        else:
+            st.session_state.chat_history = []
+            st.session_state.current_speaker_index = 0
+            
         st.session_state.start_time = time.time()
+        st.session_state.session_status = "running"
         st.session_state.is_running = True
         st.rerun()
 
@@ -614,7 +709,7 @@ if not st.session_state.is_running:
             st.rerun()
 
 # ------------------- VIEW: LIVE DIALOGUE SIMULATION -------------------
-else:
+elif st.session_state.session_status == "running":
     # Display running details
     st.markdown(f"""
     <div class="chat-info-card">
@@ -640,16 +735,14 @@ else:
         
     with col_stop:
         if st.button("🛑 停止對話", type="primary", use_container_width=True):
-            st.session_state.is_running = False
-            st.session_state.num_ais = 2
-            st.warning("對話已手動結束。")
+            st.session_state.session_status = "post_dialogue"
+            st.session_state.post_dialogue_reason = "manual_stop"
             st.rerun()
             
     # Check if time has expired
     if remaining <= 0:
-        st.session_state.is_running = False
-        st.session_state.num_ais = 2
-        st.success("⏱️ 設定時間到！對話已自動結束。")
+        st.session_state.session_status = "post_dialogue"
+        st.session_state.post_dialogue_reason = "time_expired"
         st.rerun()
         
     # Render entire dialogue history
@@ -706,3 +799,86 @@ else:
     
     # Rerun stream to update UI
     st.rerun()
+
+# ------------------- VIEW: POST DIALOGUE ACTIONS -------------------
+elif st.session_state.session_status == "post_dialogue":
+    st.subheader("🏁 對話已結束")
+    
+    # Show status notification
+    if st.session_state.post_dialogue_reason == "time_expired":
+        st.success("⏱️ 設定時間到！對話已自動結束。")
+    elif st.session_state.post_dialogue_reason == "manual_stop":
+        st.warning("🛑 對話已由使用者手動結束。")
+        
+    st.markdown("### 🎯 請選擇後續動作")
+    
+    # 5 Action Options
+    opt_col1, opt_col2 = st.columns(2)
+    
+    with opt_col1:
+        if st.button("💬 1. 不修改參數，繼續對話", help="保留目前對話紀錄，以相同的參數設定繼續對話", use_container_width=True):
+            st.session_state.start_time = time.time()
+            st.session_state.session_status = "running"
+            st.rerun()
+            
+        if st.button("⚙️ 2. 修改參數，繼續對話", help="保留目前對話紀錄，進入設定畫面調整參數後繼續對話", use_container_width=True):
+            sync_inputs_from_agents()
+            st.session_state.session_status = "editing_continue"
+            st.rerun()
+            
+        if st.button("🔄 3. 不修改參數，重新對話", help="清除對話紀錄，以相同的參數設定重新開始對話", use_container_width=True):
+            st.session_state.chat_history = []
+            st.session_state.current_speaker_index = 0
+            st.session_state.start_time = time.time()
+            st.session_state.session_status = "running"
+            st.rerun()
+            
+    with opt_col2:
+        if st.button("📝 4. 修改參數，重新對話", help="清除對話紀錄，進入設定畫面重新調整參數後開始新對話", use_container_width=True):
+            sync_inputs_from_agents()
+            st.session_state.chat_history = []
+            st.session_state.current_speaker_index = 0
+            st.session_state.session_status = "editing_restart"
+            st.rerun()
+            
+        if st.button("🚪 5. 結束對話", type="primary", help="清除對話紀錄與設定，返回初始畫面", use_container_width=True):
+            st.session_state.chat_history = []
+            st.session_state.current_speaker_index = 0
+            st.session_state.session_status = "setup"
+            st.rerun()
+            
+    st.markdown("---")
+    st.subheader("💾 對話結果與匯出")
+    
+    if len(st.session_state.chat_history) > 0:
+        # Format the markdown transcript
+        lines = []
+        lines.append(f"# 聊天主題：{st.session_state.topic}\n")
+        lines.append("## 參與 AI 角色名單：")
+        for agent in st.session_state.agents:
+            lines.append(f"- **{agent.name}** (角色設定: {agent.role}) [模型: {agent.model_provider} - {agent.model_name}]")
+        lines.append("\n---\n")
+        
+        for msg in st.session_state.chat_history:
+            provider_str = f" | 來自 {msg.get('model_provider', 'Mock')}"
+            lines.append(f"[{msg['name']} ({msg['role']}{provider_str})]: {msg['text']}\n")
+            
+        transcript_content = "\n".join(lines)
+        
+        st.info("您可以點選下方按鈕儲存對話存檔。內容會完整記錄主題、各 AI 的角色設定、以及對話紀錄。")
+        
+        # Download button
+        st.download_button(
+            label="📥 儲存並下載對話內容 (.md)",
+            data=transcript_content,
+            file_name=f"AI_Chat_{int(time.time())}.md",
+            mime="text/markdown",
+            use_container_width=True
+        )
+        
+        # Review display
+        with st.expander("👀 預覽本次對話內容", expanded=True):
+            st.markdown(f"**主題：{st.session_state.topic}**")
+            for msg in st.session_state.chat_history:
+                provider_str = f" | 來自 {msg.get('model_provider', 'Mock')}"
+                st.write(f"**{msg['name']} ({msg['role']}{provider_str})**： {msg['text']}")
