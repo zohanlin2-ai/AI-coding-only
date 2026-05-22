@@ -57,6 +57,11 @@ This repository is used to store various projects developed with AI assistance.
 - **Key Features**: Supports 1 to 4 customizable AI agents running concurrently, synchronous API key validation for Gemini, OpenAI, Claude, DeepSeek, Grok, Groq Cloud, and GitHub Models. Integrates real-time countdown timer, adjustable pacing delay, speaker-nomination, sequential, or orchestrator turn-taking, interactive randomizers for naming and roles, and markdown transcript export with provider attributions.
 - **Status**: Production-ready initial version uploaded.
 
+### 11. [UML Sequence & Activity Diagrams (UML_seq_act)](./UML_seq_act)
+- **Description**: A central interactive dashboard hosting professional system architecture diagrams for the AI-to-AI Dialogue Observer.
+- **Key Features**: Comprehensive interactive Mermaid-based UML Sequence Diagram representing multi-agent asynchronous communication and Activity Diagram documenting the post-dialogue state machine. Includes custom client-side 2x high-resolution PNG (with dark background fill) and lossless SVG export features.
+- **Status**: Initial version uploaded.
+
 ---
 *Generated and maintained in strict adherence to AI-coding-only SKILL specifications.*
 
