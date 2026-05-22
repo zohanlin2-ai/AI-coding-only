@@ -9,6 +9,10 @@
   - Optimized local model queries with a 120-second timeout, 1024 max tokens, and disabled thinking mode (`extra_body={"think": False}`) for direct replies.
 - **Post-Dialogue State Machine**:
   - Implemented 5 post-dialogue options (continue/restart with or without parameter adjustments, or end session) displayed when dialogue halts or times out.
+- **UML Diagrams**:
+  - Added interactive system Sequence Diagram illustrating the UI-Agent-Orchestrator-LLM asynchronous dialogue flow.
+  - Added Activity Diagram mapping the Streamlit session state machine, including the five post-dialogue options.
+  - Placed the diagrams in `uml.html` / `uml.xml` directly under `AI_to_AI_Interaction`.
 - **Andrej Karpathy Guidelines**:
   - Formally documented the coding guidelines in `CLAUDE.md`.
 
@@ -20,7 +24,7 @@
 
 ### Fixed
 - **UI Reset Behavior**:
-  - Added programmatic reset of the "👥 參與 AI 數量" (Number of AI Agents) slider widget to its default value of `2` when the conversation terminates (either via manual stop or time expiration).
+  - Added programmatic reset of the "Number of AI Agents" slider widget to its default value of `2` when the conversation terminates (either via manual stop or time expiration).
 
 ## [1.3.0] - 2026-05-22
 
@@ -48,7 +52,7 @@
   - Supported Grok as a candidate coordinator in Orchestrator Mode.
   - Added comprehensive unit tests for Grok API client calls and key verification.
 - **Model Provider Attribution**:
-  - Annotated dialogues in the chat UI, typing indicator, review panel, and exported Markdown files to explicitly show which AI provider generated the message (e.g. `來自 OpenAI` or `來自 Grok`).
+  - Annotated dialogues in the chat UI, typing indicator, review panel, and exported Markdown files to explicitly show which AI provider generated the message (e.g. "via OpenAI" or "via Grok").
 - **Dynamic Provider Filtering**:
   - Implemented dynamic model provider list filtering in the setup panel selectbox. If a provider's key verification fails, that provider is hidden from options. If it was already selected, it automatically falls back to `Mock` mode safely.
 
@@ -57,9 +61,9 @@
 ### Added
 - **API Key Verification**:
   - Added synchronous API Key validation for Gemini, OpenAI, Claude, and DeepSeek.
-  - Interactive "驗證金鑰" (Verify Key) buttons under each API key input field in the Streamlit sidebar.
+  - Interactive "Verify Key" buttons under each API key input field in the Streamlit sidebar.
   - Implemented automated state transition resetting verification status to "unverified" if any key is edited.
-  - Enhanced "API 連線狀態" (API Status) indicators displaying "🟢 驗證成功" (Verified), "🔴 未配置" (Not Configured), "🟡 已配置 (未驗證)" (Configured but Unverified), or "❌ 驗證失敗" (Verification Failed) with detailed error capture messages.
+  - Enhanced API Status indicators displaying "🟢 Verified", "🔴 Not Configured", "🟡 Configured (Unverified)", or "❌ Verification Failed" with detailed error capture messages.
   - Added unit tests for key verification logic in `test_app.py`.
 
 ## [1.0.0] - 2026-05-22
@@ -72,8 +76,8 @@
   - Standard LLM API clients integrated for Google Gemini, OpenAI, Anthropic Claude, and DeepSeek.
   - Offline Mock AI simulation mode with a dynamic, randomized combination template generator.
   - Real-time countdown timer (1 to 120 minutes) with pacing control (1 to 15 seconds) and a manual stop button.
-  - Selection of three turn-taking modes: Sequential (輪流), Nomination (點名接力), and Orchestrator (中央協調).
-  - Randomizer fallback logic: Fills empty name, role, and topic fields with random presets in Chinese. Added "Randomize Blanks" and "Randomize All" buttons.
+  - Selection of three turn-taking modes: Sequential, Nomination, and Orchestrator.
+  - Randomizer fallback logic: Fills empty name, role, and topic fields with random presets. Added "Randomize Blanks" and "Randomize All" buttons.
   - Markdown transcript download/export featuring the topic, participant configuration (name, role, model), and speaker-demarcated chat history.
 - **Testing**:
   - Automated unit test suite `test_app.py` covering Mock AI generator, randomizer fallbacks, regular expression nomination parsing, turn-taking orchestration logic, transcript format schemas, and mock client integrations.

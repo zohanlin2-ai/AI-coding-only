@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-to-AI Dialogue Observer - System Diagrams</title>
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: rgba(22, 27, 34, 0.7);
+            --border-color: rgba(48, 54, 61, 0.8);
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-blue-gradient: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%);
+            --accent-purple: #bc8cff;
+            --accent-purple-gradient: linear-gradient(135deg, #8957e5 0%, #bc8cff 100%);
+            --accent-green: #3fb950;
+            --glow-color: rgba(56, 139, 253, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(31, 111, 235, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(137, 87, 229, 0.1) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+
+        header {
+            max-width: 1200px;
+            margin: 0 auto 40px auto;
+            text-align: center;
+        }
+
+        .logo-area {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .badge {
+            background: var(--accent-blue-gradient);
+            color: #0d1117;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #f0f6fc, #58a6ff, #bc8cff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 32px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 12px 40px 0 var(--glow-color);
+            border-color: rgba(88, 166, 255, 0.4);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+            padding-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .card-title-group h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .card-title-group p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            cursor: pointer;
+            outline: none;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #ffffff;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-png {
+            background: var(--accent-blue-gradient);
+        }
+
+        .btn-png:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(56, 139, 253, 0.4);
+        }
+
+        .btn-svg {
+            background: var(--accent-purple-gradient);
+        }
+
+        .btn-svg:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(188, 140, 255, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        /* Mermaid Render Canvas Container */
+        .diagram-container {
+            background-color: #121212;
+            border: 1px solid rgba(48, 54, 61, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: auto;
+            min-height: 400px;
+        }
+
+        .mermaid {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        footer {
+            max-width: 1200px;
+            margin: 60px auto 0 auto;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+        }
+
+        footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* SVG Inner Styling Fixes */
+        svg {
+            background-color: transparent !important;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-area">
+            <span class="badge">UML Blueprint</span>
+        </div>
+        <h1>AI-to-AI Dialogue Observer</h1>
+        <p class="subtitle">System Sequence and Activity Diagram Designs (Mermaid Rendering & High-Resolution Export Tools)</p>
+    </header>
+
+    <main>
+        <!-- 1. Sequence Diagram Card -->
+        <section class="card">
+            <div class="card-header">
+                <div class="card-title-group">
+                    <h2>1. Multi-Agent Interaction Sequence Diagram</h2>
+                    <p>Illustrates the core asynchronous communication and lifecycle delegation between the Streamlit UI, AI Agent, Central Orchestrator, and LLM APIs upon starting a dialogue.</p>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-png" onclick="exportPNG('seq-container', 'AI_to_AI_Sequence_Diagram.png')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        Export 2x PNG
+                    </button>
+                    <button class="btn btn-svg" onclick="exportSVG('seq-container', 'AI_to_AI_Sequence_Diagram.svg')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        Export SVG
+                    </button>
+                </div>
+            </div>
+            <div class="diagram-container" id="seq-container">
+                <div class="mermaid">
+                    sequenceDiagram
+                        autonumber
+                        actor User as User
+                        participant UI as Streamlit UI (app.py)
+                        participant Agent as AI Agent (ai_agent.py)
+                        participant Orch as Central Orchestrator (orchestrator.py)
+                        participant LLM as API Provider (Gemini/OpenAI/Ollama/etc.)
+
+                        User->>UI: Configure parameters & click "Start Dialogue" / "Continue Dialogue"
+                        activate UI
+                        UI->>UI: Initialize states, set session_status = "running"
+                        UI->>UI: Start real-time countdown timer
+
+                        loop Dialogue In Progress (is_running)
+                            UI->>UI: Render "Typing..." dynamic effect for active agent
+                            UI->>Agent: Call get_response(prompt, system_instruction)
+                            activate Agent
+                            
+                            alt Provider == Ollama (Local)
+                                Agent->>LLM: Call local endpoint (pass think=False & max_tokens=1024)
+                            else Provider == Other Cloud API
+                                Agent->>LLM: Pass API Key and dialogue context
+                            end
+                            activate LLM
+                            LLM-->>Agent: Return generated dialogue content (Content / Reasoning)
+                            deactivate LLM
+                            
+                            Agent-->>UI: Return cleaned reply text
+                            deactivate Agent
+                            
+                            UI->>UI: Append message to chat_history, render chat bubble and provider attribution
+                            
+                            alt Speaker Order == Sequential Mode
+                                UI->>UI: Calculate next speaker index: (current + 1) % total
+                            else Speaker Order == Nomination Mode
+                                UI->>UI: Parse speech with regex to check for "@Agent"
+                                opt Parsing succeeds & nominated agent exists
+                                    UI->>UI: Set next speaker to the nominated agent
+                                end
+                            else Speaker Order == Orchestrator Mode
+                                UI->>Orch: Call get_next_speaker(chat_history, candidate_agents, api_key)
+                                activate Orch
+                                Orch->>LLM: Send orchestration prompt and full history
+                                activate LLM
+                                LLM-->>Orch: Return decided next speaker index (JSON / integer)
+                                deactivate LLM
+                                Orch-->>UI: Return next speaker index
+                                deactivate Orch
+                            end
+                            
+                            UI->>UI: Pacing delay (1~15 seconds)
+                            
+                            opt Timeout or User clicks "🛑 Stop Dialogue"
+                                UI->>UI: Terminate run loop, set session_status = "post_dialogue"
+                                Note over UI, User: Enter post-dialogue decision screen (display 5 options)
+                            end
+                        end
+                        deactivate UI
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. Activity Diagram Card -->
+        <section class="card">
+            <div class="card-header">
+                <div class="card-title-group">
+                    <h2>2. Dialogue State Machine & Decision Activity Diagram</h2>
+                    <p>Illustrates the core state transitions of the Streamlit application, specifically focusing on parameter synchronization and state resets when the user selects one of the five post-dialogue options.</p>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-png" onclick="exportPNG('act-container', 'AI_to_AI_Activity_Diagram.png')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        Export 2x PNG
+                    </button>
+                    <button class="btn btn-svg" onclick="exportSVG('act-container', 'AI_to_AI_Activity_Diagram.svg')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        Export SVG
+                    </button>
+                </div>
+            </div>
+            <div class="diagram-container" id="act-container">
+                <div class="mermaid">
+                    flowchart TD
+                        Start(["Start Application"]) --> InitState["Initialize session_state<br/>session_status = 'setup'"]
+                        InitState --> SetupView["Render Setup Panel"]
+                        
+                        SetupView --> SubmitCheck{"User clicks submit?"}
+                        SubmitCheck -- "No" --> SetupView
+                        
+                        SubmitCheck -- "Yes (Start / Continue Dialogue)" --> InitSession["Initialize dialogue based on state:<br/>- setup / restart: clear history, reset index<br/>- continue: keep history, safely adjust index"]
+                        
+                        InitSession --> SetRunning["Set session_status = 'running'"]
+                        
+                        SetRunning --> LoopStart["Dialogue loop start"]
+                        LoopStart --> GenReply["AI Agent generates response"]
+                        GenReply --> UpdateUI["Update chat history & UI bubbles"]
+                        UpdateUI --> CheckStop{"Countdown timer expired<br/>or clicked 'Stop Dialogue'?"}
+                        
+                        CheckStop -- "No" --> Delay["Pacing delay"]
+                        Delay --> LoopStart
+                        
+                        CheckStop -- "Yes" --> SetPostState["Set session_status = 'post_dialogue'"]
+                        
+                        SetPostState --> PostDialogueView["Render post-dialogue view<br/>(Show Markdown preview, download button, and 5 action buttons)"]
+                        
+                        PostDialogueView --> Choice{"Which button does the user select?"}
+                        
+                        %% 1. Keep params & continue
+                        Choice -- "1. Keep params & continue" --> Act1["Reset timer<br/>Keep history<br/>session_status = 'running'"]
+                        Act1 --> LoopStart
+                        
+                        %% 2. Edit params & continue
+                        Choice -- "2. Edit params & continue" --> Act2["Call sync_inputs_from_agents()<br/>Sync active parameters to inputs<br/>session_status = 'editing_continue'"]
+                        Act2 --> SetupView
+                        
+                        %% 3. Keep params & restart
+                        Choice -- "3. Keep params & restart" --> Act3["Reset timer<br/>Clear history, reset index<br/>session_status = 'running'"]
+                        Act3 --> LoopStart
+                        
+                        %% 4. Edit params & restart
+                        Choice -- "4. Edit params & restart" --> Act4["Call sync_inputs_from_agents()<br/>Sync parameters to inputs<br/>Clear history, reset index<br/>session_status = 'editing_restart'"]
+                        Act4 --> SetupView
+                        
+                        %% 5. End conversation
+                        Choice -- "5. End conversation" --> Act5["Call sync_inputs_from_agents()<br/>Clear history, reset index<br/>Reset all params and API keys to defaults<br/>session_status = 'setup'"]
+                        Act5 --> SetupView
+
+                        %% Style Colors
+                        style Start fill:#2d3748,stroke:#4a5568,color:#fff
+                        style InitState fill:#1a202c,stroke:#2d3748,color:#fff
+                        style SetupView fill:#2b6cb0,stroke:#2b6cb0,color:#fff
+                        style LoopStart fill:#2d3748,stroke:#4a5568,color:#fff
+                        style SetRunning fill:#2d3748,stroke:#4a5568,color:#fff
+                        style GenReply fill:#2d3748,stroke:#4a5568,color:#fff
+                        style SetPostState fill:#276749,stroke:#276749,color:#fff
+                        style PostDialogueView fill:#276749,stroke:#276749,color:#fff
+                        
+                        subgraph RunningState ["Running State (running)"]
+                            LoopStart
+                            GenReply
+                            UpdateUI
+                            CheckStop
+                            Delay
+                        end
+                        
+                        subgraph PostActions ["Post-Dialogue Action States"]
+                            Act1
+                            Act2
+                            Act3
+                            Act4
+                            Act5
+                        end
+
+                        style RunningState fill:#1e293b,stroke:#38bdf8,stroke-dasharray:5
+                        style PostActions fill:#14532d,stroke:#4ade80,stroke-dasharray:5
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>© 2026 AI-to-AI Dialogue Observer.</p>
+    </footer>
+
+    <!-- JavaScript for Exporting Diagrams -->
+    <script>
+        // Export to lossless SVG
+        function exportSVG(containerId, filename) {
+            const container = document.getElementById(containerId);
+            const svgElement = container.querySelector('svg');
+            
+            if (!svgElement) {
+                alert("Diagram is still loading. Please try again later.");
+                return;
+            }
+
+            // Deep clone the SVG to avoid mutating the visible DOM
+            const svgClone = svgElement.cloneNode(true);
+            svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+            
+            // Apply inline style to force transparent background to be visible as #121212 when opened in blank tab
+            svgClone.style.backgroundColor = "#121212";
+            svgClone.style.padding = "20px";
+            
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svgClone);
+            const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            link.click();
+            
+            // Garbage collection
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        }
+
+        // Export to crisp 2x supersampled PNG
+        function exportPNG(containerId, filename) {
+            const container = document.getElementById(containerId);
+            const svgElement = container.querySelector('svg');
+            
+            if (!svgElement) {
+                alert("Diagram is still loading. Please try again later.");
+                return;
+            }
+
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svgElement);
+            const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement("canvas");
+                const bbox = svgElement.getBoundingClientRect();
+                
+                // Fallback dimensions in case bounding box is not loaded properly
+                let width = bbox.width;
+                let height = bbox.height;
+                if (!width || !height) {
+                    width = parseFloat(svgElement.getAttribute("width")) || 900;
+                    height = parseFloat(svgElement.getAttribute("height")) || 700;
+                }
+
+                // 2x Supersampling for crisp text and lines
+                canvas.width = width * 2;
+                canvas.height = height * 2;
+                
+                const ctx = canvas.getContext("2d");
+                
+                // Fill background with matching solid dark theme color
+                ctx.fillStyle = "#121212";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Scale rendering context by 2x to draw the high-res SVG
+                ctx.scale(2, 2);
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Trigger download
+                const link = document.createElement("a");
+                link.href = canvas.toDataURL("image/png");
+                link.download = filename;
+                link.click();
+                
+                // Garbage collection
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+            };
+            img.src = url;
+        }
+    </script>
+
+    <!-- Load Mermaid v10 CDN using ESM -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'dark', 
+            securityLevel: 'loose',
+            themeVariables: {
+                background: '#121212',
+                primaryColor: '#1f6feb',
+                primaryTextColor: '#c9d1d9',
+                lineColor: '#8b949e',
+                actorBkg: '#21262d',
+                actorBorder: '#30363d',
+                signalColor: '#58a6ff',
+                signalText: '#58a6ff',
+                labelBoxBkgColor: '#21262d',
+                labelBoxBorderColor: '#30363d',
+                loopTextColor: '#bc8cff',
+                noteBkgColor: '#161b22',
+                noteBorderColor: '#30363d'
+            }
+        });
+    </script>
+</body>
+</html>
