@@ -57,6 +57,11 @@ This repository is used to store various projects developed with AI assistance.
 - **Key Features**: Supports 1 to 4 customizable AI agents running concurrently, synchronous API key validation for Gemini, OpenAI, Claude, DeepSeek, Grok, Groq Cloud, and GitHub Models. Integrates real-time countdown timer, adjustable pacing delay, speaker-nomination, sequential, or orchestrator turn-taking, interactive randomizers for naming and roles, and markdown transcript export with provider attributions.
 - **Status**: Production-ready initial version uploaded.
 
+### 11. [AI World (AI_World)](./AI_World)
+- **Description**: A multi-agent AI civilization simulator and world simulation engine.
+- **Key Features**: Local-first architecture (Ollama, SQLite, ChromaDB, FastAPI), persistent world state engine, memory systems (vector and semantic databases), dynamic rules engine, time & history systems, and Streamlit visualization dashboard. Includes detailed modular design and prompt-based specification files.
+- **Status**: Modular specifications and architecture blueprint completed.
+
 ---
 *Generated and maintained in strict adherence to AI-coding-only SKILL specifications.*
 
