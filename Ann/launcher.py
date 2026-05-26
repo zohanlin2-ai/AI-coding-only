@@ -9,6 +9,8 @@ Exit codes from assistant.py:
   42 ??update requested ??run updater, then restart
   other ??error ??log and restart
 """
+from __future__ import annotations
+
 import logging
 import subprocess
 import sys
