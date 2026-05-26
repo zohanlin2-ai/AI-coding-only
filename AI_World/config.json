@@ -1,0 +1,10 @@
+{
+  "ollama_model": "gemma4:e4b",
+  "ollama_base_url": "http://localhost:11434",
+  "avg_response_time_sec": 21.69,
+  "tokens_per_sec": 26.6,
+  "recommended_max_agents": 3,
+  "tick_interval_sec": 30,
+  "concurrency_mode": "sequential",
+  "max_concurrent_requests": 1
+}

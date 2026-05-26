@@ -1,47 +1,47 @@
-# Module M4：多 Agent 互動引擎（Multi-Agent Interaction Engine）
+# Module M4: Multi-Agent Interaction Engine
 
-## 你的任務
+## Your Task
 
-協調多個 Agent 在同一個 AI World 中的互動，並驅動完整的 tick 循環——每個 tick 讓所有存活 Agent 依序完成需求更新、生存檢查、鄰近互動、行動執行與記憶儲存，最終返回本 tick 所有發生的 `WorldEvent`。
-
----
-
-## 負責範圍
-
-- **負責：**
-  - 實作 `run_tick()` 完整 tick 驅動流程
-  - 判斷哪些 Agent 在同一地點（`get_nearby_agents()`）
-  - 驅動兩個 Agent 之間的互動事件（`run_agent_interaction()`）
-  - 驅動談判流程並更新 Agent relationship（`negotiate()`）
-  - 協調呼叫 M1、M2、M3、M5 的外部函數
-  - 確保死亡 Agent 不再參與後續 tick
-
-- **不負責：**
-  - LLM 呼叫本身（由 M2 的 `agent_think` / `agent_act` 負責）
-  - 資源消耗規則計算（由 M5 的 `apply_resource_decay` 負責）
-  - 行動合法性驗證邏輯（由 M5 的 `validate_action` 負責）
-  - 記憶的向量儲存細節（由 M3 的 `save_memory` 負責）
-  - 世界狀態的持久化（由 M1 的 `add_event` / `update_agent` 負責）
-  - 時間推進（`advance_tick()` 由 M6 負責）
+Coordinate the interaction of multiple Agents in the same AI World, and drive the complete tick cycle — for each tick, let all alive Agents sequentially complete needs updates, survival checks, proximity interactions, action execution, and memory storage, and finally return all `WorldEvent`s occurring in this tick.
 
 ---
 
-## 依賴關係
+## Scope of Responsibility
 
-- **需要先完成：**
-  - M0（提供 `config.json`）
-  - M1（提供 `get_world_state`, `add_event`, `update_agent`）
-  - M2（提供 `agent_think`, `agent_act`, `update_agent_needs`, `list_agents`）
-  - M3（提供 `save_memory`, `recall_memory`）
-  - M5（提供 `validate_action`, `apply_resource_decay`, `check_survival`）
+- **Responsible for:**
+  - Implement the complete tick drive process of `run_tick()`
+  - Determine which Agents are at the same location (`get_nearby_agents()`)
+  - Drive interaction events between two Agents (`run_agent_interaction()`)
+  - Drive negotiation process and update Agent relationships (`negotiate()`)
+  - Coordinate calls to external functions of M1, M2, M3, M5
+  - Ensure deceased Agents do not participate in subsequent ticks
 
-- **被以下模組使用：**
-  - M8（整合測試時呼叫 `run_tick()`）
-  - M6（時間系統在每個 tick 後呼叫 M4 驅動世界運作）
+- **Not responsible for:**
+  - LLM calls themselves (handled by M2's `agent_think` / `agent_act`)
+  - Resource decay rule calculation (handled by M5's `apply_resource_decay`)
+  - Action validity verification logic (handled by M5's `validate_action`)
+  - Memory vector storage details (handled by M3's `save_memory`)
+  - Persistence of the world state (handled by M1's `add_event` / `update_agent`)
+  - Time advancement (`advance_tick()` handled by M6)
 
 ---
 
-## 工作目錄
+## Dependencies
+
+- **Prerequisites:**
+  - M0 (Provides `config.json`)
+  - M1 (Provides `get_world_state`, `add_event`, `update_agent`)
+  - M2 (Provides `agent_think`, `agent_act`, `update_agent_needs`, `list_agents`)
+  - M3 (Provides `save_memory`, `recall_memory`)
+  - M5 (Provides `validate_action`, `apply_resource_decay`, `check_survival`)
+
+- **Used by the following modules:**
+  - M8 (Calls `run_tick()` during integration testing)
+  - M6 (Time system calls M4 to drive the world after each tick)
+
+---
+
+## Working Directory
 
 ```
 c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\modules\m4_multi_agent\
@@ -49,37 +49,37 @@ c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\modules\m4_multi_agent\
 
 ---
 
-## 環境安裝
+## Environment Setup
 
 ```bash
 pip install pydantic
 ```
 
 > [!NOTE]
-> pydantic 用於 Schema 型別驗證。M4 本身不直接安裝 LLM 或資料庫套件，所有 LLM / DB 操作皆透過呼叫 M2、M3 的函數完成。
+> `pydantic` is used for Schema validation. M4 itself does not directly install LLM or database packages; all LLM / DB operations are completed by calling functions from M2 and M3.
 
 ---
 
-## 需要建立的檔案
+## Files to Create
 
 ```
 AI_World/
 └── modules/
     └── m4_multi_agent/
-        └── main.py          ← 唯一需要實作的檔案
+        └── main.py          ← The only file to implement
 ```
 
 > [!IMPORTANT]
-> **不需要**建立 `__init__.py`。整個模組只有一個 `main.py`。
+> **No need** to create `__init__.py`. The entire module has only one `main.py`.
 
 ---
 
-## 共用 Schema（直接使用，不可修改）
+## Shared Schema (Use directly, do not modify)
 
-以下 Schema 定義在 `shared/schemas.py`，M4 **必須** `from shared.schemas import *` 使用，禁止自行重新定義這些 class。
+The following Schema is defined in `shared/schemas.py`. M4 **must** use it via `from shared.schemas import *`; redefining these classes is prohibited.
 
 ```python
-# shared/schemas.py（節錄 M4 相關部分）
+# shared/schemas.py (Excerpt of M4-related parts)
 
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -100,11 +100,11 @@ class Resource(BaseModel):
 
 
 class AgentPersonality(BaseModel):
-    hunger: float = 0.3      # 0.0~1.0，越高越餓
-    fear: float = 0.3        # 0.0~1.0，越高越恐懼
-    ambition: float = 0.5    # 0.0~1.0，越高越有野心
-    loyalty: float = 0.5     # 0.0~1.0，越高越忠誠
-    aggression: float = 0.3  # 0.0~1.0，越高越好戰
+    hunger: float = 0.3      # 0.0~1.0, higher means hungrier
+    fear: float = 0.3        # 0.0~1.0, higher means more fearful
+    ambition: float = 0.5    # 0.0~1.0, higher means more ambitious
+    loyalty: float = 0.5     # 0.0~1.0, higher means more loyal
+    aggression: float = 0.3  # 0.0~1.0, higher means more aggressive
 
 
 class Agent(BaseModel):
@@ -118,7 +118,7 @@ class Agent(BaseModel):
     memory_ids: list[str] = Field(default_factory=list)
     organization_id: Optional[str] = None
     is_alive: bool = True
-    age: int = 0  # 單位：tick
+    age: int = 0  # Unit: tick
 
 
 class Location(BaseModel):
@@ -162,68 +162,68 @@ class WorldState(BaseModel):
 
 ---
 
-## 你對外提供的函數（簽名不可修改）
+## Provided Functions (Signatures cannot be modified)
 
-以下四個函數是 M4 的**對外合約**。函數名稱、參數名稱、參數型別、回傳型別**一律不得修改**。
+The following four functions are the **external contract** of M4. Function names, parameter names, parameter types, and return types **must not be changed**.
 
 ```python
 def run_agent_interaction(agent_id_1: str, agent_id_2: str) -> WorldEvent:
-    """驅動兩個 Agent 產生互動，返回互動事件"""
+    """Drive two Agents to interact, returning the interaction event"""
 
 def run_tick() -> list[WorldEvent]:
-    """執行一個完整 tick（所有 Agent 依序行動），返回本 tick 所有事件"""
+    """Execute a complete tick (all Agents act sequentially), returning all events in this tick"""
 
 def negotiate(agent_id_1: str, agent_id_2: str, topic: str) -> dict:
-    """驅動兩 Agent 就某 topic 談判，返回結果 {success: bool, outcome: str}"""
+    """Drive two Agents to negotiate on a topic, returning the result {success: bool, outcome: str}"""
 
 def get_nearby_agents(agent_id: str, radius: int = 1) -> list[Agent]:
-    """返回指定 Agent 附近 radius 格內的所有存活 Agent"""
+    """Return all alive Agents within radius grids of the specified Agent"""
 ```
 
 ---
 
-## 你可以呼叫的外部函數
+## External Functions You Can Call
 
-以下是 M4 被允許呼叫的其他模組函數。呼叫時使用完整 import 路徑，**不可**繞過這些介面直接操作資料庫。
+The following are other module functions M4 is allowed to call. Use the full import path when calling, and **do not** bypass these interfaces to operate the database directly.
 
 ```python
 # M1 — World State Engine
 from modules.m1_world_state.main import (
-    get_world_state,      # () -> WorldState：讀取當前完整世界狀態
-    add_event,            # (event: WorldEvent) -> None：新增世界事件
-    update_agent,         # (agent: Agent) -> None：更新 Agent 狀態到資料庫
-    get_tick,             # () -> int：取得當前 tick 數
+    get_world_state,      # () -> WorldState: Read the current complete world state
+    add_event,            # (event: WorldEvent) -> None: Add a world event
+    update_agent,         # (agent: Agent) -> None: Update Agent state in the database
+    get_tick,             # () -> int: Get the current tick count
 )
 
 # M2 — Agent System
 from modules.m2_agent.main import (
-    agent_think,          # (agent_id: str, context: str) -> str：讓 Agent 思考，返回行動描述
-    agent_act,            # (agent_id: str) -> WorldEvent：讓 Agent 執行行動，返回事件
-    update_agent_needs,   # (agent_id: str) -> None：更新 Agent 的 hunger/energy 等需求
-    list_agents,          # () -> list[Agent]：列出所有存活 Agent
+    agent_think,          # (agent_id: str, context: str) -> str: Let the Agent think, returning the action description
+    agent_act,            # (agent_id: str) -> WorldEvent: Let the Agent execute the action, returning the event
+    update_agent_needs,   # (agent_id: str) -> None: Update Agent needs such as hunger/energy
+    list_agents,          # () -> list[Agent]: List all alive Agents
 )
 
 # M3 — Memory System
 from modules.m3_memory.main import (
-    save_memory,          # (agent_id: str, event: str, importance: float) -> str：儲存記憶
-    recall_memory,        # (agent_id: str, query: str, top_k: int = 5) -> list[str]：語意搜尋記憶
+    save_memory,          # (agent_id: str, event: str, importance: float) -> str: Store memory
+    recall_memory,        # (agent_id: str, query: str, top_k: int = 5) -> list[str]: Semantically search memory
 )
 
 # M5 — Rules Engine
 from modules.m5_rules.main import (
-    validate_action,      # (agent: Agent, action: str) -> tuple[bool, str]：驗證行動是否合法
-    apply_resource_decay, # (world_state: WorldState) -> WorldState：套用資源自然消耗
-    check_survival,       # (agent: Agent) -> bool：檢查 Agent 是否存活
+    validate_action,      # (agent: Agent, action: str) -> tuple[bool, str]: Validate if action is valid
+    apply_resource_decay, # (world_state: WorldState) -> WorldState: Apply natural resource decay
+    check_survival,       # (agent: Agent) -> bool: Check if Agent is alive
 )
 ```
 
 ---
 
-## 實作步驟
+## Implementation Steps
 
-### 步驟 1：建立檔案並設定 import
+### Step 1: Create File and Set Imports
 
-建立 `modules/m4_multi_agent/main.py`，加入所有必要 import：
+Create `modules/m4_multi_agent/main.py` and add all necessary imports:
 
 ```python
 # modules/m4_multi_agent/main.py
@@ -248,23 +248,23 @@ from modules.m5_rules.main import validate_action, apply_resource_decay, check_s
 
 ---
 
-### 步驟 2：實作 `get_nearby_agents()`
+### Step 2: Implement `get_nearby_agents()`
 
-邏輯說明：
-- 從 `get_world_state()` 取得當前 `WorldState`
-- 找到 `agent_id` 對應的 `Location`（取得 `x`, `y` 座標）
-- 遍歷所有其他 **存活** Agent，計算 Chebyshev 距離（棋盤格距離）
-- 距離 ≤ `radius` 且非自身 → 加入回傳列表
+Logic Description:
+- Get current `WorldState` from `get_world_state()`
+- Find `Location` corresponding to `agent_id` (get `x`, `y` coordinates)
+- Traverse all other **alive** Agents, and calculate the Chebyshev distance (chessboard distance)
+- distance ≤ `radius` and not oneself → add to return list
 
 > [!TIP]
-> Chebyshev 距離公式：`max(|x1-x2|, |y1-y2|)`。這讓「相鄰」包含對角線方向，符合直覺的棋盤格移動。
+> Chebyshev distance formula: `max(|x1-x2|, |y1-y2|)`. This allows "adjacent" to include diagonal directions, conforming to intuitive chessboard movement.
 
 ```python
 def get_nearby_agents(agent_id: str, radius: int = 1) -> list[Agent]:
-    """返回指定 Agent 附近 radius 格內的所有存活 Agent"""
+    """Return all alive Agents within radius grids of the specified Agent"""
     world: WorldState = get_world_state()
 
-    # TODO: 取得目標 Agent 的位置
+    # TODO: Get the target Agent's position
     target_agent = world.agents.get(agent_id)
     if target_agent is None or not target_agent.is_alive:
         return []
@@ -276,11 +276,11 @@ def get_nearby_agents(agent_id: str, radius: int = 1) -> list[Agent]:
     nearby: list[Agent] = []
 
     for other_id, other_agent in world.agents.items():
-        # TODO: 跳過自身與死亡 Agent
+        # TODO: Skip oneself and deceased Agents
         if other_id == agent_id or not other_agent.is_alive:
             continue
 
-        # TODO: 計算兩個 Agent 所在 Location 的 Chebyshev 距離
+        # TODO: Calculate Chebyshev distance of the Locations of the two Agents
         other_location = world.locations.get(other_agent.location_id)
         if other_location is None:
             continue
@@ -290,7 +290,7 @@ def get_nearby_agents(agent_id: str, radius: int = 1) -> list[Agent]:
             abs(target_location.y - other_location.y),
         )
 
-        # TODO: 若距離 <= radius，加入列表
+        # TODO: If distance <= radius, add to list
         if distance <= radius:
             nearby.append(other_agent)
 
@@ -299,20 +299,20 @@ def get_nearby_agents(agent_id: str, radius: int = 1) -> list[Agent]:
 
 ---
 
-### 步驟 3：實作 `run_agent_interaction()`
+### Step 3: Implement `run_agent_interaction()`
 
-邏輯說明：
-- 分別呼叫 `agent_think()` 讓兩個 Agent 思考「遇到對方」的情境
-- 根據雙方 `personality.aggression` 決定互動類型：
-  - 若任一方 `aggression > 0.7` → `event_type = "conflict"`
-  - 否則 → `event_type = "interaction"`
-- 建立一個 `WorldEvent` 描述這次互動
-- 呼叫 `save_memory()` 讓兩個 Agent 都記住這次事件
-- 呼叫 `add_event()` 把事件加入世界歷史
+Logic Description:
+- Call `agent_think()` for each of the two Agents to think about the scenario of "encountering each other"
+- Determine interaction type based on both parties' `personality.aggression`:
+  - If either party has `aggression > 0.7` → `event_type = "conflict"`
+  - Otherwise → `event_type = "interaction"`
+- Create a `WorldEvent` describing this interaction
+- Call `save_memory()` so both Agents remember this event
+- Call `add_event()` to add the event to world history
 
 ```python
 def run_agent_interaction(agent_id_1: str, agent_id_2: str) -> WorldEvent:
-    """驅動兩個 Agent 產生互動，返回互動事件"""
+    """Drive two Agents to interact, returning the interaction event"""
     world: WorldState = get_world_state()
     current_tick: int = get_tick()
 
@@ -320,27 +320,27 @@ def run_agent_interaction(agent_id_1: str, agent_id_2: str) -> WorldEvent:
     agent2 = world.agents.get(agent_id_2)
 
     if agent1 is None or agent2 is None:
-        raise ValueError(f"Agent 不存在：{agent_id_1} 或 {agent_id_2}")
+        raise ValueError(f"Agent does not exist: {agent_id_1} or {agent_id_2}")
 
-    # TODO: 讓兩個 Agent 各自思考遇到對方的情境
-    context_1 = f"你遇到了 {agent2.name}，思考你該如何回應。"
-    context_2 = f"你遇到了 {agent1.name}，思考你該如何回應。"
+    # TODO: Let each Agent think about the scenario of meeting the other
+    context_1 = f"You met {agent2.name}, think about how you should respond."
+    context_2 = f"You met {agent1.name}, think about how you should respond."
 
     thought_1 = agent_think(agent_id_1, context_1)
     thought_2 = agent_think(agent_id_2, context_2)
 
-    # TODO: 根據 aggression 決定互動類型
+    # TODO: Determine interaction type based on aggression
     is_conflict = (
         agent1.personality.aggression > 0.7
         or agent2.personality.aggression > 0.7
     )
     event_type = "conflict" if is_conflict else "interaction"
 
-    # TODO: 建立 WorldEvent
+    # TODO: Create WorldEvent
     description = (
-        f"{agent1.name} 與 {agent2.name} 發生{'衝突' if is_conflict else '互動'}。"
-        f"（{agent1.name}：{thought_1[:50]}…）"
-        f"（{agent2.name}：{thought_2[:50]}…）"
+        f"{agent1.name} and {agent2.name} had a {'clash' if is_conflict else 'interaction'}."
+        f"({agent1.name}: {thought_1[:50]}...)"
+        f"({agent2.name}: {thought_2[:50]}...)"
     )
     event = WorldEvent(
         tick=current_tick,
@@ -349,12 +349,12 @@ def run_agent_interaction(agent_id_1: str, agent_id_2: str) -> WorldEvent:
         affected_agent_ids=[agent_id_1, agent_id_2],
     )
 
-    # TODO: 兩個 Agent 各自記住這次互動
+    # TODO: Let both Agents remember this interaction
     importance = 0.8 if is_conflict else 0.5
     save_memory(agent_id_1, description, importance)
     save_memory(agent_id_2, description, importance)
 
-    # TODO: 新增事件到世界歷史
+    # TODO: Add event to world history
     add_event(event)
 
     return event
@@ -362,47 +362,47 @@ def run_agent_interaction(agent_id_1: str, agent_id_2: str) -> WorldEvent:
 
 ---
 
-### 步驟 4：實作 `negotiate()`
+### Step 4: Implement `negotiate()`
 
-邏輯說明：
-- 讓兩個 Agent 各自 `agent_think()`，將 `topic` 作為思考 context
-- 根據雙方個性計算談判成功率：
-  - `loyalty` 高 → 傾向合作（提高成功率）
-  - `aggression` 高 → 傾向對抗（降低成功率）
-  - 建議公式：`success_prob = (a1.loyalty + a2.loyalty) / 2 - (a1.aggression + a2.aggression) / 4`
-- 若成功（`success_prob > 0.5`）：
-  - 更新兩個 Agent 的 `relationships` 分數（互相增加 `+0.1`，上限 `1.0`）
-  - 呼叫 `update_agent()` 儲存更新後的 Agent
-- 建立談判記憶並呼叫 `save_memory()`
-- 返回 `{"success": bool, "outcome": str}`
+Logic Description:
+- Let each Agent `agent_think()`, using `topic` as the thinking context
+- Calculate negotiation success rate based on personalities:
+  - High `loyalty` → inclined to cooperate (increases success rate)
+  - High `aggression` → inclined to clash (decreases success rate)
+  - Recommended formula: `success_prob = (a1.loyalty + a2.loyalty) / 2 - (a1.aggression + a2.aggression) / 4`
+- If successful (`success_prob > 0.5`):
+  - Update the `relationships` scores of both Agents (add `+0.1` to each other, max `1.0`)
+  - Call `update_agent()` to save the updated Agents
+- Create negotiation memory and call `save_memory()`
+- Return `{"success": bool, "outcome": str}`
 
-> [!IMPORTANT]
-> 回傳格式必須嚴格符合 `{"success": bool, "outcome": str}`。`outcome` 是描述談判結果的文字說明。
+> [IMPORTANT]
+> Return format must strictly match `{"success": bool, "outcome": str}`. `outcome` is the text description of the negotiation result.
 
 ```python
 def negotiate(agent_id_1: str, agent_id_2: str, topic: str) -> dict:
-    """驅動兩 Agent 就某 topic 談判，返回結果 {success: bool, outcome: str}"""
+    """Drive two Agents to negotiate on a topic, returning the result {success: bool, outcome: str}"""
     world: WorldState = get_world_state()
 
     agent1 = world.agents.get(agent_id_1)
     agent2 = world.agents.get(agent_id_2)
 
     if agent1 is None or agent2 is None:
-        raise ValueError(f"Agent 不存在：{agent_id_1} 或 {agent_id_2}")
+        raise ValueError(f"Agent does not exist: {agent_id_1} or {agent_id_2}")
 
-    # TODO: 兩個 Agent 各自針對 topic 思考
-    context = f"你正在與對方談判，主題是：{topic}。表達你的立場。"
+    # TODO: Let each Agent think about the topic
+    context = f"You are negotiating with the other party on: {topic}. Express your stance."
     thought_1 = agent_think(agent_id_1, context)
     thought_2 = agent_think(agent_id_2, context)
 
-    # TODO: 根據 personality 計算成功率
+    # TODO: Calculate success rate based on personality
     success_prob = (
         (agent1.personality.loyalty + agent2.personality.loyalty) / 2
         - (agent1.personality.aggression + agent2.personality.aggression) / 4
     )
     success = success_prob > 0.5
 
-    # TODO: 若談判成功，更新雙方 relationship 分數
+    # TODO: If negotiation succeeds, update relationship scores of both parties
     if success:
         current_rel_1_to_2 = agent1.relationships.get(agent_id_2, 0.0)
         current_rel_2_to_1 = agent2.relationships.get(agent_id_1, 0.0)
@@ -413,12 +413,12 @@ def negotiate(agent_id_1: str, agent_id_2: str, topic: str) -> dict:
         update_agent(agent1)
         update_agent(agent2)
 
-    # TODO: 建立 outcome 描述與記憶
+    # TODO: Create outcome description and memory
     outcome = (
-        f"談判{'成功' if success else '失敗'}（成功率：{success_prob:.2f}）。"
-        f"主題：{topic}。"
-        f"{agent1.name} 的立場：{thought_1[:50]}…"
-        f"{agent2.name} 的立場：{thought_2[:50]}…"
+        f"Negotiation {'successful' if success else 'failed'} (success rate: {success_prob:.2f})."
+        f"Topic: {topic}."
+        f"{agent1.name}'s stance: {thought_1[:50]}..."
+        f"{agent2.name}'s stance: {thought_2[:50]}..."
     )
 
     importance = 0.7 if success else 0.4
@@ -430,54 +430,54 @@ def negotiate(agent_id_1: str, agent_id_2: str, topic: str) -> dict:
 
 ---
 
-### 步驟 5：實作 `run_tick()`（核心主流程）
+### Step 5: Implement `run_tick()` (Core Main Flow)
 
-`run_tick()` 是 M4 的主函數，負責驅動一個完整 tick。請嚴格按照以下流程實作：
+`run_tick()` is the main function of M4, responsible for driving a complete tick. Please implement strictly according to the following process:
 
 ```
-1. get_world_state() 取得當前狀態
-2. apply_resource_decay() 套用資源消耗
-3. 對每個存活 Agent：
+1. get_world_state() to get the current state
+2. apply_resource_decay() to apply resource decay
+3. For each alive Agent:
    a. update_agent_needs()
-   b. check_survival() → 若死亡則標記並建立 death 事件
-   c. get_nearby_agents() 找附近 Agent
-   d. 若有鄰近 Agent → run_agent_interaction()
-   e. agent_act() → 取得行動事件
-   f. validate_action() → 不合法則跳過，記錄原因
-   g. save_memory() 存入記憶
-4. 收集所有 WorldEvent，呼叫 add_event()
-5. 返回本 tick 所有事件
+   b. check_survival() → if deceased, mark and create death event
+   c. get_nearby_agents() to find nearby Agents
+   d. If there are nearby Agents → run_agent_interaction()
+   e. agent_act() → get action event
+   f. validate_action() → if invalid, skip and record reason
+   g. save_memory() to store memory
+4. Collect all WorldEvents, call add_event()
+5. Return all events in this tick
 ```
 
 ```python
 def run_tick() -> list[WorldEvent]:
-    """執行一個完整 tick（所有 Agent 依序行動），返回本 tick 所有事件"""
+    """Execute a complete tick (all Agents act sequentially), returning all events in this tick"""
     tick_events: list[WorldEvent] = []
     current_tick: int = get_tick()
 
-    # --- 步驟 1：取得當前世界狀態 ---
+    # --- Step 1: Get current world state ---
     world: WorldState = get_world_state()
 
-    # --- 步驟 2：套用資源自然消耗 ---
-    # TODO: 呼叫 apply_resource_decay()，傳入當前 WorldState
+    # --- Step 2: Apply natural resource decay ---
+    # TODO: Call apply_resource_decay(), passing the current WorldState
     world = apply_resource_decay(world)
 
-    # --- 步驟 3：對每個存活 Agent 執行行動循環 ---
-    agents: list[Agent] = list_agents()  # 只返回存活 Agent
+    # --- Step 3: Execute action loop for each alive Agent ---
+    agents: list[Agent] = list_agents()  # Only returns alive Agents
 
     for agent in agents:
-        # --- 3a：更新 Agent 需求（hunger, energy 等）---
-        # TODO: 呼叫 update_agent_needs()
+        # --- 3a: Update Agent needs (hunger, energy, etc.) ---
+        # TODO: Call update_agent_needs()
         update_agent_needs(agent.id)
 
-        # --- 重新取得最新 Agent 狀態（needs 已更新）---
+        # --- Re-obtain latest Agent state (needs updated) ---
         refreshed_world = get_world_state()
         agent = refreshed_world.agents.get(agent.id)
         if agent is None:
             continue
 
-        # --- 3b：生存檢查 ---
-        # TODO: 呼叫 check_survival()，若死亡則標記 is_alive=False 並建立 death 事件
+        # --- 3b: Survival Check ---
+        # TODO: Call check_survival(); if deceased, set is_alive=False and create death event
         is_alive = check_survival(agent)
         if not is_alive:
             agent.is_alive = False
@@ -486,52 +486,52 @@ def run_tick() -> list[WorldEvent]:
             death_event = WorldEvent(
                 tick=current_tick,
                 event_type="death",
-                description=f"{agent.name} 因資源耗盡而死亡。",
+                description=f"{agent.name} died due to resource exhaustion.",
                 affected_agent_ids=[agent.id],
                 affected_location_ids=[agent.location_id],
             )
             add_event(death_event)
             tick_events.append(death_event)
-            # 死亡後跳過本 Agent 的後續步驟
+            # Skip subsequent steps for this Agent after death
             continue
 
-        # --- 3c：尋找附近 Agent ---
-        # TODO: 呼叫 get_nearby_agents()，radius=1
+        # --- 3c: Find nearby Agents ---
+        # TODO: Call get_nearby_agents(), radius=1
         nearby: list[Agent] = get_nearby_agents(agent.id, radius=1)
 
-        # --- 3d：若有鄰近 Agent，執行互動 ---
-        # TODO: 對第一個鄰近 Agent 呼叫 run_agent_interaction()
-        #       （進階：可對所有鄰近 Agent 都互動，但要避免重複互動）
+        # --- 3d: If there are nearby Agents, execute interaction ---
+        # TODO: Call run_agent_interaction() on the first nearby Agent
+        #       (Advanced: can interact with all nearby Agents, but avoid duplicate interactions)
         if nearby:
             interaction_target = nearby[0]
             try:
                 interaction_event = run_agent_interaction(agent.id, interaction_target.id)
                 tick_events.append(interaction_event)
             except Exception as e:
-                print(f"[M4] 互動失敗：{agent.name} <-> {interaction_target.name}：{e}")
+                print(f"[M4] Interaction failed: {agent.name} <-> {interaction_target.name}: {e}")
 
-        # --- 3e：讓 Agent 執行行動 ---
-        # TODO: 呼叫 agent_act()，取得行動 WorldEvent
+        # --- 3e: Let Agent execute action ---
+        # TODO: Call agent_act(), getting action WorldEvent
         try:
             action_event: WorldEvent = agent_act(agent.id)
         except Exception as e:
-            print(f"[M4] agent_act 失敗（{agent.name}）：{e}")
+            print(f"[M4] agent_act failed ({agent.name}): {e}")
             continue
 
-        # --- 3f：驗證行動合法性 ---
-        # TODO: 呼叫 validate_action()；若不合法，跳過此事件（不加入列表）
+        # --- 3f: Validate action validity ---
+        # TODO: Call validate_action(); if invalid, skip this event (do not add to list)
         is_valid, reason = validate_action(agent, action_event.event_type)
         if not is_valid:
-            print(f"[M4] 行動不合法（{agent.name}）：{reason}，跳過。")
+            print(f"[M4] Action invalid ({agent.name}): {reason}, skipping.")
             continue
 
-        # 合法行動：加入 tick 事件列表並寫入世界
+        # Valid action: add to tick event list and write to world
         add_event(action_event)
         tick_events.append(action_event)
 
-        # --- 3g：儲存記憶 ---
-        # TODO: 呼叫 save_memory()，讓 Agent 記住這次行動
-        memory_text = f"Tick {current_tick}：{action_event.description}"
+        # --- 3g: Store Memory ---
+        # TODO: Call save_memory(), letting the Agent remember this action
+        memory_text = f"Tick {current_tick}: {action_event.description}"
         save_memory(agent.id, memory_text, importance=0.5)
 
     return tick_events
@@ -539,53 +539,42 @@ def run_tick() -> list[WorldEvent]:
 
 ---
 
-## 驗證標準（全部通過才算完成）
+## Verification Standards (Must pass all to be considered complete)
 
-請依序執行以下驗證，**所有項目必須通過**才算完成 M4 的開發：
+Please execute the following verifications in order, **all items must pass** to consider the development of M4 complete:
 
-- [ ] **環境確認**：`python -c "from modules.m4_multi_agent.main import run_tick, run_agent_interaction, negotiate, get_nearby_agents; print('import OK')"` 輸出 `import OK` 不報錯
-
-- [ ] **`run_tick()` 完整驅動**：在測試環境中準備 3 個存活 Agent（位於不同 Location），呼叫 `run_tick()` 不拋出 Exception，且成功返回 `list[WorldEvent]`
-
-- [ ] **`run_tick()` 至少返回 1 個事件**：`len(run_tick()) >= 1`
-
-- [ ] **`get_nearby_agents()` 只返回同地點 Agent**：將 Agent A 放在 `(0,0)`，Agent B 放在 `(0,1)`，Agent C 放在 `(5,5)`；呼叫 `get_nearby_agents(A.id, radius=1)` 應只返回 B，不返回 C
-
-- [ ] **`get_nearby_agents()` 不返回自身**：返回列表中不包含呼叫者自己的 Agent
-
-- [ ] **`get_nearby_agents()` 不返回死亡 Agent**：將某個鄰近 Agent 標記 `is_alive=False`，確認不出現在結果中
-
-- [ ] **`run_agent_interaction()` 返回合法 WorldEvent**：返回值型別為 `WorldEvent`，且 `event_type` 為 `"interaction"` 或 `"conflict"`，`affected_agent_ids` 包含兩個 Agent 的 id
-
-- [ ] **`negotiate()` 返回合法格式**：`result = negotiate(a1.id, a2.id, "資源分配")`，確認 `result` 是 `dict`，且包含 `"success"` (`bool`) 與 `"outcome"` (`str`) 兩個 key
-
-- [ ] **談判成功時 relationship 有更新**：在 `loyalty` 高、`aggression` 低的兩個 Agent 之間執行 `negotiate()`，確認雙方 `relationships` 分數有提升
-
-- [ ] **死亡 Agent 不再參與 tick**：將一個 Agent 的資源耗盡使其死亡後，下一次 `run_tick()` 的返回事件中，不應出現該 Agent 作為行動主體的事件（death 事件除外）
-
-- [ ] **事件已寫入 M1**：呼叫 `run_tick()` 後，`get_world_state().events` 的長度應有增加，確認事件確實透過 `add_event()` 被寫入
-
-- [ ] **記憶已寫入 M3**：呼叫 `run_tick()` 後，對參與行動的 Agent 呼叫 `recall_memory(agent_id, "行動", top_k=1)`，應能取回至少一條記憶
+- [ ] **Environment verification**: `python -c "from modules.m4_multi_agent.main import run_tick, run_agent_interaction, negotiate, get_nearby_agents; print('import OK')"` outputs `import OK` without errors
+- [ ] **`run_tick()` complete drive**: Prepare 3 alive Agents (at different Locations) in the test environment, calling `run_tick()` does not throw Exceptions, and successfully returns `list[WorldEvent]`
+- [ ] **`run_tick()` returns at least 1 event**: `len(run_tick()) >= 1`
+- [ ] **`get_nearby_agents()` only returns Agents at nearby locations**: Set Agent A at `(0,0)`, Agent B at `(0,1)`, Agent C at `(5,5)`; calling `get_nearby_agents(A.id, radius=1)` should only return B, not C
+- [ ] **`get_nearby_agents()` does not return oneself**: The returned list does not contain the caller's Agent itself
+- [ ] **`get_nearby_agents()` does not return deceased Agents**: Mark a nearby Agent `is_alive=False`, confirm it does not appear in the results
+- [ ] **`run_agent_interaction()` returns valid WorldEvent**: Return value type is `WorldEvent`, `event_type` is `"interaction"` or `"conflict"`, and `affected_agent_ids` contains both Agents' ids
+- [ ] **`negotiate()` returns valid format**: `result = negotiate(a1.id, a2.id, "resource allocation")`, confirm `result` is `dict` containing `"success"` (`bool`) and `"outcome"` (`str`) keys
+- [ ] **relationship updated on negotiation success**: Run `negotiate()` between two Agents with high `loyalty` and low `aggression`, and confirm both parties' `relationships` scores are increased
+- [ ] **Deceased Agent no longer participates in ticks**: After an Agent dies from resource depletion, its actions as the subject should not appear in the events returned by subsequent `run_tick()` calls (except for the death event itself)
+- [ ] **Events written to M1**: After calling `run_tick()`, the length of `get_world_state().events` should increase, confirming events are indeed written via `add_event()`
+- [ ] **Memory written to M3**: After calling `run_tick()`, calling `recall_memory(agent_id, "action", top_k=1)` for the acting Agent should retrieve at least one memory
 
 ---
 
-## 附錄：互動類型判斷邏輯摘要
+## Appendix: Interaction Type Decision Logic Summary
 
-| 情境 | 判斷條件 | event_type | 記憶重要性 |
+| Scenario | Decision Condition | event_type | Memory Importance |
 |------|----------|------------|------------|
-| 一般相遇 | 雙方 aggression ≤ 0.7 | `"interaction"` | 0.5 |
-| 衝突相遇 | 任一方 aggression > 0.7 | `"conflict"` | 0.8 |
-| Agent 死亡 | `check_survival()` 返回 False | `"death"` | — |
+| Normal Encounter | Both aggression ≤ 0.7 | `"interaction"` | 0.5 |
+| Conflict Encounter | Either aggression > 0.7 | `"conflict"` | 0.8 |
+| Agent Death | `check_survival()` returns False | `"death"` | — |
 
-| 談判結果 | 條件 | relationship 變化 |
+| Negotiation Result | Condition | relationship Change |
 |----------|------|------------------|
-| 成功 | `success_prob > 0.5` | 雙方 +0.1（上限 1.0）|
-| 失敗 | `success_prob <= 0.5` | 不變 |
+| Success | `success_prob > 0.5` | Both parties +0.1 (max 1.0) |
+| Failure | `success_prob <= 0.5` | No change |
 
-> [!NOTE]
-> `success_prob` 計算公式：`(loyalty1 + loyalty2) / 2 - (aggression1 + aggression2) / 4`
-> 數值範圍大約在 -0.15 ~ 0.75 之間，0.5 是合理的分界線。
+> [NOTE]
+> `success_prob` formula: `(loyalty1 + loyalty2) / 2 - (aggression1 + aggression2) / 4`
+> The value range is approximately -0.15 to 0.75; 0.5 is a reasonable boundary.
 
 ---
 
-*文件版本：1.0 | 對應 Architecture.md 最後更新：2026-05-25*
+*Document Version: 1.0 | Corresponding to Architecture.md last updated: 2026-05-25*

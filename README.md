@@ -58,9 +58,9 @@ This repository is used to store various projects developed with AI assistance.
 - **Status**: Production-ready initial version uploaded.
 
 ### 11. [AI World (AI_World)](./AI_World)
-- **Description**: A multi-agent AI civilization simulator and world simulation engine.
-- **Key Features**: Local-first architecture (Ollama, SQLite, ChromaDB, FastAPI), persistent world state engine, memory systems (vector and semantic databases), dynamic rules engine, time & history systems, and Streamlit visualization dashboard. Includes detailed modular design and prompt-based specification files.
-- **Status**: Modular specifications and architecture blueprint completed.
+- **Description**: A multi-agent AI civilization simulator and world simulation engine set in a persistent magical world.
+- **Key Features**: Local-first architecture (Ollama, SQLite, ChromaDB, FastAPI), persistent world state engine, semantic memory systems, dynamic rules engine, time & history systems, and interactive Streamlit visualization dashboard. Includes professional embedded interactive Mermaid-based UML Sequence and Activity diagrams with client-side high-resolution PNG/SVG export capabilities.
+- **Status**: Production-ready initial version uploaded.
 
 ---
 *Generated and maintained in strict adherence to AI-coding-only SKILL specifications.*

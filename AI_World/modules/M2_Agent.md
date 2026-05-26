@@ -1,91 +1,91 @@
-# Module M2：Agent 系統
+# Module M2: Agent System
 
-## 你的任務
+## Your Task
 
-建立並管理 AI Agent，透過 Ollama 本地 LLM 讓每個 Agent 能夠思考（`agent_think`）與行動（`agent_act`），並將行動結果以 `WorldEvent` 的形式寫入 M1 世界狀態。
-
----
-
-## 負責範圍
-
-- **負責：**
-  - 建立 Agent 並存入 M1 世界狀態
-  - 組合 Agent 的思考 Prompt 並呼叫 Ollama LLM
-  - 解析 LLM 輸出並轉換為合法行動
-  - 執行行動（更新資源、位置）並產生 `WorldEvent`
-  - 每 tick 更新 Agent 的 `hunger`、`energy` 等需求數值
-  - 透過 M5 驗證行動合法性並檢查存活狀態
-
-- **不負責：**
-  - 世界狀態的持久化（由 M1 負責）
-  - 記憶的向量搜尋與儲存底層（由 M3 負責）
-  - 多 Agent 之間的互動排程（由 M4 負責）
-  - 規則的定義與套用（由 M5 負責）
-  - 時間推進（由 M6 負責）
+Create and manage AI Agents, enabling each Agent to think (`agent_think`) and act (`agent_act`) via the local Ollama LLM, and write the action results into the M1 world state as `WorldEvent`s.
 
 ---
 
-## 依賴關係
+## Scope of Responsibility
 
-- **需要先完成：**
-  - M0（`config.json` 必須存在）
-  - M1（`get_world_state`、`update_agent`、`add_event` 必須可呼叫）
-  - M3（`get_recent_memory`、`save_memory` 必須可呼叫）
-  - M5（`validate_action`、`check_survival` 必須可呼叫）
+- **Responsible for:**
+  - Create Agents and store them in the M1 world state
+  - Assemble Agent thinking prompts and call the Ollama LLM
+  - Parse LLM outputs and convert them into valid actions
+  - Execute actions (update resources, locations) and generate `WorldEvent`s
+  - Update Agent needs such as `hunger` and `energy` every tick
+  - Validate action validity and check survival status via M5
 
-- **被以下模組使用：**
-  - M4（呼叫 `agent_think`、`agent_act`、`list_agents`）
-  - M8（整合測試）
+- **Not responsible for:**
+  - Persistence of the world state (handled by M1)
+  - Memory vector search and storage low-level layer (handled by M3)
+  - Interaction scheduling among multiple Agents (handled by M4)
+  - Rule definition and application (handled by M5)
+  - Time advancement (handled by M6)
 
 ---
 
-## 工作目錄
+## Dependencies
+
+- **Prerequisites:**
+  - M0 (`config.json` must exist)
+  - M1 (`get_world_state`, `update_agent`, `add_event` must be callable)
+  - M3 (`get_recent_memory`, `save_memory` must be callable)
+  - M5 (`validate_action`, `check_survival` must be callable)
+
+- **Used by the following modules:**
+  - M4 (Calls `agent_think`, `agent_act`, `list_agents`)
+  - M8 (Integration Testing)
+
+---
+
+## Working Directory
 
 ```
 c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\modules\m2_agent\
 ```
 
-> **注意**：所有 `import` 路徑皆以 `AI_World/` 為根目錄執行，例如：
+> **Note**: All `import` paths are executed with `AI_World/` as the root directory, e.g.:
 > ```bash
-> # 在 AI_World/ 目錄下執行
+> # Run under AI_World/ directory
 > python -m modules.m2_agent.main
 > ```
 
 ---
 
-## 環境安裝
+## Environment Setup
 
 ```bash
 pip install requests pydantic
 ```
 
-> `requests` 用於呼叫 Ollama HTTP API；`pydantic` 用於 Schema 驗證。  
-> Ollama 本體需另外安裝，請至 https://ollama.ai 下載並確保 `ollama serve` 正在運行。
+> `requests` is used to call the Ollama HTTP API; `pydantic` is used for Schema validation.  
+> Ollama itself needs to be installed separately, please download from https://ollama.ai and ensure `ollama serve` is running.
 
 ---
 
-## 需要建立的檔案
+## Files to Create
 
 ```
 AI_World/
 └── modules/
     └── m2_agent/
-        ├── __init__.py     ← 空檔，讓 Python 認識此為 package
-        ├── main.py         ← 對外函數（模組介面）
-        └── llm_client.py   ← Ollama HTTP API 呼叫封裝
+        ├── __init__.py     ← Empty file to let Python recognize this as a package
+        ├── main.py         ← External functions (module interface)
+        └── llm_client.py   ← Ollama HTTP API call encapsulation
 ```
 
 ---
 
-## 共用 Schema（直接使用，不可修改）
+## Shared Schema (Use directly, do not modify)
 
-> 所有 Schema 定義於 `AI_World/shared/schemas.py`。  
-> 在你的程式碼中一律使用 `from shared.schemas import ...`，**不可自行定義**相同 class。
+> All schemas are defined in `AI_World/shared/schemas.py`.  
+> In your code, always use `from shared.schemas import ...`; **do not define** the same classes yourself.
 
-以下是 M2 會用到的 Schema，供參考：
+The following are schemas used by M2 for reference:
 
 ```python
-# shared/schemas.py（節錄，完整版請見 AI_World_Architecture.md）
+# shared/schemas.py (Excerpt, see AI_World_Architecture.md for the full version)
 
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -106,11 +106,11 @@ class Resource(BaseModel):
 
 
 class AgentPersonality(BaseModel):
-    hunger: float = 0.3      # 0.0~1.0，越高越餓
-    fear: float = 0.3        # 0.0~1.0，越高越恐懼
-    ambition: float = 0.5    # 0.0~1.0，越高越有野心
-    loyalty: float = 0.5     # 0.0~1.0，越高越忠誠
-    aggression: float = 0.3  # 0.0~1.0，越高越好戰
+    hunger: float = 0.3      # 0.0~1.0, higher means hungrier
+    fear: float = 0.3        # 0.0~1.0, higher means more fearful
+    ambition: float = 0.5    # 0.0~1.0, higher means more ambitious
+    loyalty: float = 0.5     # 0.0~1.0, higher means more loyal
+    aggression: float = 0.3  # 0.0~1.0, higher means more aggressive
 
 
 class Agent(BaseModel):
@@ -124,7 +124,7 @@ class Agent(BaseModel):
     memory_ids: list[str] = Field(default_factory=list)
     organization_id: Optional[str] = None
     is_alive: bool = True
-    age: int = 0  # 單位：tick
+    age: int = 0  # Unit: tick
 
 
 class WorldEvent(BaseModel):
@@ -150,147 +150,147 @@ class Config(BaseModel):
 
 ---
 
-## 你對外提供的函數（簽名不可修改）
+## Provided Functions (Signatures cannot be modified)
 
 ```python
 # modules/m2_agent/main.py
 
 def create_agent(name: str, location_id: str, personality: AgentPersonality) -> Agent:
-    """建立新 Agent 並存入世界狀態"""
+    """Create a new Agent and store it in the world state"""
 
 def get_agent(agent_id: str) -> Agent:
-    """取得指定 Agent"""
+    """Get the specified Agent"""
 
 def agent_think(agent_id: str, context: str) -> str:
-    """呼叫 LLM，讓 Agent 根據 context 思考，返回行動描述文字"""
+    """Call LLM, let the Agent think based on the context, and return action description text"""
 
 def agent_act(agent_id: str) -> WorldEvent:
-    """讓 Agent 執行行動，返回對應的 WorldEvent"""
+    """Let the Agent perform the action and return the corresponding WorldEvent"""
 
 def update_agent_needs(agent_id: str) -> None:
-    """每 tick 更新 Agent 的 hunger、energy 等需求數值"""
+    """Update the Agent's need values such as hunger and energy every tick"""
 
 def list_agents() -> list[Agent]:
-    """列出所有存活的 Agent"""
+    """List all alive Agents"""
 ```
 
-> **重要**：函數名稱、參數型別、回傳型別均**不可更改**。內部實作可自由設計。
+> **Important**: Function names, parameter types, and return types **cannot be modified**. The internal implementation can be designed freely.
 
 ---
 
-## 你可以呼叫的外部函數
+## External Functions You Can Call
 
-### 來自 M1（World State Engine）
+### From M1 (World State Engine)
 
 ```python
 from modules.m1_world_state.main import (
-    get_world_state,   # () -> WorldState：取得完整世界狀態
-    update_agent,      # (agent: Agent) -> None：更新 Agent 狀態到資料庫
-    add_event,         # (event: WorldEvent) -> None：新增世界事件
-    get_tick,          # () -> int：取得當前 tick 數
+    get_world_state,   # () -> WorldState: Get the complete world state
+    update_agent,      # (agent: Agent) -> None: Update Agent state in the database
+    add_event,         # (event: WorldEvent) -> None: Add a world event
+    get_tick,          # () -> int: Get the current tick count
 )
 ```
 
-### 來自 M3（Memory System）
+### From M3 (Memory System)
 
 ```python
 from modules.m3_memory.main import (
-    get_recent_memory, # (agent_id: str, n: int = 10) -> list[str]：最近 n 條記憶
-    save_memory,       # (agent_id: str, event: str, importance: float) -> str：儲存記憶
+    get_recent_memory, # (agent_id: str, n: int = 10) -> list[str]: Recent n memories
+    save_memory,       # (agent_id: str, event: str, importance: float) -> str: Save memory
 )
 ```
 
-### 來自 M5（Rules Engine）
+### From M5 (Rules Engine)
 
 ```python
 from modules.m5_rules.main import (
-    validate_action,   # (agent: Agent, action: str) -> tuple[bool, str]：驗證行動合法性
-    check_survival,    # (agent: Agent) -> bool：檢查 Agent 是否存活
+    validate_action,   # (agent: Agent, action: str) -> tuple[bool, str]: Validate action validity
+    check_survival,    # (agent: Agent) -> bool: Check if Agent is alive
 )
 ```
 
 ---
 
-## Prompt 組合邏輯（`agent_think` 內部使用）
+## Prompt Assembly Logic (used internally in `agent_think`)
 
-`agent_think` 必須按照以下模板組合 Prompt，再傳給 Ollama：
+`agent_think` must assemble the Prompt according to the following template before passing it to Ollama:
 
 ```
-你是 {agent.name}，一個生活在 AI 世界中的角色。
-個性：hunger={personality.hunger}, ambition={personality.ambition}, aggression={personality.aggression}
-位置：{location.name}（{location.terrain}）
-資源：food={resources.food}, money={resources.money}
-記憶：{recent_memories}
-當前世界狀況：{context}
+You are {agent.name}, a character living in an AI world.
+Personality: hunger={personality.hunger}, ambition={personality.ambition}, aggression={aggression}
+Location: {location.name} ({location.terrain})
+Resources: food={resources.food}, money={resources.money}
+Memory: {recent_memories}
+Current world state: {context}
 
-請用一句話描述你現在要做什麼行動。行動必須是以下之一：
-- 採集食物
-- 休息
-- 移動到 [地點名稱]
-- 與 [Agent名稱] 交談
-- 交易
-- 其他（請說明）
+Please describe in one sentence what action you are going to take now. The action must be one of the following:
+- Gather food
+- Rest
+- Move to [Location Name]
+- Talk with [Agent Name]
+- Trade
+- Other (please specify)
 ```
 
-**欄位說明：**
+**Field Descriptions:**
 
-| 欄位 | 來源 |
+| Field | Source |
 |------|------|
 | `agent.name` | `Agent.name` |
 | `personality.hunger` | `Agent.personality.hunger` |
 | `personality.ambition` | `Agent.personality.ambition` |
 | `personality.aggression` | `Agent.personality.aggression` |
-| `location.name` | 從 `WorldState.locations[agent.location_id].name` 取得 |
-| `location.terrain` | 從 `WorldState.locations[agent.location_id].terrain` 取得 |
+| `location.name` | Obtained from `WorldState.locations[agent.location_id].name` |
+| `location.terrain` | Obtained from `WorldState.locations[agent.location_id].terrain` |
 | `resources.food` | `Agent.resources.food` |
 | `resources.money` | `Agent.resources.money` |
-| `recent_memories` | 呼叫 `get_recent_memory(agent_id, n=5)` 並用換行合併 |
-| `context` | 直接使用傳入的 `context` 參數 |
+| `recent_memories` | Call `get_recent_memory(agent_id, n=5)` and join with newlines |
+| `context` | Use the passed `context` parameter directly |
 
 ---
 
-## 實作步驟
+## Implementation Steps
 
-### Step 1：建立 `__init__.py`
+### Step 1: Create `__init__.py`
 
 ```python
 # modules/m2_agent/__init__.py
-# 空檔，讓 Python 認識此為 package
+# Empty file to let Python recognize this as a package
 ```
 
 ---
 
-### Step 2：實作 `llm_client.py`（Ollama HTTP API 封裝）
+### Step 2: Implement `llm_client.py` (Ollama HTTP API Encapsulation)
 
-Ollama 提供本地 REST API，endpoint 為 `POST /api/generate`。
+Ollama provides a local REST API, and the endpoint is `POST /api/generate`.
 
 ```python
 # modules/m2_agent/llm_client.py
 
 import json
 import requests
-from shared.schemas import Config  # 引入 Config schema
+from shared.schemas import Config  # Import Config schema
 
 
 def load_config() -> Config:
     """
-    讀取 AI_World/config.json，返回 Config 物件。
-    config.json 由 M0 產生，格式範例：
+    Read AI_World/config.json, returning a Config object.
+    config.json is generated by M0; format example:
     {
         "ollama_model": "gemma3:4b",
         "ollama_base_url": "http://localhost:11434",
         ...
     }
     """
-    # TODO: 用 open() 讀取 config.json，用 Config(**data) 解析
+    # TODO: Read config.json with open(), and parse with Config(**data)
     pass
 
 
 def call_ollama(prompt: str, config: Config) -> str:
     """
-    呼叫 Ollama /api/generate endpoint，返回 LLM 生成的文字。
+    Call Ollama /api/generate endpoint, returning LLM-generated text.
 
-    API 說明：
+    API Description:
     - URL: {config.ollama_base_url}/api/generate
     - Method: POST
     - Content-Type: application/json
@@ -300,37 +300,37 @@ def call_ollama(prompt: str, config: Config) -> str:
             "prompt": "{prompt}",
             "stream": false
         }
-    - Response body（stream=false 時）：
+    - Response body (when stream=false):
         {
             "model": "...",
-            "response": "LLM 生成的文字",
+            "response": "LLM-generated text",
             "done": true,
             ...
         }
 
-    錯誤處理：
-    - 若連線失敗（requests.exceptions.ConnectionError），拋出例外並說明 Ollama 未啟動
-    - 若 HTTP status != 200，拋出例外並附上 status code
-    - 若 response 為空字串，拋出例外
+    Error Handling:
+    - If connection fails (requests.exceptions.ConnectionError), raise an exception indicating Ollama is not started.
+    - If HTTP status != 200, raise an exception with status code.
+    - If response is an empty string, raise an exception.
 
-    :param prompt: 組合好的 Prompt 字串
-    :param config: Config 物件（含 model 名稱與 base_url）
-    :return: LLM 回傳的行動描述文字（str）
+    :param prompt: Assembled prompt string
+    :param config: Config object (including model name and base_url)
+    :return: LLM-returned action description text (str)
     """
     url = f"{config.ollama_base_url}/api/generate"
 
-    # TODO: 組合 request body
+    # TODO: Assemble request body
     payload = {
         # ...
     }
 
-    # TODO: 發送 POST request，取出 response["response"] 並返回
+    # TODO: Send POST request, extract response["response"] and return
     pass
 ```
 
 ---
 
-### Step 3：實作 `main.py`
+### Step 3: Implement `main.py`
 
 ```python
 # modules/m2_agent/main.py
@@ -341,21 +341,21 @@ from modules.m3_memory.main import get_recent_memory, save_memory
 from modules.m5_rules.main import validate_action, check_survival
 from modules.m2_agent.llm_client import call_ollama, load_config
 
-# 模組層級快取：儲存各 agent 的「最後思考結果」，供 agent_act 使用
-# key: agent_id, value: 行動文字（str）
+# Module level cache: stores the "last thought result" of each Agent, for agent_act to use
+# key: agent_id, value: action text (str)
 _last_action: dict[str, str] = {}
 
 
 def create_agent(name: str, location_id: str, personality: AgentPersonality) -> Agent:
     """
-    建立新 Agent 並存入世界狀態。
+    Create a new Agent and store it in the world state.
 
-    實作步驟：
-    1. 建立 Agent 物件（id 自動生成，resources 使用預設值）
-    2. 呼叫 M1 的 update_agent(agent) 存入資料庫
-    3. 返回建立好的 Agent
+    Implementation steps:
+    1. Create Agent object (id auto-generated, resources use defaults)
+    2. Call M1's update_agent(agent) to store in the database
+    3. Return the created Agent
 
-    注意：location_id 必須是世界狀態中已存在的地點 id。
+    Note: location_id must be a location id that already exists in the world state.
     """
     # TODO
     pass
@@ -363,14 +363,14 @@ def create_agent(name: str, location_id: str, personality: AgentPersonality) -> 
 
 def get_agent(agent_id: str) -> Agent:
     """
-    從世界狀態取得指定 Agent。
+    Get the specified Agent from the world state.
 
-    實作步驟：
-    1. 呼叫 get_world_state() 取得 WorldState
-    2. 從 world_state.agents[agent_id] 取得 Agent
-    3. 若 agent_id 不存在，拋出 KeyError（附上清楚的錯誤訊息）
+    Implementation steps:
+    1. Call get_world_state() to get WorldState
+    2. Get Agent from world_state.agents[agent_id]
+    3. If agent_id does not exist, raise KeyError (with a clear error message)
 
-    :raises KeyError: 若 agent_id 不存在於世界狀態
+    :raises KeyError: if agent_id does not exist in the world state
     """
     # TODO
     pass
@@ -378,72 +378,72 @@ def get_agent(agent_id: str) -> Agent:
 
 def agent_think(agent_id: str, context: str) -> str:
     """
-    組合 Prompt，呼叫 Ollama LLM，讓 Agent 思考並返回行動文字。
+    Assemble Prompt, call Ollama LLM, let the Agent think and return action text.
 
-    實作步驟：
-    1. 取得 Agent（呼叫 get_agent）
-    2. 取得 WorldState，找到 Agent 所在 Location
-    3. 呼叫 get_recent_memory(agent_id, n=5) 取得最近記憶
-    4. 按照 Prompt 模板組合 prompt 字串（見「Prompt 組合邏輯」章節）
-    5. 呼叫 call_ollama(prompt, config) 取得 LLM 回應
-    6. 將回應文字存入 _last_action[agent_id]（供 agent_act 使用）
-    7. 返回行動文字
+    Implementation steps:
+    1. Get Agent (call get_agent)
+    2. Get WorldState, find the Location where the Agent resides
+    3. Call get_recent_memory(agent_id, n=5) to get recent memories
+    4. Assemble the prompt string according to the Prompt template (see "Prompt Assembly Logic" section)
+    5. Call call_ollama(prompt, config) to get LLM response
+    6. Store the response text in _last_action[agent_id] (for agent_act to use)
+    7. Return action text
 
-    :param agent_id: 目標 Agent 的 id
-    :param context: 當前世界狀況描述（由呼叫方提供，例如 M4）
-    :return: LLM 生成的行動描述文字（非空字串）
+    :param agent_id: Target Agent's id
+    :param context: Current world state description (provided by caller, e.g., M4)
+    :return: LLM-generated action description text (non-empty string)
     """
-    # TODO: 組合 prompt
-    prompt_template = """你是 {name}，一個生活在 AI 世界中的角色。
-個性：hunger={hunger}, ambition={ambition}, aggression={aggression}
-位置：{location_name}（{terrain}）
-資源：food={food}, money={money}
-記憶：{memories}
-當前世界狀況：{context}
+    # TODO: Assemble prompt
+    prompt_template = """You are {name}, a character living in an AI world.
+Personality: hunger={hunger}, ambition={ambition}, aggression={aggression}
+Location: {location_name}（{terrain}）
+Resources: food={food}, money={money}
+Memory: {memories}
+Current world state: {context}
 
-請用一句話描述你現在要做什麼行動。行動必須是以下之一：
-- 採集食物
-- 休息
-- 移動到 [地點名稱]
-- 與 [Agent名稱] 交談
-- 交易
-- 其他（請說明）"""
+Please describe in one sentence what action you are going to take now. The action must be one of the following:
+- Gather food
+- Rest
+- Move to [Location Name]
+- Talk with [Agent Name]
+- Trade
+- Other (please specify)"""
 
-    # TODO: 填入 prompt_template，呼叫 call_ollama，儲存並返回結果
+    # TODO: Fill in prompt_template, call call_ollama, store and return result
     pass
 
 
 def agent_act(agent_id: str) -> WorldEvent:
     """
-    讓 Agent 執行 _last_action 中記錄的行動，更新世界狀態，返回 WorldEvent。
+    Let the Agent execute the action recorded in _last_action, update world state, and return WorldEvent.
 
-    實作步驟：
-    1. 取得 _last_action[agent_id]（若不存在，先呼叫 agent_think 取得行動）
-    2. 取得 Agent 物件
-    3. 呼叫 validate_action(agent, action) 驗證行動合法性
-       - 若不合法，將 action 改為「休息」（fallback 行為）
-    4. 根據行動文字執行對應邏輯（解析文字後分支處理）：
-       - "採集食物"   → agent.resources.food += 10.0，event_type = "resource"
-       - "休息"       → agent.resources.energy = min(100.0, energy + 20.0)，event_type = "resource"
-       - "移動到 ..." → 解析目標地點名稱，更新 agent.location_id，event_type = "interaction"
-       - "與 ... 交談" → 更新關係值（relationships），event_type = "interaction"
-       - "交易"       → 簡單資源交換邏輯，event_type = "resource"
-       - 其他         → 僅記錄事件，event_type = "discovery"
-    5. 呼叫 check_survival(agent)，若返回 False，設 agent.is_alive = False，event_type = "death"
-    6. 呼叫 update_agent(agent) 存回 M1
-    7. 建立並返回 WorldEvent，同時呼叫 add_event(event) 寫入世界狀態
-    8. 呼叫 save_memory(agent_id, event.description, importance=0.5) 存入記憶
+    Implementation steps:
+    1. Get _last_action[agent_id] (if not exists, call agent_think first to get action)
+    2. Get Agent object
+    3. Call validate_action(agent, action) to validate action validity
+       - If invalid, change action to "Rest" (fallback behavior)
+    4. Execute corresponding logic based on the action text (parse and branch):
+       - "Gather food" → agent.resources.food += 10.0, event_type = "resource"
+       - "Rest"        → agent.resources.energy = min(100.0, energy + 20.0), event_type = "resource"
+       - "Move to ..." → Parse target location name, update agent.location_id, event_type = "interaction"
+       - "Talk with..." → Update relationship values (relationships), event_type = "interaction"
+       - "Trade"       → Simple resource exchange logic, event_type = "resource"
+       - Other         → only record event, event_type = "discovery"
+    5. Call check_survival(agent); if returns False, set agent.is_alive = False, and event_type = "death"
+    6. Call update_agent(agent) to save back to M1
+    7. Create and return WorldEvent, and call add_event(event) to write to world state
+    8. Call save_memory(agent_id, event.description, importance=0.5) to store in memory
 
-    行動文字解析規則（使用 str.startswith 或 in 判斷）：
-    - 包含 "採集食物" → 採集食物
-    - 包含 "休息"     → 休息
-    - 包含 "移動到"   → 移動（格式：「移動到 {地點名稱}」）
-    - 包含 "交談"     → 交談（格式：「與 {Agent名稱} 交談」）
-    - 包含 "交易"     → 交易
-    - 其他            → 其他
+    Action text parsing rules (using str.startswith or in):
+    - Contains "Gather food" → Gather food
+    - Contains "Rest"        → Rest
+    - Contains "Move to"     → Move (Format: "Move to {Location Name}")
+    - Contains "Talk with"   → Talk (Format: "Talk with {Agent Name}")
+    - Contains "Trade"       → Trade
+    - Other                  → Other
 
-    :param agent_id: 目標 Agent 的 id
-    :return: 代表本次行動的 WorldEvent
+    :param agent_id: Target Agent's id
+    :return: WorldEvent representing this action
     """
     # TODO
     pass
@@ -451,23 +451,23 @@ def agent_act(agent_id: str) -> WorldEvent:
 
 def update_agent_needs(agent_id: str) -> None:
     """
-    每 tick 呼叫一次，模擬 Agent 自然需求的增加。
+    Called once per tick, simulating the increase of the Agent's natural needs.
 
-    實作步驟：
-    1. 取得 Agent
-    2. 每次呼叫，依以下規則更新數值：
-       - hunger（personality.hunger）增加：+= 0.01，最大值 1.0
-         （表示 Agent 越來越餓，hunger 越高代表需求越迫切）
-       - energy（resources.energy）減少：-= 2.0，最小值 0.0
-         （表示 Agent 隨時間消耗體力）
-       - water（resources.water）減少：-= 1.5，最小值 0.0
-         （表示 Agent 隨時間消耗水分）
-    3. 呼叫 check_survival(agent)，若返回 False，設 agent.is_alive = False
-    4. 呼叫 update_agent(agent) 存回 M1
+    Implementation steps:
+    1. Get Agent
+    2. Update values according to the following rules:
+       - hunger (personality.hunger) increase: += 0.01, max 1.0
+         (representing the Agent getting hungrier, higher hunger means more urgent need)
+       - energy (resources.energy) decrease: -= 2.0, min 0.0
+         (representing the Agent consuming energy over time)
+       - water (resources.water) decrease: -= 1.5, min 0.0
+         (representing the Agent consuming water over time)
+    3. Call check_survival(agent); if returns False, set agent.is_alive = False
+    4. Call update_agent(agent) to save back to M1
 
-    注意：personality.hunger 是 float，使用 min/max 限制範圍在 0.0~1.0。
+    Note: personality.hunger is float; use min/max to limit the range between 0.0 and 1.0.
 
-    :param agent_id: 目標 Agent 的 id
+    :param agent_id: Target Agent's id
     """
     # TODO
     pass
@@ -475,14 +475,14 @@ def update_agent_needs(agent_id: str) -> None:
 
 def list_agents() -> list[Agent]:
     """
-    列出所有存活（is_alive=True）的 Agent。
+    List all alive (is_alive=True) Agents.
 
-    實作步驟：
-    1. 呼叫 get_world_state() 取得 WorldState
-    2. 過濾 world_state.agents.values() 中 is_alive == True 的 Agent
-    3. 返回 list
+    Implementation steps:
+    1. Call get_world_state() to get WorldState
+    2. Filter Agents in world_state.agents.values() where is_alive == True
+    3. Return list
 
-    :return: 所有存活 Agent 的列表
+    :return: List of all alive Agents
     """
     # TODO
     pass
@@ -490,92 +490,92 @@ def list_agents() -> list[Agent]:
 
 ---
 
-### Step 4：行動解析輔助函數（建議放在 `main.py` 內部）
+### Step 4: Action Parsing Helper Functions (Recommended to be placed inside `main.py`)
 
 ```python
 def _parse_action(action_text: str) -> str:
     """
-    解析 LLM 回傳的行動文字，返回行動類型。
+    Parse the action text returned by the LLM, and return the action type.
 
-    :return: "採集食物" | "休息" | "移動" | "交談" | "交易" | "其他"
+    :return: "Gather food" | "Rest" | "Move" | "Talk" | "Trade" | "Other"
     """
-    # TODO: 使用 in 或 startswith 判斷行動類型
-    # 範例：
-    # if "採集食物" in action_text:
-    #     return "採集食物"
+    # TODO: Use `in` or `startswith` to determine the action type
+    # Example:
+    # if "Gather food" in action_text:
+    #     return "Gather food"
     pass
 
 
 def _find_location_by_name(location_name: str, world_state) -> str | None:
     """
-    根據地點名稱查找 location_id。
+    Find location_id based on location name.
 
-    :param location_name: 地點名稱（從 LLM 回傳的行動文字解析出）
-    :param world_state: 當前 WorldState
-    :return: location_id，若找不到返回 None
+    :param location_name: Location name (parsed from LLM-returned action text)
+    :param world_state: Current WorldState
+    :return: location_id, or None if not found
     """
-    # TODO: 遍歷 world_state.locations，找出 name 匹配的 location
+    # TODO: Traverse world_state.locations to find the location with matching name
     pass
 ```
 
 ---
 
-## 驗證標準（全部通過才算完成）
+## Verification Standards (Must pass all to be considered complete)
 
-- [ ] **`create_agent()` 成功建立 Agent**
-  - 呼叫 `create_agent("小明", "<valid_location_id>", AgentPersonality())` 不拋例外
-  - 返回的 `Agent` 物件 `.name == "小明"`，`.is_alive == True`
-  - 呼叫 `get_world_state().agents` 可找到該 Agent 的 id
+- [ ] **`create_agent()` successfully creates an Agent**
+  - Calling `create_agent("Xiaoming", "<valid_location_id>", AgentPersonality())` does not raise exceptions
+  - The returned `Agent` object has `.name == "Xiaoming"`, `.is_alive == True`
+  - The Agent's id can be found by calling `get_world_state().agents`
 
-- [ ] **`get_agent()` 正確取得 Agent**
-  - 以有效 id 呼叫，返回對應 `Agent`
-  - 以無效 id 呼叫，拋出 `KeyError`
+- [ ] **`get_agent()` correctly obtains the Agent**
+  - Calling with a valid id returns the corresponding `Agent`
+  - Calling with an invalid id raises a `KeyError`
 
-- [ ] **`agent_think()` 實際呼叫 Ollama 並返回非空文字**
-  - 需要 Ollama 服務正在運行（`ollama serve`）且模型已下載
-  - 返回的字串長度 > 0
-  - 字串內容包含行動描述（包含「採集」「休息」「移動」「交談」「交易」其中之一）
-  - `_last_action[agent_id]` 被正確更新
+- [ ] **`agent_think()` actually calls Ollama and returns non-empty text**
+  - Requires Ollama service to be running (`ollama serve`) and the model downloaded
+  - The returned string length is > 0
+  - The string content contains action descriptions (containing one of "Gather", "Rest", "Move", "Talk", "Trade")
+  - `_last_action[agent_id]` is correctly updated
 
-- [ ] **`agent_act()` 返回合法的 `WorldEvent`**
-  - 返回物件型別為 `WorldEvent`
-  - `event.event_type` 為 `"interaction"` | `"resource"` | `"conflict"` | `"discovery"` | `"death"` 之一
-  - `event.affected_agent_ids` 包含目標 `agent_id`
-  - `event.tick` 等於 `get_tick()` 的返回值
-  - 呼叫後 `get_world_state().events` 中包含此事件
+- [ ] **`agent_act()` returns a valid `WorldEvent`**
+  - The returned object type is `WorldEvent`
+  - `event.event_type` is one of `"interaction"` | `"resource"` | `"conflict"` | `"discovery"` | `"death"`
+  - `event.affected_agent_ids` contains the target `agent_id`
+  - `event.tick` equals the return value of `get_tick()`
+  - `get_world_state().events` contains this event after calling
 
-- [ ] **`update_agent_needs()` 後 hunger 數值增加**
-  - 呼叫前記錄 `agent.personality.hunger`
-  - 呼叫後重新取得 Agent，`.personality.hunger` 數值增加約 0.01
-  - `agent.resources.energy` 數值減少約 2.0
+- [ ] **`update_agent_needs()` hunger value increases after call**
+  - Record `agent.personality.hunger` before calling
+  - Re-obtain Agent after calling; `.personality.hunger` value increases by about 0.01
+  - `agent.resources.energy` value decreases by about 2.0
 
-- [ ] **`check_survival` 失敗的 Agent 設 `is_alive=False`**
-  - 手動將某 Agent 的 `resources.food = 0`、`resources.water = 0`、`resources.energy = 0`
-  - 呼叫 `update_agent_needs(agent_id)` 後
-  - 從 `get_world_state()` 取得該 Agent，`.is_alive == False`
+- [ ] **Agent failing `check_survival` is set `is_alive=False`**
+  - Manually set an Agent's `resources.food = 0`, `resources.water = 0`, `resources.energy = 0`
+  - After calling `update_agent_needs(agent_id)`
+  - Obtain that Agent from `get_world_state()`; `.is_alive == False`
 
-- [ ] **`list_agents()` 只返回存活 Agent**
-  - 若有 Agent 的 `is_alive=False`，不出現在 `list_agents()` 結果中
-  - 返回值型別為 `list[Agent]`
+- [ ] **`list_agents()` only returns alive Agents**
+  - If an Agent has `is_alive=False`, it does not appear in the results of `list_agents()`
+  - Return value type is `list[Agent]`
 
-- [ ] **所有函數皆有型別標注**
-  - 每個參數都有型別標注（如 `name: str`）
-  - 每個函數都有回傳型別標注（如 `-> Agent`）
-  - 執行 `python -m mypy modules/m2_agent/main.py --ignore-missing-imports` 無 error（warning 可接受）
+- [ ] **All functions have type hints**
+  - Every parameter has type hints (e.g., `name: str`)
+  - Every function has return type hints (e.g., `-> Agent`)
+  - Running `python -m mypy modules/m2_agent/main.py --ignore-missing-imports` has no errors (warnings acceptable)
 
 ---
 
-## 常見問題排查
+## Common Errors and Troubleshooting
 
-| 問題 | 可能原因 | 解法 |
+| Issue | Possible Cause | Solution |
 |------|----------|------|
-| `ConnectionError` | Ollama 服務未啟動 | 執行 `ollama serve` |
-| `404 Not Found` | 模型名稱錯誤 | 確認 `config.json` 中的 `ollama_model` 與 `ollama list` 輸出一致 |
-| `KeyError: agent_id` | Agent 未建立或 M1 未初始化 | 先確認 M1 `init_world` 已執行 |
-| `ModuleNotFoundError` | 執行目錄不正確 | 必須在 `AI_World/` 目錄下執行，而非在 `m2_agent/` 內 |
-| LLM 回傳空字串 | 模型 context 太長或模型問題 | 縮短 `recent_memories` 數量（n=3），或更換模型 |
+| `ConnectionError` | Ollama service not started | Run `ollama serve` |
+| `404 Not Found` | Model name incorrect | Confirm `ollama_model` in `config.json` matches `ollama list` output |
+| `KeyError: agent_id` | Agent not created or M1 not initialized | First confirm M1 `init_world` has executed |
+| `ModuleNotFoundError` | Incorrect execution directory | Must execute under the `AI_World/` directory, not inside `m2_agent/` |
+| LLM-returned empty string | Model context too long or model issue | Shorten `recent_memories` count (n=3), or change model |
 
 ---
 
-*本文件依據 `AI_World_Architecture.md`（最後更新：2026-05-25）撰寫。*
-*如 Schema 或介面有異動，請以 `AI_World_Architecture.md` 為準。*
+*This document is written based on `AI_World_Architecture.md` (last updated: 2026-05-25).*
+*If there are changes to Schema or interfaces, `AI_World_Architecture.md` shall prevail.*

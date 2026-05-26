@@ -70,7 +70,18 @@ AI_World/
 │   ├── world.db                   # SQLite（由 M1 管理）
 │   └── chroma/                    # ChromaDB（由 M3 管理）
 └── start.py                       # M8 產生的一鍵啟動腳本
+├── uml.html                       # 系統架構 Sequence & Activity 互動式圖表與匯出網頁
 ```
+
+## 系統架構圖表 (UML Diagrams)
+
+本專案提供互動式的 UML 架構圖表網頁 [uml.html](file:///c:/Users/zohan/Documents/ai_test/AI_World/uml.html)，整合在專案根目錄下，內容包含：
+- **Sequence Diagram (時序圖)**：呈現系統啟動、Agent 思考與行動 Tick 迴圈、SQLite 狀態更新與 ChromaDB 記憶寫入、以及 Streamlit 儀表板非同步讀取的完整生命週期。
+- **Activity Diagram (活動圖)**：詳細拆解 `run_tick()` 迴圈內部的決策判定分支（包含資源消耗衰減、存活檢測、LLM 決策生成、規則驗證與資料持久化同步）。
+
+此網頁為純瀏覽器端渲染（使用 Mermaid.js v10 ESM），支援：
+1. **互動切換**：整合 Glassmorphism 風格側邊欄與 Tab 切換。
+2. **高解析度匯出**：一鍵匯出 SVG 向量圖或 2x 超取樣高解析度 PNG（包含背景填滿與字型樣式嵌入，防止文字失真與透明度問題）。
 
 ---
 

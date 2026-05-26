@@ -1,37 +1,37 @@
-# Module M0：環境設定與 Ollama Benchmark
+# Module M0: Environment Setup and Ollama Benchmark
 
-## 你的任務
+## Your Task
 
-偵測本機 Ollama 安裝狀態、讓使用者選擇模型並執行 benchmark，依測量結果產出 `config.json` 到 `AI_World/` 根目錄，供所有其他模組讀取。
-
----
-
-## 負責範圍
-
-- **負責：**
-  - 呼叫 Ollama API 列出已安裝的模型
-  - 讓使用者從清單中選擇模型
-  - 對選定模型發送 3 個測試 prompt，**實際計時**每次回應（不可假造數據）
-  - 計算平均回應時間（`avg_response_time_sec`）與 tokens/sec（`tokens_per_sec`）
-  - 依速度推薦 `MAX_AGENTS` 數量，並允許使用者手動覆寫
-  - 產出 `config.json` 並儲存到 `AI_World/` 根目錄
-
-- **不負責：**
-  - 安裝 Ollama 本身（請使用者自行安裝）
-  - 初始化世界資料庫（M1 負責）
-  - 建立 Agent（M2 負責）
-  - 任何 config.json 以外的持久化儲存
+Detect local Ollama installation status, allow the user to select a model, perform a benchmark, and output `config.json` to the `AI_World/` root directory based on the measurements, for other modules to read.
 
 ---
 
-## 依賴關係
+## Scope of Responsibility
 
-- **需要先完成：** 無（M0 是第一個執行的模組）
-- **被以下模組使用：** M1、M2、M3、M4、M5、M6、M7、M8（所有模組都從 `config.json` 讀取設定）
+- **Responsible for:**
+  - Call Ollama API to list installed models
+  - Let the user select a model from the list
+  - Send 3 test prompts to the selected model, timing each response in real time (no fake data)
+  - Calculate average response time (`avg_response_time_sec`) and tokens/sec (`tokens_per_sec`)
+  - Recommend `MAX_AGENTS` count based on speed and allow the user to manually override it
+  - Generate `config.json` and save it to the `AI_World/` root directory
+
+- **Not responsible for:**
+  - Installing Ollama itself (users must install it themselves)
+  - Initializing the world database (handled by M1)
+  - Creating Agents (handled by M2)
+  - Any persistent storage other than `config.json`
 
 ---
 
-## 工作目錄
+## Dependencies
+
+- **Prerequisite:** None (M0 is the first module to be executed)
+- **Used by the following modules:** M1, M2, M3, M4, M5, M6, M7, M8 (All modules read settings from `config.json`)
+
+---
+
+## Working Directory
 
 ```
 c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\modules\m0_setup\
@@ -39,35 +39,35 @@ c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\modules\m0_setup\
 
 ---
 
-## 環境安裝
+## Environment Setup
 
 ```bash
 pip install requests pydantic
 ```
 
-> **注意：** 執行前請確認 Ollama 已安裝並在背景執行（`ollama serve`）。
-> 若尚未安裝，請至 https://ollama.com 下載。
+> **Note:** Before running, please ensure Ollama is installed and running in the background (`ollama serve`).
+> If not installed, please download it from https://ollama.com.
 
 ---
 
-## 需要建立的檔案
+## Files to Create
 
 ```
 AI_World/
-├── config.json                  ← 本模組執行後產出（輸出到根目錄）
+├── config.json                  ← Output after execution of this module (exported to the root directory)
 └── modules/
     └── m0_setup/
-        └── main.py              ← 本模組唯一需要撰寫的檔案
+        └── main.py              ← The only file to write for this module
 ```
 
 ---
 
-## 共用 Schema（直接使用，不可修改）
+## Shared Schema (Use directly, do not modify)
 
-> 來源：`AI_World_Architecture.md`。M0 本身不需要 `import shared.schemas`，但產出的 `config.json` 必須完全符合以下 `Config` schema 的欄位定義。
+> Source: `AI_World_Architecture.md`. M0 itself does not need to `import shared.schemas`, but the generated `config.json` must strictly conform to the field definitions in the `Config` schema below.
 
 ```python
-# shared/schemas.py 中的 Config class（僅供對照，不需 import）
+# Config class in shared/schemas.py (for reference only, no need to import)
 from pydantic import BaseModel
 
 class Config(BaseModel):
@@ -81,7 +81,7 @@ class Config(BaseModel):
     max_concurrent_requests: int = 1
 ```
 
-### config.json 完整格式範例
+### config.json Full Format Example
 
 ```json
 {
@@ -96,39 +96,39 @@ class Config(BaseModel):
 }
 ```
 
-**欄位型別要求：**
+**Field Type Requirements:**
 
-| 欄位 | 型別 | 說明 |
+| Field | Type | Description |
 |------|------|------|
-| `ollama_model` | `str` | 使用者選擇的模型名稱，例如 `"gemma3:4b"` |
-| `ollama_base_url` | `str` | 固定為 `"http://localhost:11434"` |
-| `avg_response_time_sec` | `float` | benchmark 平均回應時間（秒），四捨五入到小數點後 2 位 |
-| `tokens_per_sec` | `float` | 平均 tokens/sec，四捨五入到小數點後 2 位 |
-| `recommended_max_agents` | `int` | 依速度推薦的最大 Agent 數，使用者可覆寫 |
-| `tick_interval_sec` | `int` | 固定為 `30`（此欄位由 M0 寫入，其他模組讀取） |
-| `concurrency_mode` | `str` | 固定為 `"sequential"` |
-| `max_concurrent_requests` | `int` | 固定為 `1` |
+| `ollama_model` | `str` | The model name selected by the user, e.g., `"gemma3:4b"` |
+| `ollama_base_url` | `str` | Fixed to `"http://localhost:11434"` |
+| `avg_response_time_sec` | `float` | Average response time (seconds) of the benchmark, rounded to 2 decimal places |
+| `tokens_per_sec` | `float` | Average tokens/sec, rounded to 2 decimal places |
+| `recommended_max_agents` | `int` | Recommended maximum Agent count based on speed, can be overridden by the user |
+| `tick_interval_sec` | `int` | Fixed to `30` (written by M0, read by other modules) |
+| `concurrency_mode` | `str` | Fixed to `"sequential"` |
+| `max_concurrent_requests` | `int` | Fixed to `1` |
 
 ---
 
-## 你對外提供的函數（簽名不可修改）
+## Provided Functions (Signatures cannot be modified)
 
-> M0 為一次性執行腳本，**不對外暴露函數**。
-> 其他模組只需讀取 M0 產出的 `config.json`，不會直接 `import` M0 的任何函數。
+> M0 is a one-time script and does not expose external functions.
+> Other modules only need to read `config.json` generated by M0 and will not directly `import` any of M0's functions.
 
 ---
 
-## 你可以呼叫的外部函數
+## External Functions You Can Call
 
-> M0 不依賴其他模組的函數。
-> M0 只與 **Ollama REST API** 直接溝通：
+> M0 does not depend on functions from other modules.
+> M0 only communicates directly with the Ollama REST API:
 
-| Endpoint | Method | 說明 |
+| Endpoint | Method | Description |
 |----------|--------|------|
-| `http://localhost:11434/api/tags` | `GET` | 列出本機已安裝的所有模型 |
-| `http://localhost:11434/api/generate` | `POST` | 向指定模型發送 prompt 並取得回應 |
+| `http://localhost:11434/api/tags` | `GET` | List all models installed locally |
+| `http://localhost:11434/api/generate` | `POST` | Send a prompt to the specified model and get the response |
 
-**`/api/tags` 回應格式（簡化）：**
+**`/api/tags` Response Format (Simplified):**
 ```json
 {
   "models": [
@@ -138,32 +138,32 @@ class Config(BaseModel):
 }
 ```
 
-**`/api/generate` 請求格式：**
+**`/api/generate` Request Format:**
 ```json
 {
   "model": "gemma3:4b",
-  "prompt": "你好，請用一句話介紹自己。",
+  "prompt": "Hello, please introduce yourself in one sentence.",
   "stream": false
 }
 ```
 
-**`/api/generate` 回應格式（簡化）：**
+**`/api/generate` Response Format (Simplified):**
 ```json
 {
-  "response": "我是一個語言模型...",
+  "response": "I am a language model...",
   "eval_count": 42,
   "eval_duration": 1234567890
 }
 ```
 
-> `eval_count`：本次回應產生的 token 數量
-> `eval_duration`：本次回應的 LLM 推理時間（單位：奈秒 ns）
+> `eval_count`: The number of tokens generated in this response
+> `eval_duration`: The LLM inference duration for this response (unit: nanoseconds, ns)
 
 ---
 
-## 實作步驟
+## Implementation Steps
 
-### Step 1：從 Ollama 取得已安裝模型清單
+### Step 1: Get the list of installed models from Ollama
 
 ```python
 import requests
@@ -172,127 +172,127 @@ OLLAMA_BASE_URL = "http://localhost:11434"
 
 def list_models() -> list[str]:
     """
-    呼叫 GET /api/tags，回傳模型名稱列表。
-    若 Ollama 未啟動或無法連線，印出友善錯誤訊息後 exit(1)。
+    Call GET /api/tags, returning a list of model names.
+    If Ollama is not started or connection fails, print a friendly error message and exit(1).
     """
-    # TODO: 呼叫 requests.get(f"{OLLAMA_BASE_URL}/api/tags")
-    # TODO: 解析 response.json()["models"]，提取每個模型的 "name" 欄位
-    # TODO: 若 models 列表為空，提示使用者先執行 `ollama pull <model>` 後 exit(1)
-    # TODO: 回傳 list[str]
+    # TODO: Call requests.get(f"{OLLAMA_BASE_URL}/api/tags")
+    # TODO: Parse response.json()["models"] and extract the "name" field of each model
+    # TODO: If the models list is empty, prompt the user to run `ollama pull <model>` first, then exit(1)
+    # TODO: Return list[str]
     pass
 ```
 
 ---
 
-### Step 2：讓使用者選擇模型
+### Step 2: Let the user select a model
 
 ```python
 def select_model(models: list[str]) -> str:
     """
-    印出模型清單（附編號），讓使用者輸入編號選擇。
-    驗證輸入合法後回傳選定的模型名稱。
+    Print the model list (with numbers) for the user to select by inputting a number.
+    Validate the input and return the selected model name.
     """
-    # TODO: 用 enumerate 印出 "1. gemma3:4b"、"2. llama3.2:3b" 格式的清單
-    # TODO: 用 input() 等待使用者輸入編號
-    # TODO: 驗證輸入是有效整數且在範圍內，無效則重新詢問
-    # TODO: 回傳 models[選擇索引]
+    # TODO: Use enumerate to print a list in the format "1. gemma3:4b", "2. llama3.2:3b"
+    # TODO: Use input() to wait for user to enter a number
+    # TODO: Validate that the input is a valid integer within the range, and ask again if invalid
+    # TODO: Return models[selected index]
     pass
 ```
 
 ---
 
-### Step 3：執行 Benchmark（實際計時，禁止假造數據）
+### Step 3: Run Benchmark (real timing, no fake data allowed)
 
 ```python
 import time
 
 BENCHMARK_PROMPTS = [
-    "請用繁體中文，一句話描述你所在的世界。",
-    "現在是春天，你感覺如何？請用一句話回答。",
-    "你的名字叫什麼？你最想做的事是什麼？請簡短回答。",
+    "Please describe the world you are in using Traditional Chinese in one sentence.",
+    "It's spring now. How do you feel? Please answer in one sentence.",
+    "What is your name? What is the thing you want to do the most? Please answer briefly.",
 ]
 
 def benchmark_model(model_name: str) -> dict:
     """
-    對指定模型依序發送 BENCHMARK_PROMPTS 中的 3 個 prompt。
-    每次均使用 time.time() 實際計時（wall clock time）。
-    回傳包含以下資訊的 dict：
+    Send the 3 prompts in BENCHMARK_PROMPTS to the specified model sequentially.
+    Time each run using time.time() (wall clock time).
+    Return a dict containing the following information:
     {
-        "avg_response_time_sec": float,  # 3 次回應的平均時間（秒）
-        "tokens_per_sec": float,         # 平均 tokens/sec（使用 eval_count 與 eval_duration）
-        "raw_results": [                 # 每次 benchmark 的原始資料（供除錯）
+        "avg_response_time_sec": float,  # Average response time of the 3 runs (seconds)
+        "tokens_per_sec": float,         # Average tokens/sec (using eval_count and eval_duration)
+        "raw_results": [                 # Raw data of each benchmark (for debugging)
             {
                 "prompt": str,
                 "response_time_sec": float,
                 "eval_count": int,
                 "eval_duration_ns": int,
-                "response_preview": str  # 回應前 50 字
+                "response_preview": str  # First 50 characters of the response
             },
             ...
         ]
     }
     """
-    # TODO: 建立空列表 results = []
-    # TODO: 對每個 prompt 執行以下流程：
-    #   1. 記錄 start = time.time()
-    #   2. 呼叫 POST /api/generate，payload = {"model": model_name, "prompt": prompt, "stream": False}
-    #   3. 記錄 elapsed = time.time() - start
-    #   4. 從 response.json() 取出 eval_count 與 eval_duration（奈秒）
-    #   5. 計算此次 tokens_per_sec = eval_count / (eval_duration / 1e9)
-    #   6. 將結果 append 到 results
-    #   7. 印出進度，例如 "[1/3] 回應時間：2.34 秒，tokens/sec：45.2"
-    # TODO: 計算 avg_response_time_sec = mean(所有 response_time_sec)
-    # TODO: 計算 tokens_per_sec = mean(所有單次 tokens_per_sec)
-    # TODO: 回傳 dict
+    # TODO: Create empty list results = []
+    # TODO: Perform the following process for each prompt:
+    #   1. Record start = time.time()
+    #   2. Call POST /api/generate, payload = {"model": model_name, "prompt": prompt, "stream": False}
+    #   3. Record elapsed = time.time() - start
+    #   4. Extract eval_count and eval_duration (nanoseconds) from response.json()
+    #   5. Calculate tokens_per_sec = eval_count / (eval_duration / 1e9) for this run
+    #   6. Append the result to results
+    #   7. Print progress, e.g., "[1/3] Response time: 2.34 seconds, tokens/sec: 45.2"
+    # TODO: Calculate avg_response_time_sec = mean(all response_time_sec)
+    # TODO: Calculate tokens_per_sec = mean(all individual tokens_per_sec)
+    # TODO: Return dict
     pass
 ```
 
 ---
 
-### Step 4：依速度推薦 MAX_AGENTS
+### Step 4: Recommend MAX_AGENTS Based on Speed
 
 ```python
 def recommend_max_agents(avg_response_time_sec: float) -> int:
     """
-    依平均回應時間推薦最大 Agent 數量：
-      < 2 秒  → 推薦 10
-      2~5 秒  → 推薦 6
-      5~10 秒 → 推薦 3
-      > 10 秒 → 推薦 1
-    回傳推薦的整數值。
+    Recommend maximum Agent count based on average response time:
+      < 2 seconds  → Recommend 10
+      2~5 seconds  → Recommend 6
+      5~10 seconds → Recommend 3
+      > 10 seconds → Recommend 1
+    Return the recommended integer value.
     """
-    # TODO: 用 if/elif/else 實作上述邏輯
+    # TODO: Implement the above logic using if/elif/else
     pass
 ```
 
 ---
 
-### Step 5：讓使用者確認或修改推薦數量
+### Step 5: Let User Confirm or Modify Recommended Count
 
 ```python
 def confirm_max_agents(recommended: int) -> int:
     """
-    顯示推薦的 max_agents，讓使用者確認（按 Enter）或輸入自訂數字。
-    驗證輸入為正整數，無效則重新詢問。
-    回傳最終確認的整數值。
+    Display the recommended max_agents, allow the user to confirm (press Enter) or enter a custom number.
+    Validate that the input is a positive integer, and re-ask if invalid.
+    Return the final confirmed integer value.
     """
-    # TODO: 印出 f"推薦 MAX_AGENTS = {recommended}（按 Enter 確認，或輸入自訂數字）："
-    # TODO: 取得 user_input = input().strip()
-    # TODO: 若 user_input 為空，回傳 recommended
-    # TODO: 嘗試 int(user_input)，驗證 > 0，無效則重新詢問
-    # TODO: 回傳最終值
+    # TODO: Print f"Recommended MAX_AGENTS = {recommended} (press Enter to confirm, or enter custom number):"
+    # TODO: Get user_input = input().strip()
+    # TODO: If user_input is empty, return recommended
+    # TODO: Attempt int(user_input), validate > 0, and re-ask if invalid
+    # TODO: Return final value
     pass
 ```
 
 ---
 
-### Step 6：產出並儲存 config.json
+### Step 6: Generate and Save config.json
 
 ```python
 import json
 import os
 
-# config.json 輸出到 AI_World/ 根目錄（main.py 的上兩層）
+# config.json output to AI_World/ root directory (two levels up from main.py)
 CONFIG_OUTPUT_PATH = os.path.join(
     os.path.dirname(__file__),  # m0_setup/
     "..",                        # modules/
@@ -307,8 +307,8 @@ def save_config(
     max_agents: int,
 ) -> None:
     """
-    建立 config dict，寫入 JSON 檔案到 CONFIG_OUTPUT_PATH。
-    欄位值必須完全符合 Config schema，數值四捨五入到小數點後 2 位。
+    Create the config dict, write the JSON file to CONFIG_OUTPUT_PATH.
+    Field values must fully conform to the Config schema, and numerical values should be rounded to 2 decimal places.
     """
     config = {
         "ollama_model": model_name,
@@ -320,38 +320,38 @@ def save_config(
         "concurrency_mode": "sequential",
         "max_concurrent_requests": 1,
     }
-    # TODO: 用 json.dump 寫入 CONFIG_OUTPUT_PATH，ensure_ascii=False，indent=2
-    # TODO: 印出成功訊息，包含檔案的絕對路徑（os.path.abspath(CONFIG_OUTPUT_PATH)）
+    # TODO: Write to CONFIG_OUTPUT_PATH using json.dump, ensure_ascii=False, indent=2
+    # TODO: Print success message including the absolute path of the file (os.path.abspath(CONFIG_OUTPUT_PATH))
     pass
 ```
 
 ---
 
-### Step 7：主程式入口
+### Step 7: Main Program Entry
 
 ```python
 def main():
     """
-    整合所有步驟的主流程：
+    Main flow integrating all steps:
     1. list_models()
     2. select_model()
-    3. benchmark_model()（印出進度）
+    3. benchmark_model() (print progress)
     4. recommend_max_agents()
     5. confirm_max_agents()
     6. save_config()
-    7. 印出完成摘要
+    7. Print completion summary
     """
     print("=" * 50)
-    print("  AI World — M0 環境設定與 Benchmark")
+    print("  AI World — M0 Environment Setup and Benchmark")
     print("=" * 50)
 
-    # TODO: 依序呼叫 Step 1 ~ Step 6 的函數
-    # TODO: 最後印出摘要，例如：
-    #   模型：gemma3:4b
-    #   平均回應時間：3.24 秒
-    #   Tokens/sec：45.20
-    #   MAX_AGENTS：6
-    #   Config 已儲存至：C:\...\AI_World\config.json
+    # TODO: Call functions from Step 1 to Step 6 in order
+    # TODO: Finally print summary, e.g.:
+    #   Model: gemma3:4b
+    #   Average response time: 3.24 seconds
+    #   Tokens/sec: 45.20
+    #   MAX_AGENTS: 6
+    #   Config saved to: C:\...\AI_World\config.json
     pass
 
 
@@ -361,16 +361,16 @@ if __name__ == "__main__":
 
 ---
 
-## 執行方式
+## Execution Method
 
-在 `AI_World/` 根目錄下執行（以確保相對路徑正確）：
+Run under the `AI_World/` root directory (to ensure relative paths are correct):
 
 ```bash
 cd c:\Users\zohanlin\Documents\zohan_ai_test\AI_World
 python modules/m0_setup/main.py
 ```
 
-或直接在 `m0_setup/` 目錄下執行：
+Or run directly under the `m0_setup/` directory:
 
 ```bash
 cd c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\modules\m0_setup
@@ -379,38 +379,38 @@ python main.py
 
 ---
 
-## 驗證標準（全部通過才算完成）
+## Verification Standards (Must pass all to be considered complete)
 
-- [ ] `AI_World/config.json` 存在且可被 `json.load()` 正常解析
-- [ ] `config.json` 包含以下所有欄位，型別完全符合 schema：
-  - `ollama_model`（str）
-  - `ollama_base_url`（str，值為 `"http://localhost:11434"`）
-  - `avg_response_time_sec`（float）
-  - `tokens_per_sec`（float）
-  - `recommended_max_agents`（int）
-  - `tick_interval_sec`（int，值為 `30`）
-  - `concurrency_mode`（str，值為 `"sequential"`）
-  - `max_concurrent_requests`（int，值為 `1`）
-- [ ] 程式能成功呼叫 `GET /api/tags` 並列出模型（Ollama 需事先啟動）
-- [ ] Benchmark 確實呼叫 LLM 3 次並計時，`avg_response_time_sec` 為真實測量值（非 hardcode）
-- [ ] `tokens_per_sec` 基於 Ollama API 回傳的 `eval_count` 與 `eval_duration` 計算，非估算
-- [ ] 使用者可在 Step 5 輸入自訂數字覆寫 `recommended_max_agents`，覆寫後的數值會正確寫入 `config.json`
-- [ ] 輸入非法值（非數字、負數、超出範圍的索引）時，程式提示錯誤並重新詢問，不 crash
-- [ ] Ollama 未啟動時，程式印出友善錯誤訊息（不是 Python traceback）後退出
+- [ ] `AI_World/config.json` exists and can be parsed normally by `json.load()`
+- [ ] `config.json` contains all the following fields, with types fully conforming to the schema:
+  - `ollama_model` (str)
+  - `ollama_base_url` (str, value is `"http://localhost:11434"`)
+  - `avg_response_time_sec` (float)
+  - `tokens_per_sec` (float)
+  - `recommended_max_agents` (int)
+  - `tick_interval_sec` (int, value is `30`)
+  - `concurrency_mode` (str, value is `"sequential"`)
+  - `max_concurrent_requests` (int, value is `1`)
+- [ ] The program can successfully call `GET /api/tags` and list models (Ollama must be started beforehand)
+- [ ] Benchmark indeed calls the LLM 3 times and times them; `avg_response_time_sec` is the actual measured value (not hardcoded)
+- [ ] `tokens_per_sec` is calculated based on `eval_count` and `eval_duration` returned by Ollama API, not estimated
+- [ ] User can enter a custom number in Step 5 to override `recommended_max_agents`, and the overridden value is correctly written into `config.json`
+- [ ] When entering invalid values (non-numeric, negative, out-of-range index), the program prints an error and asks again, without crashing
+- [ ] When Ollama is not started, the program prints a friendly error message (not Python traceback) and exits
 
 ---
 
-## 常見問題
+## FAQ
 
-**Q：Ollama API 的 `eval_duration` 單位是什麼？**
-A：奈秒（nanoseconds）。換算成秒：`eval_duration / 1e9`。
+**Q: What is the unit of `eval_duration` in Ollama API?**
+**A:** Nanoseconds (ns). To convert to seconds: `eval_duration / 1e9`.
 
-**Q：tokens/sec 要怎麼計算？**
-A：使用 Ollama 回傳的 `eval_count`（token 數）除以 `eval_duration / 1e9`（秒）。
-若 `eval_duration` 為 0 或缺失，則 fallback 使用 wall clock time（`response_time_sec`）作分母。
+**Q: How to calculate tokens/sec?**
+**A:** Divide `eval_count` (number of tokens) returned by Ollama by `eval_duration / 1e9` (seconds).
+If `eval_duration` is 0 or missing, fallback to using wall clock time (`response_time_sec`) as the denominator.
 
-**Q：`CONFIG_OUTPUT_PATH` 路徑若在 Windows 上有反斜線問題怎麼辦？**
-A：使用 `os.path.join()` 與 `os.path.abspath()` 處理，不要硬寫路徑字串。
+**Q: What if there is a backslash issue with the `CONFIG_OUTPUT_PATH` path on Windows?**
+**A:** Use `os.path.join()` and `os.path.abspath()` to handle it; do not hardcode path strings.
 
-**Q：benchmark prompt 可以改嗎？**
-A：可以，但必須至少發送 3 個 prompt 並對回應時間取平均，且所有 prompt 必須要求 LLM 實際生成文字（不可使用空字串或導致 0 token 的 prompt）。
+**Q: Can the benchmark prompts be changed?**
+**A:** Yes, but you must send at least 3 prompts and average their response times, and all prompts must require the LLM to actually generate text (do not use empty strings or prompts that result in 0 tokens).

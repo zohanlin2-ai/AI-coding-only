@@ -1,0 +1,20 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database and vector storage directories
+data/
+world.db
+chroma/
+
+# Virtual environment
+venv/
+.venv/
+env/
+.env/
+
+# IDE / local settings
+.vscode/
+.idea/
+*.local

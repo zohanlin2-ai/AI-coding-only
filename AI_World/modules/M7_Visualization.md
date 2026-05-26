@@ -1,81 +1,81 @@
-# Module M7：視覺化儀表板（Visualization Dashboard）
+# Module M7: Visualization Dashboard
 
-## 你的任務
+## Your Task
 
-建立一個 Streamlit 視覺化 App，讓人類觀察者能即時觀察 AI 世界的狀態，包含世界地圖、Agent 狀態、事件流與歷史快照查詢，所有資料從 M1 與 M6 讀取。
-
----
-
-## 負責範圍
-
-- **負責：**
-  - 啟動並維護一個 Streamlit Web App（`app.py`）
-  - 每 10 秒自動刷新畫面，從 M1 取得最新世界狀態
-  - 以彩色格子圖呈現世界地圖（地形 + Agent 位置標記）
-  - 以表格顯示所有 Agent 的資源與個性數值
-  - 以列表顯示最新 50 個世界事件
-  - 提供 Tick 範圍輸入，從 M6 查詢歷史事件
-  - 在頁首顯示當前 tick、年份、季節等全域資訊
-
-- **不負責：**
-  - 修改或寫入世界狀態（唯讀）
-  - 直接操作資料庫（透過 M1/M6 介面存取）
-  - Agent 決策、LLM 呼叫、規則執行
-  - 任何對外 API 或函數（M7 無對外介面）
+Create a Streamlit visualization App that allows human observers to monitor the state of the AI World in real-time, including the world map, Agent status, event stream, and historical snapshot queries, with all data read from M1 and M6.
 
 ---
 
-## 依賴關係
+## Scope of Responsibility
 
-- **需要先完成：**
-  - M0（產出 `config.json`，M7 需讀取以取得 tick_interval_sec 等設定）
-  - M1（`get_world_state()` 必須可正常呼叫）
-  - M6（`get_history()`、`get_snapshot()`、`get_timeline()`、`get_current_season()` 必須可正常呼叫）
+- **Responsible for:**
+  - Start and maintain a Streamlit Web App (`app.py`)
+  - Auto-refresh the screen every 10 seconds, retrieving the latest world state from M1
+  - Present the world map as a color grid (terrain + Agent position markers)
+  - Display all Agent resources and personality metrics in a table
+  - Display the latest 50 world events in a list
+  - Provide tick range input to query historical events from M6
+  - Display global information such as current tick, year, and season in the header
 
-- **被以下模組使用：**
-  - M8（整合測試時驗證 Streamlit App 可正常啟動）
+- **Not responsible for:**
+  - Modifying or writing world state (read-only)
+  - Operating the database directly (accessed via M1/M6 interfaces)
+  - Agent decision-making, LLM calling, and rule execution
+  - Any external APIs or functions (M7 has no external interface)
 
 ---
 
-## 工作目錄
+## Dependencies
+
+- **Prerequisites:**
+  - M0 (Generates `config.json`, M7 reads it to obtain settings like `tick_interval_sec`)
+  - M1 (`get_world_state()` must be callable normally)
+  - M6 (`get_history()`, `get_snapshot()`, `get_timeline()`, `get_current_season()` must be callable normally)
+
+- **Used by the following modules:**
+  - M8 (Verifies Streamlit App can start normally during integration testing)
+
+---
+
+## Working Directory
 
 ```
 c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\modules\m7_visualization\
 ```
 
-> 所有指令皆在專案根目錄 `c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\` 執行。
+All commands are run at the project root `c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\`.
 
 ---
 
-## 環境安裝
+## Environment Setup
 
 ```bash
 pip install streamlit pandas plotly pydantic
 ```
 
-> **注意：** `pydantic` 版本須為 v2（`pydantic>=2.0`）。若已安裝舊版，請執行 `pip install --upgrade pydantic`。
+> **Note:** The `pydantic` version must be v2 (`pydantic>=2.0`). If an older version is already installed, please run `pip install --upgrade pydantic`.
 
 ---
 
-## 需要建立的檔案
+## Files to Create
 
 ```
 AI_World/
 └── modules/
     └── m7_visualization/
-        └── app.py          ← 唯一需要建立的檔案
+        └── app.py          ← The only file to create
 ```
 
-> `shared/schemas.py` 與其他模組已存在，不需重建。
+`shared/schemas.py` and other modules already exist, no need to recreate.
 
 ---
 
-## 共用 Schema（直接使用，不可修改）
+## Shared Schema (Use directly, do not modify)
 
-以下 Schema 定義在 `shared/schemas.py`，M7 需直接 import 使用，**不得自行定義替代 class**。
+The following Schema is defined in `shared/schemas.py`. M7 needs to import and use it directly; **do not define alternative classes yourself**.
 
 ```python
-# shared/schemas.py（節錄 M7 會用到的部分）
+# shared/schemas.py (Excerpt of parts M7 will use)
 
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -105,11 +105,11 @@ class Location(BaseModel):
 
 
 class AgentPersonality(BaseModel):
-    hunger: float = 0.3      # 0.0~1.0，越高越餓
-    fear: float = 0.3        # 0.0~1.0，越高越恐懼
-    ambition: float = 0.5    # 0.0~1.0，越高越有野心
-    loyalty: float = 0.5     # 0.0~1.0，越高越忠誠
-    aggression: float = 0.3  # 0.0~1.0，越高越好戰
+    hunger: float = 0.3      # 0.0~1.0, higher means hungrier
+    fear: float = 0.3        # 0.0~1.0, higher means more fearful
+    ambition: float = 0.5    # 0.0~1.0, higher means more ambitious
+    loyalty: float = 0.5     # 0.0~1.0, higher means more loyal
+    aggression: float = 0.3  # 0.0~1.0, higher means more aggressive
 
 
 class Agent(BaseModel):
@@ -123,7 +123,7 @@ class Agent(BaseModel):
     memory_ids: list[str] = Field(default_factory=list)
     organization_id: Optional[str] = None
     is_alive: bool = True
-    age: int = 0  # 單位：tick
+    age: int = 0  # Unit: tick
 
 
 class WorldEvent(BaseModel):
@@ -157,85 +157,85 @@ class Config(BaseModel):
     max_concurrent_requests: int = 1
 ```
 
-### 地形顏色對照表（M7 自行定義，非 Schema 的一部分）
+### Terrain Color Map (M7 self-defined, not part of the Schema)
 
-| terrain 值  | 建議顯示顏色 |
+| terrain Value  | Recommended Display Color |
 |-------------|-------------|
-| `"plains"`  | 黃綠色 `#a8d5a2` |
-| `"mountain"` | 灰色 `#9e9e9e` |
-| `"forest"`  | 深綠色 `#2d6a4f` |
-| `"water"`   | 藍色 `#4fc3f7` |
+| `"plains"`  | Yellow-green `#a8d5a2` |
+| `"mountain"` | Gray `#9e9e9e` |
+| `"forest"`  | Dark green `#2d6a4f` |
+| `"water"`   | Blue `#4fc3f7` |
 
-### 季節符號對照（供頁首顯示）
+### Season Symbol Correspondence (for header display)
 
-| season 值   | 建議符號 |
+| season Value   | Recommended Symbol |
 |-------------|---------|
-| `"spring"`  | 🌸 春 |
-| `"summer"`  | ☀️ 夏 |
-| `"autumn"`  | 🍂 秋 |
-| `"winter"`  | ❄️ 冬 |
+| `"spring"`  | 🌸 Spring |
+| `"summer"`  | ☀️ Summer |
+| `"autumn"`  | 🍂 Autumn |
+| `"winter"`  | ❄️ Winter |
 
 ---
 
-## 你對外提供的函數（簽名不可修改）
+## Provided Functions (Signatures cannot be modified)
 
-**M7 無對外函數。** M7 是一個獨立的 Streamlit App，不提供任何可被其他模組 import 的函數。
+**M7 has no external functions.** M7 is an independent Streamlit App that does not provide any functions that can be imported by other modules.
 
-啟動方式：
+Starting method:
 ```bash
 streamlit run modules/m7_visualization/app.py
 ```
 
 ---
 
-## 你可以呼叫的外部函數
+## External Functions You Can Call
 
-### 來自 M1（`modules/m1_world_state/main.py`）
+### From M1 (`modules/m1_world_state/main.py`)
 
 ```python
 from modules.m1_world_state.main import get_world_state
 
 def get_world_state() -> WorldState:
-    """讀取當前完整世界狀態，包含所有 locations、agents、organizations、events"""
+    """Read the current complete world state, containing all locations, agents, organizations, events"""
 ```
 
-### 來自 M6（`modules/m6_time_history/main.py`）
+### From M6 (`modules/m6_time_history/main.py`)
 
 ```python
 from modules.m6_time_history.main import get_history, get_snapshot, get_timeline, get_current_season
 
 def get_history(start_tick: int, end_tick: int) -> list[WorldEvent]:
-    """取得指定 tick 範圍的歷史事件列表"""
+    """Get the list of historical events in the specified tick range"""
 
 def get_snapshot(tick: int) -> Optional[WorldState]:
-    """取得指定 tick 的世界快照，若無快照則返回 None"""
+    """Get the world snapshot for the specified tick, returns None if no snapshot exists"""
 
 def get_timeline() -> list[dict]:
-    """返回所有重大事件的時間軸列表，格式：[{tick, event_type, description}, ...]"""
+    """Return the timeline list of all major events, format: [{tick, event_type, description}, ...]"""
 
 def get_current_season() -> str:
-    """返回當前季節字串：'spring' | 'summer' | 'autumn' | 'winter'"""
+    """Return the current season string: 'spring' | 'summer' | 'autumn' | 'winter'"""
 ```
 
-> **注意：** 呼叫這些函數時，需確保 M1 與 M6 的資料庫（`data/world.db`）已存在且已初始化。若資料庫不存在，請使用 `try/except` 捕捉例外並在 UI 顯示友善錯誤訊息，**不要讓 App crash**。
+> **Note:** When calling these functions, ensure that M1 and M6's database (`data/world.db`) already exists and is initialized. If the database does not exist, use `try/except` to catch exceptions and display a user-friendly error message on the UI. **Do not let the App crash.**
 
 ---
 
-## 實作步驟
+## Implementation Steps
 
-### 步驟 0：建立目錄與空白檔案
+### Step 0: Create Directory and Empty File
 
 ```bash
-# 在專案根目錄執行
+# Execute at the project root directory
 mkdir modules\m7_visualization
 type nul > modules\m7_visualization\app.py
 ```
 
 ---
 
-### 步驟 1：建立 `app.py` 基本骨架與頁面路由
+### Step 1: Create `app.py` Basic Skeleton and Page Routes
 
-`app.py` 的整體結構如下。先建立骨架，再逐步填入各分頁邏輯。
+The overall structure of `app.py` is as follows. Create the skeleton first, then fill in each tab's logic step-by-step.
 
 ```python
 # modules/m7_visualization/app.py
@@ -249,11 +249,11 @@ import sys
 import os
 from typing import Optional
 
-# ── 路徑設定（確保從專案根目錄可以 import shared 與各 module）──
-# 將專案根目錄加入 Python 路徑
+# ── Path Settings (ensure shared and modules can be imported from project root) ──
+# Add project root directory to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-# ── 外部模組 import ──
+# ── External Module Imports ──
 try:
     from modules.m1_world_state.main import get_world_state
     M1_AVAILABLE = True
@@ -274,8 +274,8 @@ except ImportError:
 from shared.schemas import WorldState, WorldEvent, Agent, Location
 
 
-# ── 常數設定 ──
-REFRESH_INTERVAL = 10      # 自動刷新秒數
+# ── Constant Settings ──
+REFRESH_INTERVAL = 10      # Auto-refresh interval in seconds
 TERRAIN_COLORS = {
     "plains":   "#a8d5a2",
     "mountain": "#9e9e9e",
@@ -283,60 +283,60 @@ TERRAIN_COLORS = {
     "water":    "#4fc3f7",
 }
 SEASON_EMOJI = {
-    "spring": "🌸 春",
-    "summer": "☀️ 夏",
-    "autumn": "🍂 秋",
-    "winter": "❄️ 冬",
+    "spring": "🌸 Spring",
+    "summer": "☀️ Summer",
+    "autumn": "🍂 Autumn",
+    "winter": "❄️ Winter",
 }
 
 
-# ── 輔助函數 ──
+# ── Helper Functions ──
 def load_config() -> dict:
-    """讀取 config.json，失敗時返回預設值"""
-    # TODO：開啟 config.json，解析並返回 dict
-    # 若檔案不存在，返回 {"tick_interval_sec": 30}
+    """Read config.json, returns default values on failure"""
+    # TODO: Open config.json, parse and return dict
+    # If file does not exist, return {"tick_interval_sec": 30}
     pass
 
 
 def safe_get_world_state() -> Optional[WorldState]:
-    """安全地呼叫 M1，失敗時返回 None 並顯示警告"""
-    # TODO：呼叫 get_world_state()，捕捉所有例外
-    # 例外時用 st.warning() 顯示訊息，返回 None
+    """Safely call M1, returns None and displays warning on failure"""
+    # TODO: Call get_world_state(), catch all exceptions
+    # On exception, show message with st.warning(), return None
     pass
 
 
-# ── 頁面渲染函數（各步驟分別實作）──
+# ── Page Rendering Functions (to be implemented in separate steps) ──
 def render_header(world_state: Optional[WorldState]) -> None:
-    """渲染頁首：標題 + 當前 tick / 年份 / 季節"""
-    # TODO：在步驟 2 實作
+    """Render header: Title + current tick / year / season"""
+    # TODO: To be implemented in Step 2
     pass
 
 
 def render_world_map(world_state: Optional[WorldState]) -> None:
-    """渲染世界地圖分頁"""
-    # TODO：在步驟 3 實作
+    """Render world map tab"""
+    # TODO: To be implemented in Step 3
     pass
 
 
 def render_agent_status(world_state: Optional[WorldState]) -> None:
-    """渲染 Agent 狀態分頁"""
-    # TODO：在步驟 4 實作
+    """Render Agent status tab"""
+    # TODO: To be implemented in Step 4
     pass
 
 
 def render_event_stream(world_state: Optional[WorldState]) -> None:
-    """渲染事件流分頁"""
-    # TODO：在步驟 5 實作
+    """Render event stream tab"""
+    # TODO: To be implemented in Step 5
     pass
 
 
 def render_history_query() -> None:
-    """渲染歷史查詢分頁"""
-    # TODO：在步驟 6 實作
+    """Render history query tab"""
+    # TODO: To be implemented in Step 6
     pass
 
 
-# ── 主程式入口 ──
+# ── Main Program Entry ──
 def main():
     st.set_page_config(
         page_title="AI World Dashboard",
@@ -344,18 +344,18 @@ def main():
         layout="wide",
     )
 
-    # 讀取世界狀態（所有分頁共用）
+    # Read world state (shared by all tabs)
     world_state = safe_get_world_state()
 
-    # 渲染頁首
+    # Render header
     render_header(world_state)
 
-    # 分頁導航
+    # Tab navigation
     tab1, tab2, tab3, tab4 = st.tabs([
-        "🗺️ 世界地圖",
-        "🧑 Agent 狀態",
-        "📜 事件流",
-        "🕰️ 歷史查詢",
+        "🗺️ World Map",
+        "🧑 Agent Status",
+        "📜 Event Stream",
+        "🕰️ History Query",
     ])
 
     with tab1:
@@ -370,8 +370,8 @@ def main():
     with tab4:
         render_history_query()
 
-    # ── 自動刷新機制 ──
-    # TODO：在步驟 7 實作
+    # ── Auto-Refresh Mechanism ──
+    # TODO: To be implemented in Step 7
 
 
 if __name__ == "__main__":
@@ -380,140 +380,140 @@ if __name__ == "__main__":
 
 ---
 
-### 步驟 2：實作 `render_header()`
+### Step 2: Implement `render_header()`
 
-在頁首顯示 AI World 標題，以及當前的 tick、年份、季節。若 `world_state` 為 `None`（M1 尚未就緒），顯示「等待世界初始化...」。
+Display the AI World title, current tick, year, and season in the header. If `world_state` is `None` (M1 is not ready yet), display "Waiting for world initialization...".
 
 ```python
 def render_header(world_state: Optional[WorldState]) -> None:
-    st.title("🌍 AI World 即時儀表板")
+    st.title("🌍 AI World Real-time Dashboard")
     st.divider()
 
     if world_state is None:
-        st.warning("⚠️ 無法連接 M1 World State Engine，等待世界初始化...")
+        st.warning("⚠️ Unable to connect to M1 World State Engine, waiting for world initialization...")
         return
 
-    # 取得當前季節（優先從 M6 取，失敗則從 WorldState 取）
+    # Get current season (prioritize M6, fallback to WorldState on failure)
     season_str = world_state.season
     if M6_AVAILABLE:
         try:
             season_str = get_current_season()
         except Exception:
-            pass  # 使用 world_state.season 做 fallback
+            pass  # Use world_state.season as fallback
 
     season_display = SEASON_EMOJI.get(season_str, season_str)
 
-    # TODO：用 st.columns(3) 並排顯示：
-    #   col1 → "⏱️ Tick：{world_state.tick}"
-    #   col2 → "📅 年份：第 {world_state.year} 年"
-    #   col3 → "季節：{season_display}"
-    # 每欄使用 st.metric() 顯示，視覺效果較佳
+    # TODO: Use st.columns(3) to display side-by-side:
+    #   col1 → "⏱️ Tick: {world_state.tick}"
+    #   col2 → "📅 Year: Year {world_state.year}"
+    #   col3 → "Season: {season_display}"
+    # Display each using st.metric() for better visual presentation
     pass
 ```
 
 ---
 
-### 步驟 3：實作 `render_world_map()`
+### Step 3: Implement `render_world_map()`
 
-使用 Plotly 的 `go.Heatmap` 或自訂格子圖，以顏色呈現地形，並以符號「👤」標記有 Agent 的格子。
+Use Plotly's `go.Heatmap` or custom grid map to present terrain with colors, and mark grids containing Agents with the symbol "👤".
 
 ```python
 def render_world_map(world_state: Optional[WorldState]) -> None:
-    st.subheader("🗺️ 世界地圖")
+    st.subheader("🗺️ World Map")
 
     if world_state is None or not world_state.locations:
-        st.info("暫無地圖資料。請確認 M1 已初始化並建立 Location。")
+        st.info("No map data available yet. Please confirm M1 has initialized and created Locations.")
         return
 
     locations = list(world_state.locations.values())
 
-    # 計算地圖邊界
+    # Calculate map boundaries
     max_x = max(loc.x for loc in locations)
     max_y = max(loc.y for loc in locations)
 
-    # 建立格子矩陣：z 值代表地形（用整數 index 對應顏色）
-    # 建立 Agent 位置查找表：location_id → agent 名稱列表
-    # TODO：
-    #   1. 建立 (max_y+1) × (max_x+1) 的 2D 陣列，填入地形 index（0~3）
-    #   2. 建立 (max_y+1) × (max_x+1) 的 text 陣列，填入格子資訊（地名 + Agent 名）
-    #   3. 使用 go.Figure(go.Heatmap(...)) 繪製地形底圖
-    #      colorscale 對應 TERRAIN_COLORS 的四種顏色
-    #   4. 對有 Agent 的格子，疊加 go.Scatter 散點圖，符號為 "👤"
+    # Create grid matrix: z value represents terrain (using integer index mapped to color)
+    # Create Agent position lookup table: location_id → list of Agent names
+    # TODO:
+    #   1. Create a (max_y+1) x (max_x+1) 2D array, filling in terrain index (0~3)
+    #   2. Create a (max_y+1) x (max_x+1) text array, filling in grid details (Location name + Agent name)
+    #   3. Draw terrain base map using go.Figure(go.Heatmap(...))
+    #      colorscale maps to the 4 colors of TERRAIN_COLORS
+    #   4. Overlay go.Scatter scatter plot for grids with Agents, symbol "👤"
     #   5. st.plotly_chart(fig, use_container_width=True)
 
-    # ── 圖例說明 ──
-    st.markdown("**地形圖例：**")
+    # ── Legend Description ──
+    st.markdown("**Terrain Legend:**")
     cols = st.columns(len(TERRAIN_COLORS))
     for i, (terrain, color) in enumerate(TERRAIN_COLORS.items()):
-        # TODO：用 cols[i].markdown() 顯示色塊與地形名稱
+        # TODO: Use cols[i].markdown() to display color block and terrain name
         pass
 ```
 
-> **提示：** Plotly Heatmap 的 `colorscale` 接受 `[[0, "#color1"], [0.33, "#color2"], ...]` 格式。地形 index 對應關係建議為：`plains=0, forest=1, mountain=2, water=3`。
+> **Hint:** Plotly Heatmap's `colorscale` accepts `[[0, "#color1"], [0.33, "#color2"], ...]` format. The terrain index mapping is recommended as: `plains=0, forest=1, mountain=2, water=3`.
 
 ---
 
-### 步驟 4：實作 `render_agent_status()`
+### Step 4: Implement `render_agent_status()`
 
-以 `st.dataframe()` 顯示所有 Agent 的狀態表格，並提供個別 Agent 的詳細展開區塊。
+Display a status table of all Agents with `st.dataframe()`, and provide detailed expansion blocks for individual Agents.
 
 ```python
 def render_agent_status(world_state: Optional[WorldState]) -> None:
-    st.subheader("🧑 Agent 狀態總覽")
+    st.subheader("🧑 Agent Status Overview")
 
     if world_state is None or not world_state.agents:
-        st.info("暫無 Agent 資料。請確認 M2 已建立 Agent。")
+        st.info("No Agent data available yet. Please confirm M2 has created Agents.")
         return
 
     agents = list(world_state.agents.values())
 
-    # ── 主要表格 ──
-    # TODO：將 agents 轉換成 list of dict，欄位包含：
-    #   name、location_id（可進一步轉換成地名）、
-    #   food、water、energy、money、materials、
-    #   is_alive（顯示 ✅ / ❌）、age
-    # 使用 pd.DataFrame() 建立表格，再用 st.dataframe() 顯示
-    # 建議對數值欄位使用 st.dataframe 的 column_config 設定進度條樣式
+    # ── Main Table ──
+    # TODO: Convert agents to list of dicts, fields including:
+    #   name, location_id (can be mapped to location name),
+    #   food, water, energy, money, materials,
+    #   is_alive (display ✅ / ❌), age
+    # Create table using pd.DataFrame(), then display with st.dataframe()
+    # Recommend using st.dataframe's column_config to configure progress bar styles for numerical columns
 
-    # ── 個別 Agent 詳細資訊 ──
-    st.subheader("🔍 Agent 詳細資料")
+    # ── Individual Agent Details ──
+    st.subheader("🔍 Detailed Agent Data")
     agent_names = [a.name for a in agents]
-    selected_name = st.selectbox("選擇 Agent", agent_names)
+    selected_name = st.selectbox("Select Agent", agent_names)
 
-    # TODO：找到 selected_name 對應的 Agent 物件
-    # 使用 st.expander() 或 st.columns() 顯示：
-    #   - 個性特質（hunger/fear/ambition/loyalty/aggression）用進度條或雷達圖
-    #   - 技能列表（skills dict）
-    #   - 關係列表（relationships dict，顯示對象 Agent 名稱與好感度）
+    # TODO: Find Agent object corresponding to selected_name
+    # Use st.expander() or st.columns() to display:
+    #   - Personality traits (hunger/fear/ambition/loyalty/aggression) using progress bars or radar charts
+    #   - Skills list (skills dict)
+    #   - Relationships list (relationships dict, displaying target Agent name and relationship score)
     pass
 ```
 
-> **提示：** `st.progress(value)` 可顯示 0.0~1.0 的進度條，適合顯示個性數值。`plotly` 的 `go.Scatterpolar` 可繪製雷達圖呈現個性五維數據。
+> **Hint:** `st.progress(value)` can display a progress bar from 0.0~1.0, suitable for personality metrics. Plotly's `go.Scatterpolar` can draw a radar chart to present the 5D personality data.
 
 ---
 
-### 步驟 5：實作 `render_event_stream()`
+### Step 5: Implement `render_event_stream()`
 
-顯示最新 50 個世界事件，並以不同顏色區分事件類型。
+Display the latest 50 world events, distinguishing event types with different colors.
 
 ```python
 def render_event_stream(world_state: Optional[WorldState]) -> None:
-    st.subheader("📜 最新事件流")
+    st.subheader("📜 Latest Event Stream")
 
     if world_state is None:
-        st.info("無法取得事件資料。")
+        st.info("Unable to retrieve event data.")
         return
 
     events = world_state.events
 
     if not events:
-        st.info("目前尚無任何世界事件。")
+        st.info("No world events recorded yet.")
         return
 
-    # 只顯示最新 50 筆，按 tick 降序排列（最新的在最上面）
+    # Only display latest 50 items, sorted in descending order by tick (newest first)
     recent_events = sorted(events, key=lambda e: e.tick, reverse=True)[:50]
 
-    # 事件類型對應顏色 badge
+    # Event types mapped to color badges
     EVENT_COLORS = {
         "interaction": "🟦",
         "resource":    "🟩",
@@ -522,128 +522,128 @@ def render_event_stream(world_state: Optional[WorldState]) -> None:
         "death":       "⬛",
     }
 
-    # TODO：將事件轉換成 DataFrame，欄位：tick、event_type、description、timestamp
-    # 方法一（簡單）：使用 st.dataframe() 顯示表格
-    # 方法二（美觀）：用迴圈對每個事件呼叫 st.markdown() 顯示一行
-    #   格式範例："{emoji} **[Tick {tick}]** `{event_type}` — {description}"
+    # TODO: Convert events to DataFrame, fields: tick, event_type, description, timestamp
+    # Method 1 (Simple): Use st.dataframe() to display table
+    # Method 2 (Aesthetic): Use a loop to call st.markdown() for each event on a line
+    #   Format example: "{emoji} **[Tick {tick}]** `{event_type}` — {description}"
     pass
 ```
 
 ---
 
-### 步驟 6：實作 `render_history_query()`
+### Step 6: Implement `render_history_query()`
 
-提供 tick 範圍輸入，呼叫 M6 查詢歷史事件，並顯示指定 tick 的世界快照。
+Provide tick range inputs, call M6 to query historical events, and display the world snapshot for the specified tick.
 
 ```python
 def render_history_query() -> None:
-    st.subheader("🕰️ 歷史查詢")
+    st.subheader("🕰️ History Query")
 
     if not M6_AVAILABLE:
-        st.error("M6 Time & History 模組尚未就緒，無法查詢歷史。")
+        st.error("M6 Time & History module is not ready yet, unable to query history.")
         return
 
-    # ── 事件範圍查詢 ──
-    st.markdown("### 📋 事件範圍查詢")
+    # ── Event Range Query ──
+    st.markdown("### 📋 Event Range Query")
     col1, col2 = st.columns(2)
     with col1:
-        start_tick = st.number_input("起始 Tick", min_value=0, value=0, step=1)
+        start_tick = st.number_input("Start Tick", min_value=0, value=0, step=1)
     with col2:
-        end_tick = st.number_input("結束 Tick", min_value=0, value=10, step=1)
+        end_tick = st.number_input("End Tick", min_value=0, value=10, step=1)
 
-    if st.button("查詢歷史事件"):
+    if st.button("Query Historical Events"):
         try:
-            # TODO：呼叫 get_history(start_tick, end_tick)
-            # 顯示查詢結果（事件列表），格式同事件流
-            # 若無結果，顯示 st.info("此範圍內無事件")
+            # TODO: Call get_history(start_tick, end_tick)
+            # Display query results (event list), same format as event stream
+            # If no results, show st.info("No events in this range")
             pass
         except Exception as e:
-            st.error(f"查詢失敗：{e}")
+            st.error(f"Query failed: {e}")
 
     st.divider()
 
-    # ── 快照查詢 ──
-    st.markdown("### 📸 世界快照查詢")
-    snapshot_tick = st.number_input("快照 Tick", min_value=0, value=0, step=1)
+    # ── Snapshot Query ──
+    st.markdown("### 📸 Snapshot Query")
+    snapshot_tick = st.number_input("Snapshot Tick", min_value=0, value=0, step=1)
 
-    if st.button("載入快照"):
+    if st.button("Load Snapshot"):
         try:
-            # TODO：呼叫 get_snapshot(snapshot_tick)
-            # 若返回 None，顯示 st.warning("此 Tick 無快照紀錄")
-            # 若有快照，用 st.json() 顯示快照的摘要資訊（tick / year / season / agent 數量）
+            # TODO: Call get_snapshot(snapshot_tick)
+            # If returns None, show st.warning("No snapshot record for this Tick")
+            # If snapshot exists, use st.json() to display snapshot summary (tick / year / season / agent count)
             pass
         except Exception as e:
-            st.error(f"快照載入失敗：{e}")
+            st.error(f"Snapshot load failed: {e}")
 
     st.divider()
 
-    # ── 時間軸總覽 ──
-    st.markdown("### 🗓️ 重大事件時間軸")
-    if st.button("載入時間軸"):
+    # ── Timeline Overview ──
+    st.markdown("### 🗓️ Major Event Timeline")
+    if st.button("Load Timeline"):
         try:
-            # TODO：呼叫 get_timeline()
-            # 以 st.dataframe() 顯示 [{tick, event_type, description}] 列表
+            # TODO: Call get_timeline()
+            # Display [{tick, event_type, description}] list with st.dataframe()
             pass
         except Exception as e:
-            st.error(f"時間軸載入失敗：{e}")
+            st.error(f"Timeline load failed: {e}")
 ```
 
 ---
 
-### 步驟 7：實作自動刷新機制
+### Step 7: Implement Auto-Refresh Mechanism
 
-在 `main()` 函數末尾加入自動刷新邏輯。Streamlit 的自動刷新需搭配 `time.sleep()` 與 `st.rerun()`。
+Add auto-refresh logic to the end of the `main()` function. Streamlit's auto-refresh needs to be implemented with `time.sleep()` and `st.rerun()`.
 
 ```python
-# 在 main() 函數末尾（所有 tab 渲染完畢之後）加入：
+# Add at the end of main() function (after rendering all tabs):
 
 def main():
-    # ... （前面的程式碼）...
+    # ... (previous code) ...
 
-    # ── 自動刷新機制 ──
+    # ── Auto-Refresh Mechanism ──
     st.divider()
     col_refresh, col_countdown = st.columns([3, 1])
 
     with col_refresh:
-        auto_refresh = st.checkbox("啟用自動刷新（每 10 秒）", value=True)
+        auto_refresh = st.checkbox("Enable Auto-Refresh (every 10 seconds)", value=True)
 
     with col_countdown:
-        # TODO：顯示「上次更新時間」，格式：HH:MM:SS
+        # TODO: Display "Last updated time", format: HH:MM:SS
         import datetime
-        st.caption(f"上次更新：{datetime.datetime.now().strftime('%H:%M:%S')}")
+        st.caption(f"Last Updated: {datetime.datetime.now().strftime('%H:%M:%S')}")
 
     if auto_refresh:
         time.sleep(REFRESH_INTERVAL)
         st.rerun()
 ```
 
-> **注意：** `st.rerun()` 是 Streamlit 1.27+ 的新 API，舊版使用 `st.experimental_rerun()`。若執行時出現 `AttributeError`，請改用 `st.experimental_rerun()`，或確認 Streamlit 版本：`streamlit --version`。
+> **Note:** `st.rerun()` is a new API in Streamlit 1.27+. Older versions use `st.experimental_rerun()`. If `AttributeError` occurs during execution, please switch to `st.experimental_rerun()`, or check Streamlit version: `streamlit --version`.
 >
-> **效能提示：** `time.sleep(10)` 會讓整個 App 暫停 10 秒，這在 Streamlit 的單執行緒模型下是正常行為。若要更精細的控制，可使用 `st.empty()` 配合倒數計時器。
+> **Performance Tip:** `time.sleep(10)` pauses the entire App for 10 seconds, which is normal behavior under Streamlit's single-thread model. For more precise control, use `st.empty()` with a countdown timer.
 
 ---
 
-### 步驟 8：測試啟動
+### Step 8: Test Startup
 
-在專案根目錄執行以下指令啟動 App：
+Start the App by running the following command from the project root directory:
 
 ```bash
-# 切換到專案根目錄
+# Switch to project root directory
 cd c:\Users\zohanlin\Documents\zohan_ai_test\AI_World
 
-# 啟動 Streamlit
+# Start Streamlit
 streamlit run modules/m7_visualization/app.py
 ```
 
-App 啟動後，瀏覽器應自動開啟 `http://localhost:8501`。
+Once the App is started, the browser should open `http://localhost:8501` automatically.
 
 ---
 
-## 重要實作注意事項
+## Important Implementation Notes
 
-### 1. sys.path 設定
+### 1. sys.path Settings
 
-由於 `app.py` 位於 `modules/m7_visualization/`，而 `shared/schemas.py` 位於專案根目錄，**必須**在 `app.py` 開頭加入路徑設定：
+Since `app.py` is located in `modules/m7_visualization/` and `shared/schemas.py` is in the project root, path settings **must** be added at the beginning of `app.py`:
 
 ```python
 import sys
@@ -651,23 +651,23 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 ```
 
-這樣才能正確 `from shared.schemas import ...` 與 `from modules.m1_world_state.main import ...`。
+This ensures correct imports of `from shared.schemas import ...` and `from modules.m1_world_state.main import ...`.
 
-### 2. 防禦性 import
+### 2. Defensive Imports
 
-M1 與 M6 可能尚未完成實作。使用 `try/except ImportError` 加上旗標（`M1_AVAILABLE`、`M6_AVAILABLE`）保護每個 import，讓 App 在依賴模組未就緒時仍能啟動並顯示友善訊息。
+M1 and M6 implementations might not be completed. Protect each import with `try/except ImportError` along with flags (`M1_AVAILABLE`, `M6_AVAILABLE`), allowing the App to start and display friendly messages even when dependent modules are not ready.
 
-### 3. 不要讓 App crash
+### 3. Do Not Let App Crash
 
-所有呼叫 M1/M6 函數的地方都必須包在 `try/except Exception` 中。資料庫不存在、連線失敗、資料格式錯誤等情況，應以 `st.warning()` 或 `st.error()` 顯示，**絕不允許顯示 Python traceback 給使用者**。
+All places calling M1/M6 functions must be wrapped in `try/except Exception`. Situations like database non-existence, connection failure, or data format errors should be displayed using `st.warning()` or `st.error()`. **Never display Python tracebacks to users.**
 
-### 4. Plotly 格子地圖的 y 軸方向
+### 4. Plotly Grid Map y-Axis Direction
 
-Plotly Heatmap 預設 y=0 在底部（數學座標系），但地圖通常 y=0 在頂部。建議在 `fig.update_layout()` 中設定 `yaxis_autorange="reversed"`，或在建立 z 矩陣時翻轉 y 軸。
+Plotly Heatmap defaults to y=0 at the bottom (mathematical coordinate system), but maps usually have y=0 at the top. It is recommended to configure `yaxis_autorange="reversed"` in `fig.update_layout()`, or flip the y-axis when creating the z matrix.
 
-### 5. 中文字型支援
+### 5. Chinese Font Support
 
-Plotly 預設字型可能不支援中文。若地圖 hover text 出現亂碼，在 `fig.update_layout()` 中加入：
+The default font of Plotly might not support Chinese. If map hover text shows garbled characters, add to `fig.update_layout()`:
 
 ```python
 fig.update_layout(font=dict(family="Microsoft JhengHei, Arial, sans-serif"))
@@ -675,16 +675,16 @@ fig.update_layout(font=dict(family="Microsoft JhengHei, Arial, sans-serif"))
 
 ---
 
-## 驗證標準（全部通過才算完成）
+## Verification Standards (Must pass all to be considered complete)
 
-- [ ] 執行 `streamlit run modules/m7_visualization/app.py` 後，瀏覽器自動開啟且無 Python traceback
-- [ ] 頁首顯示「🌍 AI World 即時儀表板」標題，以及當前 tick、年份、季節（使用 `st.metric()`）
-- [ ] 四個分頁（世界地圖、Agent 狀態、事件流、歷史查詢）皆可正常切換，無任何分頁報錯
-- [ ] 世界地圖分頁顯示所有 Location 的地形顏色格子圖（至少一個格子有顏色）
-- [ ] 有 Agent 的格子上有明顯的 Agent 標記符號（「👤」或散點）
-- [ ] Agent 狀態分頁的表格至少包含：`name`、`location_id`、`food`、`money`、`is_alive` 欄位
-- [ ] 事件流分頁顯示最新事件，每行包含：`tick`、`event_type`、`description`
-- [ ] 歷史查詢分頁：輸入 tick 範圍後點擊按鈕，能顯示對應事件（或顯示「無事件」訊息）
-- [ ] 勾選「啟用自動刷新」後，App 每 10 秒自動重新讀取資料（可在 M1 更新資料後觀察）
-- [ ] M1 或 M6 未就緒時，App **不 crash**，而是顯示友善的警告訊息
-- [ ] 「上次更新時間」顯示正確的當前時間格式（HH:MM:SS）
+- [ ] After running `streamlit run modules/m7_visualization/app.py`, the browser opens automatically with no Python traceback
+- [ ] Header displays "🌍 AI World Real-time Dashboard" title, along with current tick, year, and season (using `st.metric()`)
+- [ ] All four tabs (World Map, Agent Status, Event Stream, History Query) switch normally with no errors in any tab
+- [ ] World Map tab displays a terrain color grid map for all Locations (at least one grid cell has color)
+- [ ] Grids with Agents have clear Agent markers ("👤" or scatter dots)
+- [ ] Agent Status tab table contains at least: `name`, `location_id`, `food`, `money`, `is_alive` fields
+- [ ] Event Stream tab displays latest events; each line includes: `tick`, `event_type`, `description`
+- [ ] History Query tab: after entering a tick range and clicking the button, corresponding events are displayed (or a "no events" message is shown)
+- [ ] After checking "Enable Auto-Refresh", the App automatically reloads data every 10 seconds (can be observed after M1 updates data)
+- [ ] When M1 or M6 is not ready, the App **does not crash** but displays friendly warning messages
+- [ ] "Last updated time" displays correct current time format (HH:MM:SS)

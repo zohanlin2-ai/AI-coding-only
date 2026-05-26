@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Interactive system architecture diagrams for the AI World simulation project, showcasing sequence flow and activity lifecycle.">
+    <title>AI World - System Architecture Diagrams</title>
+    <!-- Google Fonts for modern typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0B0F19;
+            --sidebar-bg: rgba(17, 24, 39, 0.7);
+            --card-bg: rgba(22, 28, 45, 0.6);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #F3F4F6;
+            --text-secondary: #9CA3AF;
+            --accent-color: #4F46E5;
+            --accent-hover: #6366F1;
+            --accent-success: #10B981;
+            --danger-color: #EF4444;
+            --sidebar-width: 380px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* Glassmorphic background blur effects */
+        .ambient-light {
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(79, 70, 229, 0.15) 0%, rgba(79, 70, 229, 0) 70%);
+            top: -100px;
+            right: -100px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .ambient-light-bottom {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0) 70%);
+            bottom: -200px;
+            left: -100px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Sidebar styling */
+        aside {
+            width: var(--sidebar-width);
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            backdrop-filter: blur(20px);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            padding: 40px 30px;
+            overflow-y: auto;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent-color) 0%, #06B6D4 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(79, 70, 229, 0.3);
+        }
+
+        .logo-text h1 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(to right, #F3F4F6, #9CA3AF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-text span {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        /* Menu / Tab navigation buttons */
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.95rem;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-item:hover {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-item.active {
+            color: #fff;
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.15) 0%, rgba(79, 70, 229, 0.03) 100%);
+            border-color: rgba(79, 70, 229, 0.4);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-item-icon {
+            font-size: 1.2rem;
+        }
+
+        /* Card descriptions in Sidebar */
+        .info-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: auto; /* Push footer down */
+        }
+
+        .info-card h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-card p {
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .info-card ul {
+            margin-top: 12px;
+            margin-left: 18px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        /* Sidebar Footer */
+        .sidebar-footer {
+            margin-top: 30px;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 20px;
+        }
+
+        /* Main content container */
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 5;
+            height: 100%;
+        }
+
+        /* Floating action bar inside main */
+        .control-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 25px 40px;
+            border-bottom: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+            background-color: rgba(11, 15, 25, 0.5);
+        }
+
+        .diagram-title h2 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .diagram-title p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .export-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            border-color: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+        }
+
+        .btn-secondary {
+            background-color: rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+            transform: translateY(-1px);
+        }
+
+        /* Diagram Viewer Frame */
+        .viewer-container {
+            flex-grow: 1;
+            padding: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            position: relative;
+            background-color: rgba(11, 15, 25, 0.2);
+        }
+
+        .diagram-card {
+            background-color: rgba(22, 28, 45, 0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 40px;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            min-width: 80%;
+            max-width: 95%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.3s ease;
+            opacity: 1;
+        }
+
+        .diagram-card.hidden {
+            display: none !important;
+            opacity: 0;
+        }
+
+        /* Custom Loading Spinner */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.05);
+            border-radius: 50%;
+            border-top-color: var(--accent-color);
+            animation: spin 1s ease-in-out infinite;
+            position: absolute;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Mermaid diagram styling overrides */
+        .mermaid {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .mermaid svg {
+            background-color: transparent !important;
+            max-height: 70vh !important;
+        }
+
+        /* Notification Toast */
+        .toast {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: #fff;
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 100;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Premium glassmorphic rendering overlay to fix the hidden-tab measurement bug -->
+    <div id="loading-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #0B0F19; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; backdrop-filter: blur(10px);">
+        <div class="spinner" style="position: static; transform: none; width: 50px; height: 50px;"></div>
+        <div style="font-size: 0.85rem; color: #9CA3AF; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">Rendering Architecture Diagrams...</div>
+    </div>
+
+    <div class="ambient-light"></div>
+    <div class="ambient-light-bottom"></div>
+
+    <!-- Sidebar Left Panel -->
+    <aside>
+        <div class="logo-area">
+            <div class="logo-icon">🔮</div>
+            <div class="logo-text">
+                <h1>AI World</h1>
+                <span>System Architecture</span>
+            </div>
+        </div>
+
+        <div class="section-title">Architecture Views</div>
+        <div class="nav-menu">
+            <button class="nav-item active" onclick="switchTab('sequence')">
+                <span class="nav-item-icon">🔀</span>
+                <span>Sequence Diagram</span>
+            </button>
+            <button class="nav-item" onclick="switchTab('activity')">
+                <span class="nav-item-icon">⚡</span>
+                <span>Activity Flowchart</span>
+            </button>
+        </div>
+
+        <div class="section-title">Diagram Breakdown</div>
+        <div class="info-card" id="info-card-content">
+            <!-- Dynamic Content based on active tab -->
+            <h3 id="info-title">🔀 Sequence Diagram View</h3>
+            <p id="info-desc">Illustrates the system setup and agent tick simulation loop lifecycle:</p>
+            <ul id="info-list">
+                <li>start.py initiates setup health check.</li>
+                <li>M8 Engine spawns background Streamlit.</li>
+                <li>M4 coordinates multi-agent tick iterations.</li>
+                <li>M2 fetches ChromaDB semantic memories & queries Ollama.</li>
+                <li>M5 rules validate actions & apply decay/mana regen.</li>
+                <li>M6 saves time metadata and snapshots to disk.</li>
+            </ul>
+        </div>
+
+        <div class="sidebar-footer">
+            <span>UML Spec Renderer v1.0</span>
+            <span>Mermaid v10</span>
+        </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main>
+        <!-- Control Bar -->
+        <header class="control-bar">
+            <div class="diagram-title">
+                <h2 id="main-title">AI World Sequence Diagram</h2>
+                <p id="main-subtitle">Initialization, Agent Decision Loop, and DB Sync lifecycles</p>
+            </div>
+            <div class="export-actions">
+                <button class="btn btn-secondary" onclick="triggerExport('svg')">
+                    <span>🖼️</span> Export SVG
+                </button>
+                <button class="btn btn-primary" onclick="triggerExport('png')">
+                    <span>📥</span> Export High-Res PNG (2x)
+                </button>
+            </div>
+        </header>
+
+        <!-- Viewer Frame -->
+        <div class="viewer-container">
+            <div id="spinner" class="spinner" style="display: none;"></div>
+
+            <!-- Sequence Diagram Card -->
+            <div id="sequence-card" class="diagram-card">
+                <div class="mermaid" id="seq-diagram">
+                    sequenceDiagram
+                        autonumber
+                        actor User as "User (Human Client)"
+                        participant Start as "start.py (Main Script)"
+                        participant M8 as "M8 Integration Engine"
+                        participant M4 as "M4 Multi-Agent Engine"
+                        participant M2 as "M2 Agent Engine"
+                        participant Ollama as "Local Ollama Service (gemma4:e4b)"
+                        participant M1 as "M1 World State (SQLite)"
+                        participant M3 as "M3 Memory (ChromaDB)"
+                        participant M7 as "M7 Streamlit Dashboard"
+
+                        rect rgb(15, 23, 42)
+                            Note over Start, M7: Setup & Initialization Phase
+                            User->>Start: "Run start.py"
+                            activate Start
+                            Start->>M8: "Call health_check()"
+                            M8-->>Start: "Return OK status dict"
+                            
+                            Start->>M8: "Call start_world()"
+                            activate M8
+                            M8->>M1: "Call init_world(locations, config)"
+                            M1-->>M8: "Return initialized WorldState"
+                            
+                            loop Spawning config.recommended_max_agents
+                                M8->>M2: "Call create_agent(name, location_id, personality)"
+                                M2->>M2: "Generate random gender & magical name"
+                                M2->>M1: "Call update_agent(agent) to save state"
+                            end
+                            
+                            M8->>M7: "Start Streamlit visualization (subprocess)"
+                            M8-->>Start: "Setup complete"
+                            deactivate M8
+                        end
+                        
+                        rect rgb(22, 28, 45)
+                            Note over Start, M3: Main Simulation Loop (Every Tick)
+                            loop Every config.tick_interval_sec
+                                Start->>M4: "Call run_tick()"
+                                activate M4
+                                
+                                M4->>M4: "Apply natural resource decay (via M5)"
+                                
+                                loop Iterate over all alive agents
+                                    M4->>M2: "Call update_agent_needs(agent_id)"
+                                    M2->>M1: "Update agent status in SQLite db"
+                                    
+                                    M4->>M2: "Call agent_think(agent_id, context)"
+                                    activate M2
+                                    M2->>M3: "Retrieve 5 recent memories from ChromaDB"
+                                    M3-->>M2: "Return memories"
+                                    M2->>Ollama: "POST /api/generate (prompt)"
+                                    activate Ollama
+                                    Ollama-->>M2: "Return action text decision"
+                                    deactivate Ollama
+                                    M2-->>M4: "Return decision text"
+                                    deactivate M2
+                                    
+                                    M4->>M2: "Call agent_act(agent_id)"
+                                    activate M2
+                                    M2->>M2: "Parse action type (Meditate / Cast / Move / etc)"
+                                    M2->>M2: "Validate action costs & requirements (via M5)"
+                                    M2->>M2: "Process action effects (Update MP, materials, duel roll)"
+                                    M2->>M1: "Update agent state in SQLite db"
+                                    M2->>M1: "Log world event in SQLite db"
+                                    M2->>M3: "Save memory to ChromaDB"
+                                    M2-->>M4: "Return action WorldEvent"
+                                    deactivate M2
+                                end
+                                
+                                M4-->>Start: "Return tick events list"
+                                deactivate M4
+                                
+                                Start->>Start: "Call advance_tick() (via M6)"
+                                Start->>Start: "Save JSON snapshot (if tick % 10 == 0)"
+                            end
+                        end
+                        
+                        rect rgb(11, 15, 25)
+                            Note over User, M7: Asynchronous Dashboard & Shutdown
+                            User->>M7: "Open dashboard http://localhost:8501"
+                            activate M7
+                            M7->>M1: "Call get_world_state() (read SQLite db)"
+                            M1-->>M7: "Return current WorldState"
+                            M7-->>User: "Render Plotly map, MP progress bars, and Event timeline"
+                            deactivate M7
+                            
+                            User->>Start: "Press Ctrl+C (Interrupt)"
+                            Start->>M8: "Call stop_world()"
+                            activate M8
+                            M8->>M1: "Save final database state"
+                            M8->>M7: "Terminate Streamlit subprocess"
+                            M8-->>Start: "Safely shut down"
+                            deactivate M8
+                            deactivate Start
+                        end
+                </div>
+            </div>
+
+            <!-- Activity Flowchart Card -->
+            <div id="activity-card" class="diagram-card">
+                <div class="mermaid" id="act-diagram">
+                    flowchart TD
+                        Start(["Terminal: Start M4.run_tick()"]) --> Decay["Apply natural resource decay - M5"]
+                        Decay --> Loop["For each alive Agent in world"]
+                        
+                        subgraph NeedsAndSurvival ["Needs & Survival Checks"]
+                            Loop --> Needs["Update agent needs (hunger, water, energy) - M2"]
+                            Needs --> CheckSurv{"Is Agent Alive?"}
+                            CheckSurv -- "No" --> Kill["Mark agent dead & log death event - M1"]
+                            Kill --> EndLoop
+                        end
+                        
+                        subgraph InteractionPhase ["Social Interaction & Negotiation"]
+                            CheckSurv -- "Yes" --> Interact{"Are other agents nearby?"}
+                            Interact -- "Yes" --> Negotiate["Run negotiation / conflict & log events"]
+                            Interact -- "No" --> RetrieveMem["Retrieve 5 recent memories from ChromaDB"]
+                            Negotiate --> RetrieveMem
+                        end
+                        
+                        subgraph LLMDecisions ["LLM Decision & Parsing"]
+                            RetrieveMem --> Ollama["Send context and memories to Ollama LLM"]
+                            Ollama --> Parse["Parse decision text into Action type"]
+                            Parse --> Validate{"Validate action requirements (MP, materials) - M5"}
+                        end
+                        
+                        subgraph ActionExecution ["Action Execution & Database Sync"]
+                            Validate -- "No" --> Fallback["Fallback to Rest action"]
+                            Validate -- "Yes" --> Execute["Apply action effects (Meditate / Cast / Move / Trade)"]
+                            Fallback --> Execute
+                            Execute --> UpdateDB["Update Agent state and log WorldEvent in SQLite"]
+                            UpdateDB --> SaveMem["Save event memory into ChromaDB"]
+                        end
+                        
+                        SaveMem --> EndLoop{"Last agent processed?"}
+                        EndLoop -- "No" --> Loop
+                        
+                        subgraph TimeProgression ["Time Progression & Snapshotting"]
+                            EndLoop -- "Yes" --> TimeProg["Advance world tick count & check season - M6"]
+                            TimeProg --> CheckSnap{"Is tick % 10 == 0?"}
+                            CheckSnap -- "Yes" --> Snapshot["Save complete WorldState JSON snapshot"]
+                            CheckSnap -- "No"  --> TermEnd(["Terminal: End run_tick()"])
+                            Snapshot --> TermEnd
+                        end
+                        
+                        %% Custom styling overrides for maximum visual clarity
+                        style Start fill:#1C3D24,stroke:#2F855A,color:#ffffff,stroke-width:2px
+                        style TermEnd fill:#1C3D24,stroke:#2F855A,color:#ffffff,stroke-width:2px
+                        style CheckSurv fill:#8B2635,stroke:#D6324A,color:#ffffff,stroke-width:2px
+                        style Kill fill:#8B2635,stroke:#D6324A,color:#ffffff,stroke-width:2px
+                        style Ollama fill:#4A3780,stroke:#6B46C1,color:#ffffff,stroke-width:2px
+                        style RetrieveMem fill:#B7791F,stroke:#DD6B20,color:#ffffff,stroke-width:2px
+                        style SaveMem fill:#B7791F,stroke:#DD6B20,color:#ffffff,stroke-width:2px
+                        style UpdateDB fill:#2D3748,stroke:#4A5568,color:#ffffff,stroke-width:2px
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">
+        <span>✅</span> <span id="toast-msg">Export complete!</span>
+    </div>
+
+    <!-- Mermaid CDN Initialization script -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        
+        mermaid.initialize({
+            startOnLoad: false, // Turn off auto start to render with DOM visibility
+            theme: 'dark',
+            securityLevel: 'loose',
+            themeVariables: {
+                background: '#0B0F19',
+                primaryColor: '#1E293B',
+                actorBkg: '#1F2937',
+                actorBorder: '#4B5563',
+                actorTextColor: '#F3F4F6',
+                signalColor: '#818CF8',
+                signalLineColor: '#4B5563',
+                labelBoxBkgColor: '#111827',
+                labelBoxBorderColor: '#374151',
+                labelTextColor: '#D1D5DB',
+                loopTextColor: '#F3F4F6',
+                rectBorderColor: '#374151',
+                rectBkgColor: '#1F2937',
+                noteBkgColor: '#1F2937',
+                noteBorderColor: '#374151',
+                noteTextColor: '#E5E7EB'
+            }
+        });
+
+        window.addEventListener('load', async () => {
+            try {
+                await mermaid.run();
+            } catch (err) {
+                console.error("Mermaid initialization run error:", err);
+            } finally {
+                // Remove loading overlay and initialize tab layout
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay) {
+                    overlay.style.transition = 'opacity 0.4s ease';
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.remove(), 400);
+                }
+                switchTab('sequence', true);
+            }
+        });
+    </script>
+
+    <!-- Tab navigation and Export utilities scripts -->
+    <script>
+        let currentTab = 'sequence';
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function switchTab(tabId, force = false) {
+            if (currentTab === tabId && !force) return;
+            currentTab = tabId;
+
+            const buttons = document.querySelectorAll('.nav-item');
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            const cards = document.querySelectorAll('.diagram-card');
+            cards.forEach(card => card.classList.add('hidden'));
+
+            const infoTitle = document.getElementById('info-title');
+            const infoDesc = document.getElementById('info-desc');
+            const infoList = document.getElementById('info-list');
+            
+            const mainTitle = document.getElementById('main-title');
+            const mainSubtitle = document.getElementById('main-subtitle');
+
+            if (tabId === 'sequence') {
+                document.querySelector('[onclick="switchTab(\'sequence\')"]').classList.add('active');
+                document.getElementById('sequence-card').classList.remove('hidden');
+                
+                mainTitle.innerText = "AI World Sequence Diagram";
+                mainSubtitle.innerText = "Initialization, Agent Decision Loop, and DB Sync lifecycles";
+                
+                infoTitle.innerHTML = "🔀 Sequence Diagram View";
+                infoDesc.innerText = "Illustrates the system setup and agent tick simulation loop lifecycle:";
+                infoList.innerHTML = `
+                    <li>start.py initiates setup health check.</li>
+                    <li>M8 Engine spawns background Streamlit.</li>
+                    <li>M4 coordinates multi-agent tick iterations.</li>
+                    <li>M2 fetches ChromaDB semantic memories & queries Ollama.</li>
+                    <li>M5 rules validate actions & apply decay/mana regen.</li>
+                    <li>M6 saves time metadata and snapshots to disk.</li>
+                `;
+            } else {
+                document.querySelector('[onclick="switchTab(\'activity\')"]').classList.add('active');
+                document.getElementById('activity-card').classList.remove('hidden');
+                
+                mainTitle.innerText = "AI World Tick Flowchart";
+                mainSubtitle.innerText = "Internal execution flow of a single run_tick() cycle";
+                
+                infoTitle.innerHTML = "⚡ Activity Flowchart View";
+                infoDesc.innerText = "Traces the step-by-step decision branching logic inside the generation loop:";
+                infoList.innerHTML = `
+                    <li>Natural resource decay application (M5).</li>
+                    <li>Needs update & survival evaluation (M2).</li>
+                    <li>Memory retrieval and LLM call (M3 & M2).</li>
+                    <li>Action validation & execution branch.</li>
+                    <li>SQLite Database and ChromaDB memory sync.</li>
+                `;
+            }
+        }
+
+        function triggerExport(format) {
+            const containerId = currentTab === 'sequence' ? 'seq-diagram' : 'act-diagram';
+            const filename = currentTab === 'sequence' ? 'ai_world_sequence' : 'ai_world_activity';
+            
+            const spinner = document.getElementById('spinner');
+            spinner.style.display = 'block';
+
+            setTimeout(() => {
+                try {
+                    if (format === 'svg') {
+                        exportSVG(containerId, `${filename}.svg`);
+                        showToast("SVG exported successfully!");
+                    } else if (format === 'png') {
+                        exportPNG(containerId, `${filename}.png`);
+                        showToast("PNG exported successfully (2x scale)!");
+                    }
+                } catch (err) {
+                    alert("Export failed: " + err.message);
+                } finally {
+                    spinner.style.display = 'none';
+                }
+            }, 300);
+        }
+
+        function exportSVG(containerId, filename) {
+            const svg = document.getElementById(containerId).querySelector('svg');
+            if (!svg) throw new Error("SVG elements are not fully rendered.");
+
+            const svgClone = svg.cloneNode(true);
+            svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+            const style = document.createElement('style');
+            style.textContent = `
+                svg { font-family: 'Plus Jakarta Sans', sans-serif !important; }
+                .actor { font-family: 'Plus Jakarta Sans', sans-serif !important; }
+                .messageText { font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 13px !important; }
+                .label { font-family: 'Plus Jakarta Sans', sans-serif !important; }
+            `;
+            svgClone.appendChild(style);
+
+            const source = new XMLSerializer().serializeToString(svgClone);
+            const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            a.click();
+            
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function exportPNG(containerId, filename) {
+            const svg = document.getElementById(containerId).querySelector('svg');
+            if (!svg) throw new Error("SVG elements are not fully rendered.");
+
+            const svgClone = svg.cloneNode(true);
+            svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+            const style = document.createElement('style');
+            style.textContent = `
+                svg { font-family: 'Plus Jakarta Sans', sans-serif !important; }
+                .actor { font-family: 'Plus Jakarta Sans', sans-serif !important; }
+                .messageText { font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 13px !important; }
+                .label { font-family: 'Plus Jakarta Sans', sans-serif !important; }
+            `;
+            svgClone.appendChild(style);
+
+            const source = new XMLSerializer().serializeToString(svgClone);
+            const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const bbox = svg.getBoundingClientRect();
+
+                canvas.width = bbox.width * 2;
+                canvas.height = bbox.height * 2;
+                
+                const ctx = canvas.getContext("2d");
+                
+                ctx.fillStyle = "#0B0F19";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.scale(2, 2);
+                ctx.drawImage(img, 0, 0);
+
+                const a = document.createElement("a");
+                a.href = canvas.toDataURL("image/png");
+                a.download = filename;
+                a.click();
+                
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        }
+    </script>
+</body>
+</html>

@@ -1,95 +1,95 @@
-# Module M6：Time & History（時間與歷史系統）
+# Module M6: Time & History
 
-## 你的任務
+## Your Task
 
-實作世界的時間推進與歷史記錄機制，負責 tick → season → year 的轉換、定期儲存世界快照、以及提供其他模組查詢過去事件與時間軸的能力。
-
----
-
-## 負責範圍
-
-- **負責：**
-  - 管理世界時間（tick、season、year）的推進邏輯
-  - 季節切換規則（spring → summer → autumn → winter → spring）
-  - 每 10 tick 自動儲存一次世界快照
-  - 每個季節結束時強制儲存快照
-  - 快照的寫入（`data/snapshots/snapshot_{tick}.json`）與讀取
-  - 提供指定 tick 範圍的歷史事件查詢
-  - 提供重大事件時間軸（`get_timeline()`）
-  - 提供當前季節查詢（`get_current_season()`）
-
-- **不負責：**
-  - Agent 行為的執行（由 M2、M4 負責）
-  - 資源消耗規則的套用（由 M5 負責；但 M6 推進 tick 時需提示 M5 執行）
-  - 向量記憶體的管理（由 M3 負責）
-  - 視覺化介面（由 M7 負責）
-  - Agent 的建立與刪除（由 M2 負責）
+Implement the world's time advancement and history recording mechanisms, responsible for tick → season → year conversions, periodically saving world snapshots, and providing other modules with the ability to query past events and timelines.
 
 ---
 
-## 依賴關係
+## Scope of Responsibility
 
-- **需要先完成：**
-  - M0（產出 `config.json`，M6 讀取 `tick_interval_sec` 等參數）
-  - M1（提供 `get_world_state()`、`get_tick()`、`save_state()`）
-  - M3（提供 `save_world_event()`、`search_history()`）
+- **Responsible for:**
+  - Manage the advancement logic of world time (tick, season, year)
+  - Season switching rules (spring → summer → autumn → winter → spring)
+  - Automatically save a world snapshot every 10 ticks
+  - Force save a snapshot at the end of each season
+  - Write (to `data/snapshots/snapshot_{tick}.json`) and read snapshots
+  - Provide queries for historical events within a specified tick range
+  - Provide a timeline of major events (`get_timeline()`)
+  - Provide queries for the current season (`get_current_season()`)
 
-- **被以下模組使用：**
-  - M7（Streamlit 視覺化介面直接呼叫 `get_timeline()`、`get_snapshot()`）
-  - M8（整合測試會呼叫 M6 所有對外函數）
+- **Not responsible for:**
+  - Execution of Agent behaviors (handled by M2, M4)
+  - Applying resource decay rules (handled by M5; but M6 needs to prompt M5 when advancing ticks)
+  - Management of vector memory (handled by M3)
+  - Visualization interface (handled by M7)
+  - Creation and deletion of Agents (handled by M2)
 
 ---
 
-## 工作目錄
+## Dependencies
+
+- **Prerequisites:**
+  - M0 (Generates `config.json`, M6 reads parameters like `tick_interval_sec`)
+  - M1 (Provides `get_world_state()`, `get_tick()`, `save_state()`)
+  - M3 (Provides `save_world_event()`, `search_history()`)
+
+- **Used by the following modules:**
+  - M7 (Streamlit visualization interface calls `get_timeline()` and `get_snapshot()` directly)
+  - M8 (Integration tests call all M6 provided functions)
+
+---
+
+## Working Directory
 
 ```
 c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\modules\m6_time_history\
 ```
 
-所有程式碼寫在此目錄下。執行程式時，**工作目錄（cwd）必須設定在專案根目錄**：
+All code is written under this directory. When running the program, the **working directory (cwd) must be set to the project root directory**:
 ```
 c:\Users\zohanlin\Documents\zohan_ai_test\AI_World\
 ```
-這樣 `from shared.schemas import *` 與 `from modules.m1_world_state.main import ...` 等 import 才能正確解析。
+This ensures that imports such as `from shared.schemas import *` and `from modules.m1_world_state.main import ...` can be correctly resolved.
 
 ---
 
-## 環境安裝
+## Environment Setup
 
 ```bash
 pip install pydantic
 ```
 
-> **注意：** M1 和 M3 已有其他依賴（SQLite、ChromaDB 等），請確保它們的環境也已安裝完成，M6 才能正確呼叫它們的函數。
+> **Note:** M1 and M3 have other dependencies (SQLite, ChromaDB, etc.). Please ensure their environments are also set up so M6 can call their functions correctly.
 
 ---
 
-## 需要建立的檔案
+## Files to Create
 
 ```
 AI_World/
 ├── modules/
 │   └── m6_time_history/
-│       └── main.py          ← 你需要實作的主檔案
+│       └── main.py          ← The main file you need to implement
 └── data/
-    └── snapshots/           ← 快照輸出目錄（程式執行時自動建立，不需手動建立）
+    └── snapshots/           ← Snapshot output directory (automatically created when running, no manual creation needed)
         ├── snapshot_0.json
         ├── snapshot_10.json
         └── ...
 ```
 
-> **不需要建立 `data/snapshots/` 目錄**，程式啟動時用 `os.makedirs(..., exist_ok=True)` 自動建立即可。
+> **No need to create the `data/snapshots/` directory**; it will be automatically created using `os.makedirs(..., exist_ok=True)` when the program starts.
 
 ---
 
-## 共用 Schema（直接使用，不可修改）
+## Shared Schema (Use directly, do not modify)
 
-> 從 `shared/schemas.py` import，**不可自行定義替代 class**。
+> Import from `shared/schemas.py`. **Do not define alternative classes yourself.**
 
-以下是 M6 會用到的 Schema：
+The following are schemas that M6 will use:
 
 ```python
-# shared/schemas.py（節錄）
+# shared/schemas.py (Excerpt)
 
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -172,73 +172,73 @@ class WorldState(BaseModel):
 
 ---
 
-## 你對外提供的函數（簽名不可修改）
+## Provided Functions (Signatures cannot be modified)
 
-> 以下函數名稱、參數型別、回傳型別**一律不可更改**。內部邏輯自由實作。
+> The following function names, parameter types, and return types **must not be changed**. The internal logic can be implemented freely.
 
 ```python
 # modules/m6_time_history/main.py
 
 def advance_tick() -> int:
-    """推進世界時間一個 tick，更新季節/年份，返回新 tick 數"""
+    """Advance world time by one tick, update season/year, returning the new tick count"""
 
 def get_history(start_tick: int, end_tick: int) -> list[WorldEvent]:
-    """取得指定 tick 範圍的歷史事件"""
+    """Retrieve historical events within the specified tick range"""
 
 def save_snapshot() -> None:
-    """儲存當前世界狀態快照到 data/snapshots/snapshot_{tick}.json"""
+    """Save a snapshot of the current world state to data/snapshots/snapshot_{tick}.json"""
 
 def get_snapshot(tick: int) -> Optional[WorldState]:
-    """取得指定 tick 的世界快照，若不存在返回 None"""
+    """Retrieve the world snapshot for a specified tick, returning None if not found"""
 
 def get_timeline() -> list[dict]:
-    """返回所有重大事件的時間軸列表 [{tick, event_type, description}]"""
+    """Return a timeline list of all major events [{tick, event_type, description}]"""
 
 def get_current_season() -> str:
-    """返回當前季節 'spring' | 'summer' | 'autumn' | 'winter'"""
+    """Return the current season: 'spring' | 'summer' | 'autumn' | 'winter'"""
 ```
 
 ---
 
-## 你可以呼叫的外部函數
+## External Functions You Can Call
 
 ```python
-# 從 M1 取得世界狀態與時間
+# Get world state and time from M1
 from modules.m1_world_state.main import get_world_state, get_tick, save_state
 
-# 從 M3 存取世界事件向量記憶
+# Access world event vector memory from M3
 from modules.m3_memory.main import save_world_event, search_history
 ```
 
-### 外部函數說明
+### External Function Descriptions
 
-| 函數 | 說明 |
+| Function | Description |
 |------|------|
-| `get_world_state() -> WorldState` | 讀取當前完整世界狀態（含所有 agents、events 等） |
-| `get_tick() -> int` | 取得當前 tick 數 |
-| `save_state() -> None` | 將當前世界狀態序列化並儲存到 M1 的資料庫 |
-| `save_world_event(event: WorldEvent) -> None` | 將世界事件存入 ChromaDB，供語意搜尋 |
-| `search_history(query: str, top_k: int = 10) -> list[WorldEvent]` | 語意搜尋歷史事件 |
+| `get_world_state() -> WorldState` | Read current complete world state (including all agents, events, etc.) |
+| `get_tick() -> int` | Get current tick count |
+| `save_state() -> None` | Serialize and save the current world state to M1's database |
+| `save_world_event(event: WorldEvent) -> None` | Save the world event to ChromaDB for semantic search |
+| `search_history(query: str, top_k: int = 10) -> list[WorldEvent]` | Semantically search historical events |
 
 ---
 
-## 時間規則（核心邏輯）
+## Time Rules (Core Logic)
 
 ```
-1 tick = 1 天
+1 tick = 1 day
 
-每 30 tick = 1 個季節，順序為：
-  spring（tick 0~29）→ summer（tick 30~59）→ autumn（tick 60~89）→ winter（tick 90~119）
+Every 30 ticks = 1 season, in the order of:
+  spring (ticks 0~29) → summer (ticks 30~59) → autumn (ticks 60~89) → winter (ticks 90~119)
 
-每 120 tick = 1 年（4 個季節走完後，year +1，重新從 spring 開始）
+Every 120 ticks = 1 year (after running through 4 seasons, year +1, starting over from spring)
 
-季節對資源消耗的影響（告知 M5 或在 advance_tick 中記錄）：
-  - winter：food 消耗 +20%
-  - summer：water 消耗 +20%
-  （M6 本身不直接修改 Agent 資源，應在 advance_tick 中建立 WorldEvent 告知 M5）
+Season impact on resource decay (inform M5 or record in advance_tick):
+  - winter: food decay +20%
+  - summer: water decay +20%
+  (M6 itself does not modify Agent resources directly; it should create a WorldEvent to inform M5 in advance_tick)
 ```
 
-### 季節判斷公式
+### Season Determination Formula
 
 ```python
 SEASONS = ["spring", "summer", "autumn", "winter"]
@@ -255,21 +255,21 @@ def _calculate_year(tick: int) -> int:
 
 ---
 
-## 快照儲存格式
+## Snapshot Storage Format
 
-- **儲存位置：** `data/snapshots/snapshot_{tick}.json`
-- **格式：** Pydantic `WorldState` 序列化後的 JSON（使用 `.model_dump_json()`）
-- **自動儲存條件：**
-  1. 每 10 tick 儲存一次（`tick % 10 == 0`）
-  2. 每個季節結束時強制儲存（tick 為 29、59、89、119、149…，即 `(tick + 1) % 30 == 0`）
+- **Storage Location:** `data/snapshots/snapshot_{tick}.json`
+- **Format:** JSON serialized from Pydantic `WorldState` (using `.model_dump_json()`)
+- **Auto-save conditions:**
+  1. Save once every 10 ticks (`tick % 10 == 0`)
+  2. Force save at the end of each season (ticks 29, 59, 89, 119, 149..., i.e., `(tick + 1) % 30 == 0`)
 
 ---
 
-## 實作步驟
+## Implementation Steps
 
-### Step 1：建立檔案與基本結構
+### Step 1: Create File and Basic Structure
 
-建立 `modules/m6_time_history/main.py`，先寫好所有 import 與常數定義：
+Create `modules/m6_time_history/main.py` and write all imports and constant definitions first:
 
 ```python
 # modules/m6_time_history/main.py
@@ -283,74 +283,74 @@ from shared.schemas import WorldState, WorldEvent, gen_id
 from modules.m1_world_state.main import get_world_state, get_tick, save_state
 from modules.m3_memory.main import save_world_event, search_history
 
-# ── 常數 ─────────────────────────────────────────────────
+# ── Constants ──
 SEASONS = ["spring", "summer", "autumn", "winter"]
 TICKS_PER_SEASON = 30
 TICKS_PER_YEAR = 120
 SNAPSHOT_INTERVAL = 10
 SNAPSHOT_DIR = "data/snapshots"
 
-# ── 初始化快照目錄 ─────────────────────────────────────────
+# ── Initialize Snapshot Directory ──
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 ```
 
 ---
 
-### Step 2：實作輔助函數（private）
+### Step 2: Implement Helper Functions (Private)
 
-這些函數只在模組內部使用，命名以底線開頭：
+These functions are only used internally within the module and are prefixed with an underscore:
 
 ```python
 def _calculate_season(tick: int) -> str:
-    """根據 tick 計算當前季節"""
-    # TODO: 使用 SEASONS 列表與 TICKS_PER_SEASON 計算
-    season_index = ...  # 提示：(tick % TICKS_PER_YEAR) // TICKS_PER_SEASON
+    """Calculate current season based on tick"""
+    # TODO: Calculate using SEASONS list and TICKS_PER_SEASON
+    season_index = ...  # Hint: (tick % TICKS_PER_YEAR) // TICKS_PER_SEASON
     return SEASONS[season_index]
 
 
 def _calculate_year(tick: int) -> int:
-    """根據 tick 計算當前年份（從第 1 年開始）"""
-    # TODO: 計算年份
-    return ...  # 提示：(tick // TICKS_PER_YEAR) + 1
+    """Calculate current year based on tick (starting from year 1)"""
+    # TODO: Calculate year
+    return ...  # Hint: (tick // TICKS_PER_YEAR) + 1
 
 
 def _is_season_end(tick: int) -> bool:
-    """判斷當前 tick 是否為某季節的最後一天"""
-    # TODO: 季節最後一天的條件
-    return ...  # 提示：(tick + 1) % TICKS_PER_SEASON == 0
+    """Determine if current tick is the last day of a season"""
+    # TODO: Conditions for the last day of a season
+    return ...  # Hint: (tick + 1) % TICKS_PER_SEASON == 0
 
 
 def _get_snapshot_path(tick: int) -> str:
-    """返回指定 tick 的快照檔案路徑"""
+    """Return the snapshot file path for a specified tick"""
     return os.path.join(SNAPSHOT_DIR, f"snapshot_{tick}.json")
 ```
 
 ---
 
-### Step 3：實作 `advance_tick()`
+### Step 3: Implement `advance_tick()`
 
-這是 M6 最核心的函數，需要：
-1. 從 M1 取得當前 tick
-2. 計算新 tick、新季節、新年份
-3. 如果季節切換，建立一個 `WorldEvent` 記錄
-4. 將事件存入 M3 的向量記憶
-5. 在適當時機觸發 `save_snapshot()`
-6. 呼叫 M1 的 `save_state()` 更新資料庫
+This is the core function of M6, which needs to:
+1. Get the current tick from M1
+2. Calculate new tick, new season, new year
+3. If season changes, create a `WorldEvent` record
+4. Store the event in M3's vector memory
+5. Trigger `save_snapshot()` at appropriate times
+6. Call M1's `save_state()` to update database
 
 ```python
 def advance_tick() -> int:
     """
-    推進世界時間一個 tick，更新季節/年份，返回新 tick 數。
+    Advance world time by one tick, update season/year, returning the new tick count.
 
-    流程：
-      1. 取得目前 tick（從 M1）
+    Flow:
+      1. Get current tick (from M1)
       2. new_tick = current_tick + 1
-      3. 計算 new_season 與 new_year
-      4. 若季節改變 → 建立 WorldEvent("season_change", ...)，存入 M3
-      5. 若 new_tick % 10 == 0 → 呼叫 save_snapshot()
-      6. 若 _is_season_end(new_tick - 1) → 呼叫 save_snapshot()（季節末強制儲存）
-      7. 呼叫 M1 的 save_state()
-      8. 返回 new_tick
+      3. Calculate new_season and new_year
+      4. If season changes → create WorldEvent("season_change", ...), store in M3
+      5. If new_tick % 10 == 0 → call save_snapshot()
+      6. If _is_season_end(new_tick - 1) → call save_snapshot() (force save at season end)
+      7. Call M1's save_state()
+      8. Return new_tick
     """
     current_tick = get_tick()
     new_tick = current_tick + 1
@@ -359,45 +359,45 @@ def advance_tick() -> int:
     new_season = _calculate_season(new_tick)
     new_year = _calculate_year(new_tick)
 
-    # TODO: 季節切換時，建立 WorldEvent 並存入 M3
+    # TODO: Create WorldEvent and store in M3 when season changes
     if new_season != old_season:
         event = WorldEvent(
             tick=new_tick,
-            event_type=...,        # 填入合適的 event_type
-            description=...,       # 例如：f"Season changed to {new_season} in year {new_year}"
+            event_type=...,        # Fill in appropriate event_type
+            description=...,       # For example: f"Season changed to {new_season} in year {new_year}"
         )
         save_world_event(event)
 
-    # TODO: 判斷是否需要儲存快照
-    # 條件1：每 10 tick
-    # 條件2：季節結束時（使用 _is_season_end）
+    # TODO: Determine if snapshot storage is needed
+    # Condition 1: Every 10 ticks
+    # Condition 2: At season end (use _is_season_end)
 
-    # TODO: 呼叫 M1 的 save_state()
+    # TODO: Call M1's save_state()
 
     return new_tick
 ```
 
-> **提示：** M1 的 `WorldState` 有 `tick`、`season`、`year` 欄位，但 M6 不直接修改 WorldState 物件——它通過 `save_state()` 讓 M1 持久化。若 M1 的 `save_state()` 不會自動更新 tick/season/year，需確認 M1 的實作方式，必要時在此先更新 WorldState 物件再呼叫 `save_state()`。
+> **Hint:** M1's `WorldState` has `tick`, `season`, and `year` fields, but M6 does not modify the WorldState object directly — it persists it via M1's `save_state()`. If M1's `save_state()` does not automatically update tick/season/year, verify M1's implementation and, if necessary, update the WorldState object here first before calling `save_state()`.
 
 ---
 
-### Step 4：實作 `save_snapshot()` 與 `get_snapshot()`
+### Step 4: Implement `save_snapshot()` and `get_snapshot()`
 
 ```python
 def save_snapshot() -> None:
     """
-    將當前世界狀態儲存為 JSON 快照。
+    Save the current world state as a JSON snapshot.
 
-    流程：
-      1. 呼叫 M1 的 get_world_state() 取得完整狀態
-      2. 使用 WorldState.model_dump_json() 序列化
-      3. 寫入 data/snapshots/snapshot_{tick}.json
+    Flow:
+      1. Call M1's get_world_state() to get complete state
+      2. Use WorldState.model_dump_json() for serialization
+      3. Write to data/snapshots/snapshot_{tick}.json
     """
     world_state = get_world_state()
     tick = world_state.tick
     path = _get_snapshot_path(tick)
 
-    # TODO: 序列化並寫入檔案
+    # TODO: Serialize and write to file
     json_str = world_state.model_dump_json(indent=2)
     with open(path, "w", encoding="utf-8") as f:
         ...
@@ -405,45 +405,45 @@ def save_snapshot() -> None:
 
 def get_snapshot(tick: int) -> Optional[WorldState]:
     """
-    讀取指定 tick 的快照，不存在則返回 None。
+    Read the snapshot for a specified tick, returning None if not found.
 
-    流程：
-      1. 計算檔案路徑 _get_snapshot_path(tick)
-      2. 若檔案不存在 → 返回 None
-      3. 讀取 JSON → 使用 WorldState.model_validate_json() 解析
-      4. 返回 WorldState 物件
+    Flow:
+      1. Calculate file path using _get_snapshot_path(tick)
+      2. If file does not exist → return None
+      3. Read JSON → Parse using WorldState.model_validate_json()
+      4. Return WorldState object
     """
     path = _get_snapshot_path(tick)
 
     if not os.path.exists(path):
         return None
 
-    # TODO: 讀取並解析 JSON
+    # TODO: Read and parse JSON
     with open(path, "r", encoding="utf-8") as f:
         ...
 
-    return ...  # WorldState 物件
+    return ...  # WorldState object
 ```
 
 ---
 
-### Step 5：實作 `get_history()`
+### Step 5: Implement `get_history()`
 
 ```python
 def get_history(start_tick: int, end_tick: int) -> list[WorldEvent]:
     """
-    取得 start_tick 到 end_tick（含）範圍內的所有世界事件。
+    Retrieve all world events in the range from start_tick to end_tick (inclusive).
 
-    策略：
-      1. 呼叫 M1 的 get_world_state()，從 world_state.events 取得所有事件
-      2. 篩選出 tick 在 [start_tick, end_tick] 範圍內的事件
-      3. 按 tick 排序後返回
+    Strategy:
+      1. Call M1's get_world_state(), getting all events from world_state.events
+      2. Filter events with ticks in the [start_tick, end_tick] range
+      3. Return sorted by tick
 
-    注意：若 M1 不儲存完整事件列表，可考慮掃描快照檔案合併事件。
+    Note: If M1 does not store the complete event list, consider scanning snapshot files to merge events.
     """
     world_state = get_world_state()
 
-    # TODO: 篩選並排序事件
+    # TODO: Filter and sort events
     filtered = [
         event for event in world_state.events
         if start_tick <= event.tick <= end_tick
@@ -454,32 +454,32 @@ def get_history(start_tick: int, end_tick: int) -> list[WorldEvent]:
 
 ---
 
-### Step 6：實作 `get_timeline()`
+### Step 6: Implement `get_timeline()`
 
 ```python
 def get_timeline() -> list[dict]:
     """
-    返回所有重大事件的時間軸列表。
+    Return a timeline list of all major events.
 
-    每個項目格式：
+    Each item format:
       {
         "tick": int,
         "event_type": str,
         "description": str
       }
 
-    重大事件定義（選擇以下任一策略）：
-      - 策略A：返回所有 event_type 為 "season_change"、"conflict"、"death"、"discovery" 的事件
-      - 策略B：返回 world_state.events 中所有事件（依 tick 排序）
-      - 策略C：從掃描快照檔案中彙整
+    Major event definition (choose any of the following strategies):
+      - Strategy A: Return all events with event_type "season_change", "conflict", "death", "discovery"
+      - Strategy B: Return all events in world_state.events (sorted by tick)
+      - Strategy C: Aggregate by scanning snapshot files
 
-    建議使用策略A，讓時間軸只顯示「有意義」的事件。
+    It is recommended to use Strategy A to only show "meaningful" events on the timeline.
     """
     world_state = get_world_state()
 
     MAJOR_EVENT_TYPES = {"season_change", "conflict", "death", "discovery"}
 
-    # TODO: 篩選重大事件並格式化輸出
+    # TODO: Filter major events and format output
     timeline = []
     for event in sorted(world_state.events, key=lambda e: e.tick):
         if event.event_type in MAJOR_EVENT_TYPES:
@@ -494,17 +494,17 @@ def get_timeline() -> list[dict]:
 
 ---
 
-### Step 7：實作 `get_current_season()`
+### Step 7: Implement `get_current_season()`
 
 ```python
 def get_current_season() -> str:
     """
-    返回當前季節字串。
+    Return current season string.
 
-    流程：
-      1. 呼叫 M1 的 get_tick() 取得 tick
-      2. 使用 _calculate_season(tick) 計算季節
-      3. 返回季節字串
+    Flow:
+      1. Call M1's get_tick() to get tick
+      2. Calculate season using _calculate_season(tick)
+      3. Return season string
     """
     tick = get_tick()
     return _calculate_season(tick)
@@ -512,12 +512,12 @@ def get_current_season() -> str:
 
 ---
 
-### Step 8：模組層級初始化（可選）
+### Step 8: Module-Level Initialization (Optional)
 
-如果需要在模組 import 時執行任何初始化（例如確保快照目錄存在），可在檔案最頂部或最底部加入：
+If any initialization is needed when the module is imported (e.g., ensuring snapshot directory exists), add to the very top or bottom of the file:
 
 ```python
-# 確保快照目錄存在（已在常數定義區執行，此處為備用）
+# Ensure snapshot directory exists (already executed in constant definitions, this is backup)
 def _ensure_snapshot_dir():
     os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
@@ -526,67 +526,67 @@ _ensure_snapshot_dir()
 
 ---
 
-## 驗證標準（全部通過才算完成）
+## Verification Standards (Must pass all to be considered complete)
 
-> 在專案根目錄（`AI_World/`）下執行以下測試：
+> Run the following tests under the project root (`AI_World/`):
 
-- [ ] **`advance_tick()` 回傳值正確**
-  - 連續呼叫 3 次 `advance_tick()`，每次回傳值應比上次多 1
-  - `advance_tick()` 應返回 `int` 型別
+- [ ] **`advance_tick()` return value is correct**
+  - Call `advance_tick()` 3 times consecutively; each return value should be 1 greater than the previous one
+  - `advance_tick()` should return `int` type
 
-- [ ] **季節切換正確**
-  - 從 tick 0 推進到 tick 30 時，`get_current_season()` 應從 `"spring"` 變為 `"summer"`
-  - 從 tick 90 推進到 tick 120 時，應從 `"winter"` 變為 `"spring"` 並 year +1
+- [ ] **Season switching is correct**
+  - When advancing from tick 0 to tick 30, `get_current_season()` should change from `"spring"` to `"summer"`
+  - When advancing from tick 90 to tick 120, it should change from `"winter"` to `"spring"` and year +1
 
-- [ ] **`get_history(0, 10)` 正常運作**
-  - 呼叫 `get_history(0, 10)` 應返回 `list[WorldEvent]`（可為空列表，但不能報錯）
-  - 返回的事件 tick 均在 `[0, 10]` 範圍內
+- [ ] **`get_history(0, 10)` works normally**
+  - Calling `get_history(0, 10)` should return `list[WorldEvent]` (can be empty but must not error)
+  - The returned events' ticks must all be in the `[0, 10]` range
 
-- [ ] **`save_snapshot()` 產生 JSON 檔案**
-  - 呼叫 `save_snapshot()` 後，`data/snapshots/snapshot_{tick}.json` 應存在
-  - 檔案內容為合法的 JSON，且可用 `WorldState.model_validate_json()` 解析
+- [ ] **`save_snapshot()` generates JSON file**
+  - After calling `save_snapshot()`, `data/snapshots/snapshot_{tick}.json` should exist
+  - File content must be valid JSON and parseable with `WorldState.model_validate_json()`
 
-- [ ] **`get_snapshot(tick)` 能讀回快照**
-  - 先呼叫 `save_snapshot()`，再呼叫 `get_snapshot(current_tick)` 應返回 `WorldState` 物件
-  - 呼叫 `get_snapshot(99999)` 應返回 `None`（不存在的 tick）
+- [ ] **`get_snapshot(tick)` can read back snapshot**
+  - Calling `save_snapshot()` first and then calling `get_snapshot(current_tick)` should return a `WorldState` object
+  - Calling `get_snapshot(99999)` should return `None` (non-existent tick)
 
-- [ ] **`get_timeline()` 格式正確**
-  - 呼叫 `get_timeline()` 應返回 `list[dict]`
-  - 每個 dict 必須包含 `"tick"`、`"event_type"`、`"description"` 三個 key
-  - tick 值為 `int`，event_type 與 description 為 `str`
+- [ ] **`get_timeline()` format is correct**
+  - Calling `get_timeline()` should return `list[dict]`
+  - Each dict must contain three keys: `"tick"`, `"event_type"`, and `"description"`
+  - tick value is `int`, event_type and description are `str`
 
-- [ ] **`get_current_season()` 回傳正確字串**
-  - 回傳值必須是 `"spring"`、`"summer"`、`"autumn"`、`"winter"` 其中之一
-  - 不可回傳其他字串或 `None`
+- [ ] **`get_current_season()` returns correct string**
+  - The return value must be one of `"spring"`, `"summer"`, `"autumn"`, `"winter"`
+  - Must not return other strings or `None`
 
-- [ ] **快照自動儲存觸發**
-  - 推進到第 10 tick 時，`data/snapshots/snapshot_10.json` 應自動存在
-  - 推進到第 29 tick 時（spring 結束），應有對應快照
+- [ ] **Auto-save snapshot triggered**
+  - When advancing to the 10th tick, `data/snapshots/snapshot_10.json` should automatically exist
+  - When advancing to the 29th tick (end of spring), the corresponding snapshot should exist
 
-- [ ] **不影響現有模組**
-  - import `modules.m6_time_history.main` 不會觸發任何副作用（不會修改資料庫）
-  - 如有 module-level 初始化，只允許建立目錄，不允許修改世界狀態
-
----
-
-## 常見問題（FAQ）
-
-**Q：`advance_tick()` 需要修改 M1 資料庫中的 tick 值嗎？**
-
-A：需要確認 M1 的 `save_state()` 是否會將 tick/season/year 一起儲存。若 M1 的 WorldState 物件中這些欄位只在記憶體中，M6 需要先更新 WorldState 物件（修改 `.tick`、`.season`、`.year`），再呼叫 `save_state()`。
-
-**Q：`get_history()` 如果 M1 的 events 列表太長怎麼辦？**
-
-A：目前 MVP 階段直接從記憶體篩選即可。若未來效能有問題，可改為掃描快照檔案。
-
-**Q：每 10 tick 儲存一次，如果 tick 10 同時也是季節末，要存幾次？**
-
-A：只存一次，兩個條件都滿足時呼叫一次 `save_snapshot()` 即可（函數本身是冪等的）。
-
-**Q：快照 JSON 格式的 datetime 欄位會有問題嗎？**
-
-A：Pydantic v2 的 `model_dump_json()` 會自動處理 `datetime` 序列化。讀取時使用 `model_validate_json()` 即可正確解析，無需手動處理。
+- [ ] **Does not affect existing modules**
+  - Importing `modules.m6_time_history.main` does not trigger side effects (does not modify database)
+  - Any module-level initialization should only create directories and not modify world state
 
 ---
 
-*文件版本：1.0 | 最後更新：2026-05-25*
+## FAQ
+
+**Q: Does `advance_tick()` need to modify the tick value in M1's database?**
+
+**A:** Yes, verify if M1's `save_state()` saves tick/season/year. If these fields in M1's WorldState object are in-memory only, M6 needs to update the WorldState object first (modify `.tick`, `.season`, `.year`), then call `save_state()`.
+
+**Q: What if the events list in M1 for `get_history()` is too long?**
+
+**A:** For the current MVP stage, filtering directly from memory is sufficient. If performance becomes an issue in the future, it can be changed to scan snapshot files.
+
+**Q: Saved every 10 ticks; if tick 10 is also the end of a season, how many times is it saved?**
+
+**A:** Only once. When both conditions are met, call `save_snapshot()` once (the function itself is idempotent).
+
+**Q: Will there be issues with datetime fields in the snapshot JSON format?**
+
+**A:** Pydantic v2's `model_dump_json()` automatically handles `datetime` serialization. Reading with `model_validate_json()` parses it correctly without manual handling.
+
+---
+
+*Document Version: 1.0 | Last Updated: 2026-05-25*
