@@ -2,6 +2,13 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.1.2] - 2026-05-26
+
+### Changed
+- Aligned version checks to follow the new date+commit-SHA self-update flow (`YYYYMMDD-sha` format) instead of the GitHub Release Tag flow.
+- Updated `current/version_check.py` to check branch commits on startup.
+- Refactored `current/tests/test_version_check.py` to mock branch commit API responses.
+
 ## [0.1.1] - 2026-05-26
 
 ### Changed
