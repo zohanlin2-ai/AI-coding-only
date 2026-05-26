@@ -1,0 +1,20 @@
+github:
+  owner: zohanlin2-ai
+  repo: AI-coding-only
+  subfolder: Ann
+  token: ""          # Optional: Personal Access Token to raise rate limit to 5000/hr
+
+llm:
+  provider: ollama
+  model: gemma4:e4b
+  base_url: http://localhost:11434
+
+update:
+  check_on_startup: true
+  allow_automatic_non_moral_updates: true
+  # INVARIANT: moral module updates must NEVER be automatic (moral_module_spec §20)
+  allow_automatic_moral_updates: false
+
+logging:
+  level: INFO
+  max_log_files: 10

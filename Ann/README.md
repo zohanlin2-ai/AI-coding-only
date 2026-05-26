@@ -1,191 +1,202 @@
-# Ann: AI 助理與自我更新機制 (Ann: AI Assistant with Self-Updating Mechanism)
+# Ann: AI Assistant with Self-Updating Mechanism
 
-歡迎使用 AI 助理 **Ann** 專案。本專案旨在開發一個運行於本機環境、具備自動自我更新（Self-Updating）機制的 Python AI 助理。
-
----
-
-## 📌 專案概述
-本專案採用 **Launcher + Core（啟動器與核心分離）** 架構，解決 Python 程式在執行期間無法直接覆寫自身的限制，並透過 GitHub REST API 實作無痛的靜態更新與回滾（Rollback）機制。
+Welcome to the **Ann** AI assistant project. Ann is a locally-hosted Python AI assistant featuring an automatic self-updating mechanism.
 
 ---
 
-## 🛠️ 開發語言與技術棧
-- **核心語言**：Python 3.10+
-  - **優勢**：AI/LLM 生態系最完整（LangChain、Anthropic SDK、OpenAI SDK），支援動態載入模組（`importlib`），子程序與作業系統操作簡便。
-- **測試框架**：`pytest`
-- **相依套件管理**：`pip` + `virtualenv` / `venv`
-- **通訊協定**：GitHub REST API (HTTPS)
+## 📌 Project Overview
 
-### 各語言評估比較
-| 語言 | 優點 | 缺點 | 適合度 |
+This project adopts a **Launcher + Core (separated processes)** architecture to overcome the limitation that a Python process cannot overwrite its own running files. Version management and file delivery are handled entirely through the GitHub REST API, enabling painless updates and rollbacks.
+
+---
+
+## 🛠️ Development Language & Tech Stack
+
+- **Core Language**: Python 3.10+
+  - **Advantages**: The richest AI/LLM ecosystem (LangChain, Anthropic SDK, OpenAI SDK), easy dynamic module loading (`importlib`), simple subprocess and OS operations.
+- **Test Framework**: `pytest`
+- **Dependency Management**: `pip` + `virtualenv` / `venv`
+- **Communication Protocol**: GitHub REST API (HTTPS)
+
+### Language Comparison
+
+| Language | Pros | Cons | Suitability |
 | :--- | :--- | :--- | :---: |
-| **Python** | LLM 生態系完整、適合熱更新、開發迅速 | 執行速度較慢 | ⭐⭐⭐⭐⭐ (首選) |
-| **Node.js** | 非同步效能強、容易與前端整合 | AI 生態系不及 Python 完備 | ⭐⭐⭐ |
-| **Go** | 編譯快速、單一執行檔部署簡單 | 動態載入/更新模組邏輯較複雜 | ⭐⭐ |
-| **Rust** | 效能與安全性極佳 | 開發週期長、AI 相關生態系尚弱 | ⭐ |
+| **Python** | Complete LLM ecosystem, hot-update friendly, rapid development | Slower execution speed | ⭐⭐⭐⭐⭐ (Recommended) |
+| **Node.js** | Strong async performance, easy front-end integration | AI ecosystem less mature than Python | ⭐⭐⭐ |
+| **Go** | Fast compilation, simple single-binary deployment | Complex dynamic module loading/updating logic | ⭐⭐ |
+| **Rust** | Excellent performance and safety | Longer development cycle, weak AI ecosystem | ⭐ |
 
 ---
 
-## 🏗️ 核心架構：Launcher + Core 雙模組
+## 🏗️ Core Architecture: Launcher + Core Dual-Module
 
-為了解決「程式執行中無法覆寫自身」的本機限制，本專案將程式邏輯拆分為兩個部分：
-- **`launcher.py`** (啟動器)：常駐執行且不常更新，負責啟動、監控 `assistant.py` 核心，以及執行新版本的測試與置換。
-- **`assistant.py`** (Ann 助理核心)：負責主要的 AI 對話與功能邏輯，可隨時被更新與重啟。
+To solve the "cannot overwrite running code" local limitation, the project splits program logic into two components:
+
+- **`launcher.py`** (Launcher): Always running, rarely updated. Responsible for starting and monitoring the `assistant.py` core, and executing test-and-swap for new versions.
+- **`assistant.py`** (Ann Assistant Core): Handles all AI conversation and feature logic. Can be updated and restarted at any time.
 
 ```mermaid
 graph TD
-    Launcher[launcher.py <br><i>常駐監控與版本更替</i>]
-    Assistant[current/assistant.py <br><i>AI 助理 Ann 核心與使用者互動</i>]
-    Staging[staging/ <br><i>新版程式測試與環境準備</i>]
-    Versions[versions/ <br><i>歷史版本備份與回滾庫</i>]
-    GitHub[GitHub API <br><i>線上 Release / Tag 偵測</i>]
+    Launcher[launcher.py <br><i>Persistent monitor & version management</i>]
+    Assistant[current/assistant.py <br><i>Ann AI assistant core & user interaction</i>]
+    Staging[staging/ <br><i>New version testing & environment prep</i>]
+    Versions[versions/ <br><i>Historical version backups for rollback</i>]
+    GitHub[GitHub API <br><i>Online Release / Tag detection</i>]
 
-    Launcher -->|啟動與重啟監控| Assistant
-    Assistant -->|偵測到更新，通知並結束自身| Launcher
-    Launcher -->|1. 下載 Zipball| GitHub
-    Launcher -->|2. 解壓縮| Staging
-    Launcher -->|3. 執行 Pytest 驗證| Staging
-    Staging -->|4. 測試通過: 原子置換| Assistant
-    Launcher -.->|測試失敗: 回滾舊版本| Versions
+    Launcher -->|Start & restart monitoring| Assistant
+    Assistant -->|Update detected, signal & exit| Launcher
+    Launcher -->|1. Fetch file list| GitHub
+    Launcher -->|2. Download files| Staging
+    Launcher -->|3. Run pytest validation| Staging
+    Staging -->|4. Tests pass: atomic swap| Assistant
+    Launcher -.->|Tests fail: rollback| Versions
 ```
 
 ---
 
-## 📂 建議目錄結構
-在部署與開發時，推薦的目錄層級如下：
+## 📂 Recommended Directory Structure
+
+The recommended layout for deployment and development:
 
 ```text
 ~/.ai-assistant/
-├── launcher.py              # 核心啟動器（極少更新，永不覆蓋）
-├── moral_module_spec.md     # ⚖️ 道德與安全規範模組（由 OpenAI 設計，Claude 審核，嚴禁修改）
-├── config.yml               # 使用者設定檔（保留使用者設定，不隨版本更新覆蓋）
-├── logs/                    # 系統執行日誌
-├── current/                 # 當前執行中的正式版本
-│   ├── assistant.py         # AI 助理 Ann 核心程式入口
-│   ├── requirements.txt     # 本版本相依套件
-│   └── plugins/             # 擴充外掛目錄
-├── staging/                 # 更新緩衝區（下載、安裝依賴與測試皆在此進行）
-└── versions/                # 歷史版本備份（供 Rollback 使用）
+├── launcher.py              # Core launcher (rarely updated, never overwritten)
+├── moral_module_spec.md     # ⚖️ Moral & safety specification (designed by OpenAI, audited by Claude — DO NOT MODIFY)
+├── config.yml               # User configuration (preserved across updates)
+├── logs/                    # System logs
+├── current/                 # Active production version
+│   ├── assistant.py         # Ann AI assistant core entry point
+│   ├── requirements.txt     # Dependencies for this version
+│   └── plugins/             # Plugin extension directory
+├── staging/                 # Update buffer (download, install deps, and test here)
+└── versions/                # Historical version backups (for rollback)
     ├── v1.0.1/
     └── v1.0.2/
 ```
 
 ---
 
-## 🔄 自我更新流程
+## 🔄 Self-Updating Flow
 
-本系統不依賴本地 git 指令，純粹使用 **GitHub REST API** 進行版本控制與下載。
+This system requires **no local git commands** — it relies entirely on the **GitHub REST API** for version control and file delivery.
 
-### 1. 更新循序圖
+### 1. Update Sequence Diagram
+
 ```mermaid
 sequenceDiagram
-    participant U as 使用者
+    participant U as User
     participant A as current/assistant.py
     participant L as launcher.py
     participant S as staging/
     participant GH as GitHub API
 
-    A->>GH: 1. 檢查最新版本 (GET /releases/latest)
-    GH-->>A: 回傳最新版 tag_name (例如 v1.2.0)
-    Note over A: 與本地 version.txt 比對
+    A->>GH: 1. Check latest release (GET /releases/latest)
+    GH-->>A: Return latest tag_name (e.g. v1.2.0)
+    Note over A: Compare with local version.txt
 
     rect rgb(230, 245, 255)
-        Note over A, U: 若有新版本
-        A->>U: 2. 詢問「偵測到新版本，是否現在更新？」
-        U-->>A: 同意更新 (Yes)
+        Note over A, U: If a new version is available
+        A->>U: 2. "New version detected. Update now?"
+        U-->>A: Confirm update (Yes)
     end
 
-    A->>L: 3. 發送更新信號並結束執行
-    L->>GH: 4. 取得 Ann 檔案清單 (GET /contents/Ann?ref={tag})
-    GH-->>L: 回傳 JSON 檔案清單 (包含每個檔案的 download_url)
-    L->>GH: 5. 下載 Ann 相關檔案 (使用 download_url 逐一下載)
-    L->>S: 6. 寫入至 staging/ 目錄中相對應的路徑
+    A->>L: 3. Send update signal and exit
+    L->>GH: 4. Fetch Ann file list (GET /contents/Ann?ref={tag})
+    GH-->>L: Return JSON file list (each entry includes download_url)
+    L->>GH: 5. Download Ann files (iterate download_url for each file)
+    L->>S: 6. Write files to staging/ at their relative paths
 
     rect rgb(240, 255, 240)
-        Note over L, S: 安全驗證階段
-        L->>S: 7. 於 staging 執行 pytest 與相依性檢查
-        S-->>L: 測試通過
+        Note over L, S: Safety validation phase
+        L->>S: 7. Run pytest and dependency check in staging
+        S-->>L: All tests pass
     end
 
-    L->>L: 8. 原子置換 (Atomic Swap): staging/ -> current/
-    L->>A: 9. 重新啟動新版 assistant.py (Ann)
+    L->>L: 8. Atomic swap: staging/ -> current/
+    L->>A: 9. Restart new version of assistant.py (Ann)
 ```
 
-### 2. GitHub API 詳細說明
+### 2. GitHub API Details
 
-* **比對最新版本：**
+* **Check latest release:**
   ```http
   GET https://api.github.com/repos/{owner}/{repo}/releases/latest
   ```
-  比對回傳的 `tag_name` 與本地 `version.txt`，確認是否有新發布版本。
+  Compare the returned `tag_name` with the local `version.txt` to determine whether an update is needed.
 
-* **取得 Ann 目錄下的檔案清單：**
+* **Fetch file list for the Ann directory:**
   ```http
   GET https://api.github.com/repos/zohanlin2-ai/AI-coding-only/contents/Ann?ref={tag}
   ```
-  回傳 `Ann/` 資料夾底下的檔案與目錄列表 JSON。
+  Returns a JSON list of files and subdirectories under `Ann/`.
 
-* **下載單一檔案的 Raw 原始碼：**
+* **Download a single file (raw content):**
   ```http
   GET https://raw.githubusercontent.com/zohanlin2-ai/AI-coding-only/{tag}/Ann/{path_to_file}
   ```
-  利用解析 JSON 得到的各檔案 `download_url` 進行下載，並直接寫入本機 `staging/` 對應路徑中。此方式僅下載 `Ann` 專案本身，避免下載整個 Repo。
+  Each file's `download_url` from the JSON list is used to download the file directly into the corresponding path under `staging/`. This approach downloads **only the `Ann` project** — not the entire repository.
 
 > [!TIP]
-> **API 存取權限與 Rate Limit：**
-> - **公開儲存庫 (Public Repo)**：不需要 Token，但 API 限制為每小時 60 次。
-> - **私有儲存庫 (Private Repo)**：必須在 Header 中帶入 Personal Access Token (PAT) —— `Authorization: Bearer <YOUR_TOKEN>`。
-> - **建議**：即使是 Public Repo，也建議配置 Token，可將 Rate Limit 提升至每小時 5000 次。
+> **API Access & Rate Limits:**
+> - **Public Repo**: No token required, but limited to 60 requests/hour.
+> - **Private Repo**: Must include a Personal Access Token (PAT) in the header — `Authorization: Bearer <YOUR_TOKEN>`.
+> - **Recommendation**: Even for public repos, configuring a token raises the limit to 5,000 requests/hour.
 
 ---
 
-## ⚠️ 本機環境挑戰與應對策略
-| 面臨問題 | 解決方案與機制 |
-| :--- | :--- |
-| **檔案鎖定鎖死** | Python 無法修改運作中的程式碼。透過 `launcher.py` 啟動為子程序（subprocess），更新時關閉子程序，置換完成後重新啟動。 |
-| **套件相依性更新 (`pip`)** | 新版可能引入新的第三方庫。在 `staging/` 中使用 `virtualenv` 安裝測試新相依套件，確認無誤再寫入正式環境。 |
-| 對話中斷干擾 | 在對話空檔詢問使用者是否更新，或是提供「稍後更新 / 跳過此版本」選項，優化 UX 體驗。 |
-| 網路連線中斷 | 斷網時 GitHub API 連線失敗。實作 Graceful Fallback 機制，保留 Log 並維持現有版本正常運作。 |
+## ⚠️ Local Environment Challenges & Solutions
 
-### 💬 使用者體驗 (UX) 互動範例
-當偵測到新版本時，助理核心會主動在對話中提示使用者，而非強制更新：
+| Challenge | Solution |
+| :--- | :--- |
+| **File lock / in-use** | Python cannot modify its own running code. `launcher.py` spawns `assistant.py` as a subprocess; during update, the child process is terminated, files are swapped, and it is restarted. |
+| **Dependency updates (`pip`)** | New versions may introduce new third-party packages. `virtualenv` isolation in `staging/` validates new dependencies before writing to the production environment. |
+| **Interrupting active conversation** | The update prompt is shown at conversation breaks. The user may choose "later" or "skip this version" to avoid unwanted interruptions. |
+| **Network unavailable** | GitHub API calls fail when offline. A graceful fallback keeps the existing version running and records the failure in the log. |
+
+### 💬 UX Interaction Example
+
+When a new version is detected, the assistant proactively prompts the user rather than forcing an update:
+
 ```text
-助理 Ann：「偵測到新版本 v1.2.0，包含以下更新：
-      - 新增記憶功能
-      - 修正回應速度
-      現在更新嗎？(yes / 稍後 / 跳過此版本)」
+Ann: "New version v1.2.0 is available. It includes:
+      - Added memory feature
+      - Improved response speed
+      Update now? (yes / later / skip this version)"
 ```
 
 ---
 
-## ⚖️ 道德與安全規範模組 (Moral Module)
+## ⚖️ Moral & Safety Specification Module
 
-本專案導入了 [moral_module_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/moral_module_spec.md) 規範模組，用以評估使用者請求、系統行為與自主決策，確保 Ann 的決策符合倫理原則、安全限制與問責要求。
+This project integrates [moral_module_spec.md](./moral_module_spec.md) to evaluate user requests, system actions, and autonomous decisions, ensuring Ann's behavior aligns with ethical principles, safety constraints, and accountability requirements.
 
 > [!IMPORTANT]
-> **道德規範模組設計與審核聲明：**
-> - **設計者**：本模組由 **OpenAI** 進行設計。
-> - **審核者**：本模組由 **Claude** 進行審核。
-> - **⚠️ 嚴禁修改聲明**：**嚴禁任何人修改 `moral_module_spec.md` 檔案內容**，以確保系統安全與道德底線的完整性。
+> **Moral Module Authorship & Audit Declaration:**
+> - **Designed by**: **OpenAI**
+> - **Audited by**: **Claude**
+> - **⚠️ Modification strictly prohibited**: **No one is permitted to modify `moral_module_spec.md`.** The integrity of Ann's moral baseline depends on this file remaining unchanged.
 
-### 🛑 道德模組在自我更新中的保護限制 (Protected Updates)
-根據 [moral_module_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/moral_module_spec.md) 第 20 節規定，道德模組本身屬於**受保護的元件**：
-1. **禁止自動更新**：任何涉及道德模組、提示詞、策略、分類器、工具權限或風險閾值的更新，**絕不能**以自動更新（Automatic Updates）方式靜默覆寫 (`allowAutomaticMoralUpdates: false`)。
-2. **手動確認與驗證**：道德模組的更新必須取得使用者或授權操作者的明確同意，並通過安全與迴歸測試套件驗證後方可套用，且必須提供回復至前一版本的 Rollback 路徑。
+### 🛑 Protected Updates in the Self-Updating Mechanism
+
+Per [moral_module_spec.md](./moral_module_spec.md) §20, the moral module is a **protected component**:
+
+1. **No automatic updates**: Any change to the moral module, its prompts, policies, classifiers, tool permissions, or risk thresholds **must never** be applied silently via the auto-update mechanism (`allowAutomaticMoralUpdates: false`).
+2. **Explicit confirmation required**: Updates to the moral module require explicit approval from the user or an authorized operator, must pass a safety and regression test suite, and must provide a rollback path to the previous version.
 
 ---
 
-## 🚀 建議開發與實作步驟
+## 🚀 Development Roadmap
 
-為了降低開發複雜度，建議按以下步驟逐步實作：
+To minimize complexity, implement the project in the following order:
 
-1. **Step 1: 實作常駐 Launcher** 
-   - 撰寫 `launcher.py`，負責拉起子程序 `assistant.py` 並做基本生命週期監控。
-2. **Step 2: 實作 GitHub 版本偵測**
-   - 實作 API 呼叫、比對 Tag 版本號，並可在偵測到更新時由 `assistant.py` 送出訊號。
-3. **Step 3: 實作安全下載與 Pytest 驗證**
-   - 呼叫 API 取得 `Ann/` 的檔案清單，並依據清單逐一下載檔案寫入 `staging/`，隨後使用 `subprocess` 在隔離環境下執行 `pytest`。
-4. **Step 4: 原子置換與 Rollback 機制**
-   - 實作目錄置換邏輯；若測試失敗，則清除 `staging/`，保留舊版並向使用者回報。
-5. **Step 5: 整合 AI 對話、Plugin 系統與道德規範模組**
-   - 將 LangChain 或 OpenAI/Anthropic SDK 整合進 `assistant.py`，並依據 [moral_module_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/moral_module_spec.md) 所定義之決策管線（Decision Pipeline）與風險評估機制（Risk Classifier），完成完整的 AI 助理 Ann 核心功能。
+1. **Step 1: Persistent Launcher**
+   - Implement `launcher.py` to spawn `assistant.py` as a subprocess and monitor its lifecycle.
+2. **Step 2: GitHub Version Detection**
+   - Implement the API call, compare tag versions, and signal the launcher when an update is available.
+3. **Step 3: Secure Download & pytest Validation**
+   - Fetch the `Ann/` file list via the Contents API, download each file into `staging/`, then run `pytest` in an isolated environment using `subprocess`.
+4. **Step 4: Atomic Swap & Rollback**
+   - Implement directory swap logic; on test failure, clear `staging/`, retain the current version, and notify the user.
+5. **Step 5: AI Dialogue, Plugin System & Moral Module Integration**
+   - Integrate an LLM SDK (e.g. Ollama, LangChain, or Anthropic/OpenAI SDK) into `assistant.py`, and wire up the decision pipeline and risk classifier defined in [moral_module_spec.md](./moral_module_spec.md) to complete Ann's full core functionality.
