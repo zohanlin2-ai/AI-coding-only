@@ -62,6 +62,11 @@ This repository is used to store various projects developed with AI assistance.
 - **Key Features**: Local-first architecture (Ollama, SQLite, ChromaDB, FastAPI), persistent world state engine, semantic memory systems, dynamic rules engine, time & history systems, and interactive Streamlit visualization dashboard. Includes professional embedded interactive Mermaid-based UML Sequence and Activity diagrams with client-side high-resolution PNG/SVG export capabilities.
 - **Status**: Production-ready initial version uploaded.
 
+### 12. [Ann: AI Assistant (Ann)](./Ann)
+- **Description**: A local Python-based AI assistant prototype featuring a robust self-updating (Launcher + Core) architecture and an integrated safety and ethical evaluation module.
+- **Key Features**: Separated runtime processes (`launcher.py` and `assistant.py`), pure GitHub REST API-based self-updating (no local git dependencies required), automatic unit-testing (`pytest` in staging), rollback mechanism on verification failure, and a protected moral module (`moral_module_spec.md` designed by OpenAI and audited by Claude) evaluating user prompts and agent decisions.
+- **Status**: Design and architecture version 0.1.0 uploaded.
+
 ---
 *Generated and maintained in strict adherence to AI-coding-only SKILL specifications.*
 
