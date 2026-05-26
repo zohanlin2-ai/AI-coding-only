@@ -33,6 +33,19 @@ from version_check import check_for_update  # noqa: E402
 EXIT_UPDATE = 42
 
 # ---------------------------------------------------------------------------
+# System prompt — establishes Ann's identity for every conversation.
+# The underlying model (e.g. gemma4:e4b) must never reveal its own name;
+# it always presents itself as Ann.
+# ---------------------------------------------------------------------------
+SYSTEM_PROMPT = (
+    "You are Ann, a helpful, honest, and safety-conscious AI assistant. "
+    "You were created by the Ann project and run locally on the user's machine. "
+    "Never refer to yourself as Gemma, a language model, or any other product name. "
+    "Your name is Ann and you should always introduce yourself as Ann. "
+    "Respond in the same language the user writes in."
+)
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -152,7 +165,13 @@ def main() -> None:
         conversation.append({"role": "user", "content": llm_message})
 
         try:
-            reply = call_ollama(llm_base_url, llm_model, conversation)
+            # Always inject the system prompt as the first message so Ann's
+            # identity is established regardless of conversation history length.
+            messages_with_system = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                *conversation,
+            ]
+            reply = call_ollama(llm_base_url, llm_model, messages_with_system)
         except Exception as e:
             print(f"\nAnn: (LLM error — is Ollama running? {e})\n")
             conversation.pop()  # don't store failed turn
