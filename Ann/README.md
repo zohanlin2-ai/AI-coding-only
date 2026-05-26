@@ -96,10 +96,10 @@ sequenceDiagram
     end
 
     A->>L: 3. 發送更新信號並結束執行
-    L->>GH: 4. 下載原始碼 (GET /zipball/{tag})
-    GH-->>L: 回傳 zip 檔二進位資料
-    L->>GH: 5. 驗證 Commit SHA (GET /git/ref/tags/{tag})
-    L->>S: 6. 解壓縮至 staging/ 目錄
+    L->>GH: 4. 取得 Ann 檔案清單 (GET /contents/Ann?ref={tag})
+    GH-->>L: 回傳 JSON 檔案清單 (包含每個檔案的 download_url)
+    L->>GH: 5. 下載 Ann 相關檔案 (使用 download_url 逐一下載)
+    L->>S: 6. 寫入至 staging/ 目錄中相對應的路徑
 
     rect rgb(240, 255, 240)
         Note over L, S: 安全驗證階段
@@ -119,17 +119,17 @@ sequenceDiagram
   ```
   比對回傳的 `tag_name` 與本地 `version.txt`，確認是否有新發布版本。
 
-* **下載原始碼 (Zipball)：**
+* **取得 Ann 目錄下的檔案清單：**
   ```http
-  GET https://api.github.com/repos/{owner}/{repo}/zipball/{tag}
+  GET https://api.github.com/repos/zohanlin2-ai/AI-coding-only/contents/Ann?ref={tag}
   ```
-  利用 Python `requests` 模組將檔案下載並解壓縮至 `staging/` 中。
+  回傳 `Ann/` 資料夾底下的檔案與目錄列表 JSON。
 
-* **驗證完整性：**
+* **下載單一檔案的 Raw 原始碼：**
   ```http
-  GET https://api.github.com/repos/{owner}/{repo}/git/ref/tags/{tag}
+  GET https://raw.githubusercontent.com/zohanlin2-ai/AI-coding-only/{tag}/Ann/{path_to_file}
   ```
-  取得 commit SHA，藉此確認下載內容無誤。
+  利用解析 JSON 得到的各檔案 `download_url` 進行下載，並直接寫入本機 `staging/` 對應路徑中。此方式僅下載 `Ann` 專案本身，避免下載整個 Repo。
 
 > [!TIP]
 > **API 存取權限與 Rate Limit：**
@@ -184,7 +184,7 @@ sequenceDiagram
 2. **Step 2: 實作 GitHub 版本偵測**
    - 實作 API 呼叫、比對 Tag 版本號，並可在偵測到更新時由 `assistant.py` 送出訊號。
 3. **Step 3: 實作安全下載與 Pytest 驗證**
-   - 下載 Zipball 檔案、解壓縮，並使用 `subprocess` 在隔離環境（staging）下執行 `pytest`。
+   - 呼叫 API 取得 `Ann/` 的檔案清單，並依據清單逐一下載檔案寫入 `staging/`，隨後使用 `subprocess` 在隔離環境下執行 `pytest`。
 4. **Step 4: 原子置換與 Rollback 機制**
    - 實作目錄置換邏輯；若測試失敗，則清除 `staging/`，保留舊版並向使用者回報。
 5. **Step 5: 整合 AI 對話、Plugin 系統與道德規範模組**

@@ -9,4 +9,6 @@ All notable changes to the AI assistant **Ann** project will be documented in th
 - Configured a dedicated section for the **Moral & Safety Specification Module** based on [moral_module_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/moral_module_spec.md).
 - Documented specific moral module rules (designed by OpenAI, audited by Claude, modification strictly prohibited) and their integration with the decision pipeline and update permissions.
 - Named the AI Assistant **Ann**.
+- Optimized the self-updating architecture design to use the GitHub Contents API to only download the `Ann/` subdirectory rather than the entire multi-project repository zipball.
 - Created this [CHANGELOG.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/CHANGELOG.md) to track project development history.
+
