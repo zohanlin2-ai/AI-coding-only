@@ -27,9 +27,16 @@ def config() -> dict:
     }
 
 
-def _mock_response(tag: str) -> MagicMock:
+def _mock_response(sha: str, date: str) -> MagicMock:
     m = MagicMock()
-    m.json.return_value = {"tag_name": tag}
+    m.json.return_value = {
+        "sha": sha,
+        "commit": {
+            "committer": {
+                "date": date
+            }
+        }
+    }
     m.raise_for_status = lambda: None
     return m
 
@@ -40,9 +47,9 @@ def _mock_response(tag: str) -> MagicMock:
 
 
 def test_no_update_when_same_version(tmp_path: Path, config: dict) -> None:
-    (tmp_path / "version.txt").write_text("1.0.0", encoding="utf-8")
+    (tmp_path / "version.txt").write_text("20260526-ea029a2", encoding="utf-8")
 
-    with patch("version_check.requests.get", return_value=_mock_response("v1.0.0")):
+    with patch("version_check.requests.get", return_value=_mock_response("ea029a234567", "2026-05-26T16:00:00Z")):
         result = check_for_update(config, tmp_path)
 
     assert result is None
@@ -54,12 +61,12 @@ def test_no_update_when_same_version(tmp_path: Path, config: dict) -> None:
 
 
 def test_returns_new_tag_when_newer(tmp_path: Path, config: dict) -> None:
-    (tmp_path / "version.txt").write_text("0.9.0", encoding="utf-8")
+    (tmp_path / "version.txt").write_text("20260525-ea029a1", encoding="utf-8")
 
-    with patch("version_check.requests.get", return_value=_mock_response("v1.0.0")):
+    with patch("version_check.requests.get", return_value=_mock_response("ea029a234567", "2026-05-26T16:00:00Z")):
         result = check_for_update(config, tmp_path)
 
-    assert result == "1.0.0"
+    assert result == "20260526-ea029a2"
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +77,7 @@ def test_returns_new_tag_when_newer(tmp_path: Path, config: dict) -> None:
 def test_returns_none_on_connection_error(tmp_path: Path, config: dict) -> None:
     import requests as req
 
-    (tmp_path / "version.txt").write_text("0.9.0", encoding="utf-8")
+    (tmp_path / "version.txt").write_text("20260525-ea029a1", encoding="utf-8")
 
     with patch("version_check.requests.get", side_effect=req.exceptions.ConnectionError):
         result = check_for_update(config, tmp_path)
@@ -85,7 +92,7 @@ def test_returns_none_on_connection_error(tmp_path: Path, config: dict) -> None:
 
 def test_skips_check_when_disabled(tmp_path: Path, config: dict) -> None:
     config["update"]["check_on_startup"] = False
-    (tmp_path / "version.txt").write_text("0.9.0", encoding="utf-8")
+    (tmp_path / "version.txt").write_text("20260525-ea029a1", encoding="utf-8")
 
     with patch("version_check.requests.get") as mock_get:
         result = check_for_update(config, tmp_path)
