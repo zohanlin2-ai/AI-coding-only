@@ -5,7 +5,7 @@ Ann Launcher — permanent process, NEVER auto-updated.
 Starts current/assistant.py as a subprocess and handles lifecycle events.
 
 Exit codes from assistant.py:
-  0  — normal exit  → restart assistant
+  0  — normal exit  → stop launcher completely
   42 — update requested → run updater, then restart
   other — error → log and restart
 """
@@ -69,9 +69,10 @@ def main() -> None:
             success = do_update()
             logging.info("Update %s.", "succeeded" if success else "FAILED — keeping current version")
         elif code == 0:
-            logging.info("Assistant exited cleanly.")
+            logging.info("Assistant exited cleanly. Stopping launcher.")
+            sys.exit(0)
         else:
-            logging.warning("Assistant exited with unexpected code %d.", code)
+            logging.warning("Assistant exited with unexpected code %d. Restarting...", code)
 
 
 if __name__ == "__main__":
