@@ -91,9 +91,9 @@ sequenceDiagram
     participant S as staging/
     participant GH as GitHub API
 
-    A->>GH: 1. Check latest release (GET /releases/latest)
-    GH-->>A: Return latest tag_name (e.g. v1.2.0)
-    Note over A: Compare with local version.txt
+    A->>GH: 1. Check latest commit (GET /commits/{branch})
+    GH-->>A: Return latest commit (date & SHA)
+    Note over A: Format YYYYMMDD-sha and compare with local version.txt
 
     rect rgb(230, 245, 255)
         Note over A, U: If a new version is available
@@ -102,7 +102,7 @@ sequenceDiagram
     end
 
     A->>L: 3. Send update signal and exit
-    L->>GH: 4. Fetch Ann file list (GET /contents/Ann?ref={tag})
+    L->>GH: 4. Fetch Ann file list (GET /contents/Ann?ref={branch})
     GH-->>L: Return JSON file list (each entry includes download_url)
     L->>GH: 5. Download Ann files (iterate download_url for each file)
     L->>S: 6. Write files to staging/ at their relative paths
@@ -119,21 +119,21 @@ sequenceDiagram
 
 ### 2. GitHub API Details
 
-* **Check latest release:**
+* **Check latest branch commit:**
   ```http
-  GET https://api.github.com/repos/{owner}/{repo}/releases/latest
+  GET https://api.github.com/repos/{owner}/{repo}/commits/{branch}
   ```
-  Compare the returned `tag_name` with the local `version.txt` to determine whether an update is needed.
+  Extract `commit.committer.date` (formatted as `YYYYMMDD`) and `sha` (first 7 characters) and combine them into `YYYYMMDD-sha`. Compare this formatted string with the local `version.txt` to determine whether an update is needed.
 
 * **Fetch file list for the Ann directory:**
   ```http
-  GET https://api.github.com/repos/zohanlin2-ai/AI-coding-only/contents/Ann?ref={tag}
+  GET https://api.github.com/repos/zohanlin2-ai/AI-coding-only/contents/Ann?ref={branch}
   ```
   Returns a JSON list of files and subdirectories under `Ann/`.
 
 * **Download a single file (raw content):**
   ```http
-  GET https://raw.githubusercontent.com/zohanlin2-ai/AI-coding-only/{tag}/Ann/{path_to_file}
+  GET https://raw.githubusercontent.com/zohanlin2-ai/AI-coding-only/{branch}/Ann/{path_to_file}
   ```
   Each file's `download_url` from the JSON list is used to download the file directly into the corresponding path under `staging/`. This approach downloads **only the `Ann` project** — not the entire repository.
 
@@ -142,6 +142,7 @@ sequenceDiagram
 > - **Public Repo**: No token required, but limited to 60 requests/hour.
 > - **Private Repo**: Must include a Personal Access Token (PAT) in the header — `Authorization: Bearer <YOUR_TOKEN>`.
 > - **Recommendation**: Even for public repos, configuring a token raises the limit to 5,000 requests/hour.
+
 
 ---
 

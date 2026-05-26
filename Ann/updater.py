@@ -50,9 +50,25 @@ class Updater:
         r.raise_for_status()
         return r
 
-    def _latest_tag(self) -> str:
-        url = f"{self.GITHUB_API}/repos/{self.owner}/{self.repo}/releases/latest"
-        return self._get(url).json()["tag_name"]
+    def _latest_commit_version(self) -> tuple[str, str]:
+        """Returns a tuple of (ref/branch, version_string) based on commit date + sha."""
+        for branch in ["main", "master"]:
+            url = f"{self.GITHUB_API}/repos/{self.owner}/{self.repo}/commits/{branch}"
+            try:
+                resp = self._get(url)
+                commit_data = resp.json()
+                sha = commit_data.get("sha", "")
+                commit_date = commit_data.get("commit", {}).get("committer", {}).get("date", "")
+                if sha and commit_date:
+                    date_part = commit_date.split("T")[0].replace("-", "")
+                    short_sha = sha[:7]
+                    version = f"{date_part}-{short_sha}"
+                    return branch, version
+            except Exception:
+                continue
+        raise ValueError("Could not fetch latest commit from main or master branch.")
+
+
 
     def _current_version(self) -> str:
         return self.version_file.read_text(encoding="utf-8").strip()
@@ -116,15 +132,19 @@ class Updater:
 
     def run(self) -> bool:
         try:
-            tag = self._latest_tag()
+            ref, version = self._latest_commit_version()
             old_version = self._current_version()
-            logging.info("Updating %s -> %s", old_version, tag)
+            logging.info("Updating %s -> %s", old_version, version)
+
+            if old_version == version:
+                logging.info("Already at the latest version %s. No update needed.", version)
+                return True
 
             # Download only Ann/current/ into staging/
             self._cleanup_staging()
             remote_path = f"{self.subfolder}/current"
-            logging.info("Downloading %s @ %s ...", remote_path, tag)
-            self._download_tree(tag, remote_path, self.staging)
+            logging.info("Downloading %s @ %s ...", remote_path, ref)
+            self._download_tree(ref, remote_path, self.staging)
 
             # Validate
             if not self._run_tests():
@@ -137,9 +157,9 @@ class Updater:
             self._swap()
             self._cleanup_staging()
 
-            # Record new version (strip leading 'v' from tag)
-            self.version_file.write_text(tag.lstrip("v"), encoding="utf-8")
-            logging.info("Update complete: %s -> %s", old_version, tag.lstrip("v"))
+            # Record new version
+            self.version_file.write_text(version, encoding="utf-8")
+            logging.info("Update complete: %s -> %s", old_version, version)
             return True
 
         except Exception:
