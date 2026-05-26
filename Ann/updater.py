@@ -146,6 +146,20 @@ class Updater:
             logging.info("Downloading %s @ %s ...", remote_path, ref)
             self._download_tree(ref, remote_path, self.staging)
 
+            # Check and download root launcher.py and updater.py if they exist on GitHub
+            try:
+                url = f"{self.GITHUB_API}/repos/{self.owner}/{self.repo}/contents/{self.subfolder}?ref={ref}"
+                root_items = self._get(url).json()
+                for item in root_items:
+                    if item["type"] == "file" and item["name"] in ("launcher.py", "updater.py"):
+                        dest = self.base_dir / f"{item['name']}.new"
+                        content = requests.get(item["download_url"], timeout=15)
+                        content.raise_for_status()
+                        dest.write_bytes(content.content)
+                        logging.info("  fetched root update: %s -> %s", item["name"], dest.name)
+            except Exception as root_err:
+                logging.warning("Optional root-level updates fetch failed: %s", root_err)
+
             # Validate
             if not self._run_tests():
                 logging.error("Tests FAILED. Aborting update.")

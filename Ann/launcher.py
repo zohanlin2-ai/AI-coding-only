@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Ann Launcher — permanent process, NEVER auto-updated.
+Ann Launcher ??permanent process, NEVER auto-updated.
 
 Starts current/assistant.py as a subprocess and handles lifecycle events.
 
 Exit codes from assistant.py:
-  0  — normal exit  → stop launcher completely
-  42 — update requested → run updater, then restart
-  other — error → log and restart
+  0  ??normal exit  ??stop launcher completely
+  42 ??update requested ??run updater, then restart
+  other ??error ??log and restart
 """
 import logging
 import subprocess
@@ -49,7 +49,7 @@ def do_update() -> bool:
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    # updater.py lives at root level — never inside current/
+    # updater.py lives at root level ??never inside current/
     sys.path.insert(0, str(BASE_DIR))
     from updater import Updater  # noqa: PLC0415
 
@@ -67,7 +67,24 @@ def main() -> None:
         if code == EXIT_UPDATE:
             logging.info("Update requested. Running updater...")
             success = do_update()
-            logging.info("Update %s.", "succeeded" if success else "FAILED — keeping current version")
+            logging.info("Update %s.", "succeeded" if success else "FAILED ??keeping current version")
+
+            launcher_new = BASE_DIR / "launcher.py.new"
+            updater_new = BASE_DIR / "updater.py.new"
+            if success and (launcher_new.exists() or updater_new.exists()):
+                logging.info("Root-level updates detected. Launching detached PowerShell helper...")
+                ps_command = (
+                    "Start-Sleep -s 2; "
+                    "if (Test-Path 'launcher.py.new') { Move-Item 'launcher.py.new' 'launcher.py' -Force }; "
+                    "if (Test-Path 'updater.py.new') { Move-Item 'updater.py.new' 'updater.py' -Force }; "
+                    "Start-Process py 'launcher.py'"
+                )
+                subprocess.Popen(
+                    ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_command],
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+                )
+                logging.info("PowerShell helper spawned. Stopping current launcher.")
+                sys.exit(0)
         elif code == 0:
             logging.info("Assistant exited cleanly. Stopping launcher.")
             sys.exit(0)
