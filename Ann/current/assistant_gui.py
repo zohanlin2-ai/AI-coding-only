@@ -24,7 +24,7 @@ except ImportError:
     pyqtSignal = Signal
 
 # Import core elements from assistant.py and moral_evaluator.py
-from assistant import load_config, call_ollama, SYSTEM_PROMPT, BASE_DIR
+from assistant import load_config, call_ollama, SYSTEM_PROMPT, BASE_DIR, EXIT_UPDATE
 from moral_evaluator import MoralEvaluator, Decision
 
 # Set up logging for GUI
@@ -225,6 +225,10 @@ class ChatWindow(QWidget):
 
         if user_text.lower() == "exit":
             QApplication.quit()
+            return
+
+        if user_text.lower() == "update":
+            QApplication.exit(EXIT_UPDATE)
             return
 
         self.input_field.clear()
