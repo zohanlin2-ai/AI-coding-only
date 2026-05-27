@@ -236,6 +236,11 @@ class ChatWindow(QWidget):
         """Add a bubble message to the chat view."""
         bubble = MessageBubble(text, is_user, is_refusal)
         self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, bubble)
+        
+        # Force layout update to compute correct scroll maximum synchronously
+        self.scroll_layout.activate()
+        self.scroll_widget.adjustSize()
+        
         QApplication.processEvents()
         
         # Scroll to bottom
