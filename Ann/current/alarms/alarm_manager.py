@@ -8,7 +8,7 @@ import threading
 logger = logging.getLogger(__name__)
 
 class Alarm:
-    def __init__(self, datetime_val, label=None, id_val=None, created_at=None, triggered=False):
+    def __init__(self, datetime_val, label=None, id_val=None, created_at=None, triggered=False, repeat_pattern=None):
         self.id = id_val or str(uuid.uuid4())[:8]  # Keep it short/readable but unique enough for ID matching
         # Handle datetime_val as string or datetime object
         if isinstance(datetime_val, str):
@@ -26,6 +26,7 @@ class Alarm:
             self.created_at = created_at
             
         self.triggered = triggered
+        self.repeat_pattern = repeat_pattern
 
     def to_dict(self):
         return {
@@ -33,7 +34,8 @@ class Alarm:
             "datetime": self.datetime.isoformat(),
             "label": self.label,
             "created_at": self.created_at.isoformat(),
-            "triggered": self.triggered
+            "triggered": self.triggered,
+            "repeat_pattern": self.repeat_pattern
         }
 
     @classmethod
@@ -43,7 +45,8 @@ class Alarm:
             label=data.get("label"),
             id_val=data["id"],
             created_at=data.get("created_at"),
-            triggered=data.get("triggered", False)
+            triggered=data.get("triggered", False),
+            repeat_pattern=data.get("repeat_pattern")
         )
 
 
@@ -70,6 +73,45 @@ class AlarmManager:
         except Exception as e:
             logger.error("Failed to create alarm store directory: %s", e)
 
+    def _calculate_next_occurrence(self, current_dt: datetime, repeat_pattern: str, now: datetime) -> datetime:
+        from datetime import timedelta
+        if not repeat_pattern:
+            return current_dt
+
+        # 1. daily
+        if repeat_pattern == "daily":
+            next_dt = current_dt + timedelta(days=1)
+            while next_dt <= now:
+                next_dt += timedelta(days=1)
+            return next_dt
+
+        # 2. weekly:[days] (e.g. weekly:1,2,3,4,5 where 1=Mon, 7=Sun)
+        if repeat_pattern.startswith("weekly:"):
+            try:
+                days_str = repeat_pattern.split(":")[1]
+                target_days = [int(d) for d in days_str.split(",")]
+            except Exception:
+                target_days = [1, 2, 3, 4, 5, 6, 7] # Fallback to daily if invalid format
+                
+            next_dt = current_dt + timedelta(days=1)
+            while next_dt.isoweekday() not in target_days or next_dt <= now:
+                next_dt += timedelta(days=1)
+            return next_dt
+
+        # 3. interval:[minutes] (e.g. interval:1)
+        if repeat_pattern.startswith("interval:"):
+            try:
+                minutes = int(repeat_pattern.split(":")[1])
+            except Exception:
+                minutes = 1
+                
+            next_dt = current_dt + timedelta(minutes=minutes)
+            while next_dt <= now:
+                next_dt += timedelta(minutes=minutes)
+            return next_dt
+
+        return current_dt
+
     def load_alarms(self):
         with self.lock:
             if not self.filepath.exists():
@@ -82,12 +124,18 @@ class AlarmManager:
                 
                 all_alarms = [Alarm.from_dict(d) for d in data]
                 
-                # Filter out expired (past time & triggered) alarms
+                # Filter out expired (past time & triggered) alarms, advance repeating alarms
                 now = datetime.now()
-                self.alarms = [
-                    alarm for alarm in all_alarms 
-                    if not (alarm.triggered or alarm.datetime < now)
-                ]
+                self.alarms = []
+                for alarm in all_alarms:
+                    if alarm.repeat_pattern:
+                        if alarm.datetime <= now:
+                            alarm.datetime = self._calculate_next_occurrence(alarm.datetime, alarm.repeat_pattern, now)
+                            alarm.triggered = False
+                        self.alarms.append(alarm)
+                    else:
+                        if not (alarm.triggered or alarm.datetime < now):
+                            self.alarms.append(alarm)
                 
                 # If clean-up happened, save back immediately
                 if len(self.alarms) != len(all_alarms):
@@ -108,7 +156,7 @@ class AlarmManager:
         with self.lock:
             self._save_alarms_unlocked()
 
-    def add_alarm(self, datetime_val, label=None) -> tuple[bool, str, Alarm | None]:
+    def add_alarm(self, datetime_val, label=None, repeat_pattern=None) -> tuple[bool, str, Alarm | None]:
         """
         Adds a new alarm. Checks active alarm count first.
         Returns:
@@ -117,7 +165,17 @@ class AlarmManager:
         with self.lock:
             # Clean up first to ensure accurate count
             now = datetime.now()
-            self.alarms = [alarm for alarm in self.alarms if not (alarm.triggered or alarm.datetime < now)]
+            active_alarms = []
+            for alarm in self.alarms:
+                if alarm.repeat_pattern:
+                    if alarm.datetime <= now:
+                        alarm.datetime = self._calculate_next_occurrence(alarm.datetime, alarm.repeat_pattern, now)
+                        alarm.triggered = False
+                    active_alarms.append(alarm)
+                else:
+                    if not (alarm.triggered or alarm.datetime < now):
+                        active_alarms.append(alarm)
+            self.alarms = active_alarms
             
             if len(self.alarms) >= self.MAX_ALARMS:
                 # Return the list of current alarms to facilitate deletion selection
@@ -127,7 +185,7 @@ class AlarmManager:
                 )
                 return False, alarms_list, None
             
-            alarm = Alarm(datetime_val=datetime_val, label=label)
+            alarm = Alarm(datetime_val=datetime_val, label=label, repeat_pattern=repeat_pattern)
             self.alarms.append(alarm)
             self._save_alarms_unlocked()
             return True, "鬧鐘設定成功", alarm
@@ -242,9 +300,19 @@ class AlarmManager:
 
     def get_alarms(self) -> list[Alarm]:
         with self.lock:
-            # Clean expired first
+            # Clean expired/update repeating first
             now = datetime.now()
-            self.alarms = [alarm for alarm in self.alarms if not (alarm.triggered or alarm.datetime < now)]
+            active_alarms = []
+            for alarm in self.alarms:
+                if alarm.repeat_pattern:
+                    if alarm.datetime <= now:
+                        alarm.datetime = self._calculate_next_occurrence(alarm.datetime, alarm.repeat_pattern, now)
+                        alarm.triggered = False
+                    active_alarms.append(alarm)
+                else:
+                    if not (alarm.triggered or alarm.datetime < now):
+                        active_alarms.append(alarm)
+            self.alarms = active_alarms
             return list(self.alarms)
 
     def check_and_trigger(self) -> list[Alarm]:
@@ -256,17 +324,22 @@ class AlarmManager:
         due_alarms = []
         
         with self.lock:
-            remaining_alarms = []
+            updated_alarms = []
             for alarm in self.alarms:
                 if not alarm.triggered and now >= alarm.datetime:
-                    alarm.triggered = True
                     due_alarms.append(alarm)
+                    if alarm.repeat_pattern:
+                        next_dt = self._calculate_next_occurrence(alarm.datetime, alarm.repeat_pattern, now)
+                        alarm.datetime = next_dt
+                        alarm.triggered = False # Reset triggered for next round
+                        updated_alarms.append(alarm)
+                    else:
+                        alarm.triggered = True
                 else:
-                    remaining_alarms.append(alarm)
+                    updated_alarms.append(alarm)
             
             if due_alarms:
-                # Remove triggered from self.alarms list so they clean up
-                self.alarms = remaining_alarms
+                self.alarms = updated_alarms
                 self._save_alarms_unlocked()
                 
         return due_alarms

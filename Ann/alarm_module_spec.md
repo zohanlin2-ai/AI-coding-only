@@ -18,10 +18,10 @@ This specification covers:
 - Alarm triggering with audio and visual effects
 - Alarm limit enforcement
 - One-time alarm lifecycle (set → trigger → auto-delete)
+- Repeating or recurring alarms (daily, weekly, interval-based)
 
 Out of scope for this version:
 
-- Repeating or recurring alarms (planned for future release)
 - User-selectable alarm sounds via conversation (planned for future release)
 
 ---
@@ -332,5 +332,4 @@ project/
 
 The following features are explicitly out of scope for this version but are planned:
 
-- **Repeating alarms:** Support for daily, weekly, or custom recurrence patterns, configured through conversation.
 - **User-selectable alarm sound:** Allow the user to change the alarm audio file by describing their preference in chat, using the same conversational interface pattern as alarm management.

@@ -282,15 +282,17 @@ class ChatWindow(QWidget):
             if intent == "set_alarm":
                 time_str = parsed["time"]
                 label = parsed["label"]
+                repeat_pattern = parsed.get("repeat")
                 if not time_str:
                     reply_prompt = "請告訴我您想設定鬧鐘的具體時間。"
                 else:
                     try:
                         from datetime import datetime
                         dt = datetime.fromisoformat(time_str)
-                        success, msg_or_list, _ = self.alarm_manager.add_alarm(dt, label)
+                        success, msg_or_list, _ = self.alarm_manager.add_alarm(dt, label, repeat_pattern)
                         if success:
-                            reply_prompt = f"System instruction: The alarm was successfully set for {dt.strftime('%Y-%m-%d %H:%M')} with label '{label or '無'}'. Confirm this to the user in a friendly way."
+                            repeat_msg = f" repeating '{repeat_pattern}'" if repeat_pattern else ""
+                            reply_prompt = f"System instruction: The alarm was successfully set for {dt.strftime('%Y-%m-%d %H:%M')}{repeat_msg} with label '{label or '無'}'. Confirm this to the user in a friendly way."
                         else:
                             reply_prompt = (
                                 f"System instruction: The user wants to set an alarm but the limit of 10 active alarms has been reached.\n"
@@ -306,7 +308,8 @@ class ChatWindow(QWidget):
                     reply_prompt = "System instruction: Tell the user in a friendly way that they have no active alarms."
                 else:
                     alarms_list = "\n".join(
-                        f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M:%S')} — {a.label or '無備註'}"
+                        f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M:%S')} — {a.label or '無備註'}" +
+                        (f" (重複: {a.repeat_pattern})" if a.repeat_pattern else "")
                         for a in alarms
                     )
                     reply_prompt = f"System instruction: Present the following active alarms list to the user in a friendly way:\n{alarms_list}"

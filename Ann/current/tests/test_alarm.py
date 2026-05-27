@@ -214,6 +214,43 @@ class TestAlarmManager(unittest.TestCase):
         self.assertFalse(success)
         self.assertIn("找不到符合條件", msg)
 
+    def test_calculate_next_occurrence(self):
+        manager = AlarmManager(filepath=self.test_file)
+        # 1. daily
+        base_dt = datetime(2026, 5, 27, 10, 0, 0)
+        now_dt = datetime(2026, 5, 27, 12, 0, 0)
+        next_dt = manager._calculate_next_occurrence(base_dt, "daily", now_dt)
+        self.assertEqual(next_dt, datetime(2026, 5, 28, 10, 0, 0))
+
+        # 2. weekly (2026-05-27 is Wed=3, next Wed is 2026-06-03)
+        base_dt = datetime(2026, 5, 27, 10, 0, 0)
+        now_dt = datetime(2026, 5, 28, 10, 0, 0)
+        next_dt = manager._calculate_next_occurrence(base_dt, "weekly:3", now_dt)
+        self.assertEqual(next_dt, datetime(2026, 6, 3, 10, 0, 0))
+
+        # 3. interval
+        base_dt = datetime(2026, 5, 27, 10, 0, 0)
+        now_dt = datetime(2026, 5, 27, 10, 12, 0)
+        next_dt = manager._calculate_next_occurrence(base_dt, "interval:5", now_dt)
+        self.assertEqual(next_dt, datetime(2026, 5, 27, 10, 15, 0))
+
+    def test_repeating_alarm_trigger_lifecycle(self):
+        manager = AlarmManager(filepath=self.test_file)
+        dt_past = datetime.now() - timedelta(seconds=30)
+        success, msg, alarm = manager.add_alarm(dt_past, "Recur Test", "interval:1")
+        self.assertTrue(success)
+        self.assertEqual(alarm.repeat_pattern, "interval:1")
+        
+        due = manager.check_and_trigger()
+        self.assertEqual(len(due), 1)
+        self.assertEqual(due[0].label, "Recur Test")
+        
+        active = manager.get_alarms()
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0].label, "Recur Test")
+        self.assertTrue(active[0].datetime > datetime.now())
+        self.assertFalse(active[0].triggered)
+
 
 class TestIntentParser(unittest.TestCase):
     def test_keyword_pre_filtering(self):

@@ -240,19 +240,22 @@ def main() -> None:
                     if intent == "set_alarm":
                         time_str = parsed["time"]
                         label = parsed["label"]
+                        repeat_pattern = parsed.get("repeat")
                         if not time_str:
                             reply = "請告訴我您想設定鬧鐘的具體時間。"
                         else:
                             try:
                                 # Ollama's ISO format parsing
                                 dt = datetime.fromisoformat(time_str)
-                                success, msg_or_list, _ = alarm_manager.add_alarm(dt, label)
+                                success, msg_or_list, _ = alarm_manager.add_alarm(dt, label, repeat_pattern)
                                 if success:
-                                    prompt = f"System instruction: The alarm was successfully set for {dt.strftime('%Y-%m-%d %H:%M')} with label '{label or '無'}'. Confirm this to the user in a friendly way."
+                                    repeat_msg = f" repeating '{repeat_pattern}'" if repeat_pattern else ""
+                                    prompt = f"System instruction: The alarm was successfully set for {dt.strftime('%Y-%m-%d %H:%M')}{repeat_msg} with label '{label or '無'}'. Confirm this to the user in a friendly way."
                                     reply = call_ollama(llm_base_url, llm_model, [
                                         {"role": "system", "content": SYSTEM_PROMPT},
                                         {"role": "user", "content": prompt}
                                     ])
+                                  
                                 else:
                                     limit_prompt = (
                                         f"System instruction: The user wants to set an alarm but the limit of 10 active alarms has been reached.\n"
@@ -272,7 +275,8 @@ def main() -> None:
                             reply = "您目前沒有設定 any 鬧鐘。"
                         else:
                             alarms_list = "\n".join(
-                                f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M:%S')} — {a.label or '無備註'}"
+                                f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M:%S')} — {a.label or '無備註'}" +
+                                (f" (重複: {a.repeat_pattern})" if a.repeat_pattern else "")
                                 for a in alarms
                             )
                             format_prompt = (

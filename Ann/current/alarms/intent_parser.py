@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,8 @@ class IntentParser:
                 "time": None,
                 "label": None,
                 "alarm_id": None,
-                "target_alarm": None
+                "target_alarm": None,
+                "repeat": None
             }
 
         now_str = datetime.now().isoformat()
@@ -58,7 +59,8 @@ class IntentParser:
             '  "time": "ISO-8601 datetime of the new time or null",\n'
             '  "label": "string or null (new label/remark if setting or updating)",\n'
             '  "alarm_id": "string or null (ID for delete or update)",\n'
-            '  "target_alarm": "string or null (old label, old time, description, or ID to match which alarm to update or delete)"\n'
+            '  "target_alarm": "string or null (old label, old time, description, or ID to match which alarm to update or delete)",\n'
+            '  "repeat": "daily | weekly:[days] | interval:[minutes] | null (recurrence rule: daily, weekly with days like 1,2,3 for Mon-Wed, or interval in minutes)"\n'
             "}\n\n"
             "Rules:\n"
             "- For relative times like '30 minutes later', calculate from current datetime.\n"
@@ -68,6 +70,7 @@ class IntentParser:
             "- label is optional free text the user wants attached to the alarm.\n"
             "- alarm_id is used only for delete_alarm or update_alarm intent if user specifies ID.\n"
             "- target_alarm is used for delete_alarm or update_alarm to identify which alarm (e.g. '下午3點', '開會').\n"
+            "- repeat specifies recurrence. 'every day at 8am' -> 'daily', 'every Monday and Wed' -> 'weekly:1,3', 'every minute' -> 'interval:1', 'every 10 minutes' -> 'interval:10', normal alarms -> null.\n"
         )
 
         messages = [
@@ -118,7 +121,8 @@ class IntentParser:
                 "time": result.get("time"),
                 "label": result.get("label"),
                 "alarm_id": result.get("alarm_id"),
-                "target_alarm": result.get("target_alarm")
+                "target_alarm": result.get("target_alarm"),
+                "repeat": result.get("repeat")
             }
         except Exception as e:
             logger.warning("Could not parse JSON from Ollama reply %r: %s", reply, e)
@@ -127,7 +131,8 @@ class IntentParser:
                 "time": None,
                 "label": None,
                 "alarm_id": None,
-                "target_alarm": None
+                "target_alarm": None,
+                "repeat": None
             }
 
     def _regex_fallback(self, text: str) -> dict:
@@ -141,7 +146,8 @@ class IntentParser:
                 "time": None,
                 "label": None,
                 "alarm_id": None,
-                "target_alarm": None
+                "target_alarm": None,
+                "repeat": None
             }
             
         # Check delete intent
@@ -153,7 +159,8 @@ class IntentParser:
                 "time": None,
                 "label": None,
                 "alarm_id": alarm_id,
-                "target_alarm": None
+                "target_alarm": None,
+                "repeat": None
             }
             
         # Check update intent
@@ -165,7 +172,33 @@ class IntentParser:
                 "time": None,
                 "label": None,
                 "alarm_id": None,
-                "target_alarm": target
+                "target_alarm": target,
+                "repeat": None
+            }
+
+        # Check set repeating alarm fallback
+        interval_match = re.search(r"每(?:隔)?\s*([0-9一二三四五六七八九十]*)\s*分鐘", text_lower)
+        if interval_match:
+            num_str = interval_match.group(1)
+            if not num_str:
+                minutes = 1
+            else:
+                chinese_digits = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+                if num_str in chinese_digits:
+                    minutes = chinese_digits[num_str]
+                else:
+                    try:
+                        minutes = int(num_str)
+                    except ValueError:
+                        minutes = 1
+            trigger_time = (datetime.now() + timedelta(minutes=minutes)).isoformat()
+            return {
+                "intent": "set_alarm",
+                "time": trigger_time,
+                "label": "每分鐘鬧鐘" if minutes == 1 else f"每{minutes}分鐘鬧鐘",
+                "alarm_id": None,
+                "target_alarm": None,
+                "repeat": f"interval:{minutes}"
             }
 
         return {
@@ -173,5 +206,6 @@ class IntentParser:
             "time": None,
             "label": None,
             "alarm_id": None,
-            "target_alarm": None
+            "target_alarm": None,
+            "repeat": None
         }
