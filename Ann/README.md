@@ -81,6 +81,10 @@ The recommended layout for deployment and development:
 
 This system requires **no local git commands** — it relies entirely on the **GitHub REST API** for version control and file delivery.
 
+> [!IMPORTANT]
+> **Strict Design Rule**: The update mechanism MUST use the GitHub REST API (HTTP) for all version checking, file listings, and downloads. Using local `git` commands (such as `git pull` or `git fetch`) within the update flow is strictly prohibited to ensure Ann can self-update even when deployed in non-Git target environments.
+
+
 ### 1. Update Sequence Diagram
 
 ```mermaid
