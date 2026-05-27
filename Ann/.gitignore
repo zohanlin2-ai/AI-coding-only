@@ -1,0 +1,16 @@
+# Auto-generated at runtime — never commit
+version.txt
+
+# Runtime directories
+logs/
+scratch/
+versions/
+staging/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Update zip
+update.zip

@@ -25,15 +25,6 @@ def check_for_update(config: dict, base_dir: Path) -> str | None:
         return None
 
     version_file = base_dir / "version.txt"
-    if not version_file.exists():
-        logging.warning("Local version.txt not found. Skipping update check.")
-        return None
-
-    try:
-        current = version_file.read_text(encoding="utf-8").strip()
-    except Exception as e:
-        logging.warning("Failed to read version.txt: %s", e)
-        return None
 
     headers = {"Accept": "application/vnd.github+json"}
     if token:
@@ -53,6 +44,18 @@ def check_for_update(config: dict, base_dir: Path) -> str | None:
                 date_part = commit_date.split("T")[0].replace("-", "")
                 short_sha = sha[:7]
                 latest = f"{date_part}-{short_sha}"
+
+                if not version_file.exists():
+                    # First run: version.txt not yet created — treat as uninitialized,
+                    # force an update so the file gets written after a successful install.
+                    logging.info("version.txt not found. Triggering first-run update to %s", latest)
+                    return latest
+
+                try:
+                    current = version_file.read_text(encoding="utf-8-sig").strip()
+                except Exception as e:
+                    logging.warning("Failed to read version.txt: %s. Forcing update.", e)
+                    return latest
 
                 if latest != current:
                     logging.info("New version available: %s (current: %s)", latest, current)

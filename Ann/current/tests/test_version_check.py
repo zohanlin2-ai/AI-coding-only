@@ -102,3 +102,19 @@ def test_skips_check_when_disabled(tmp_path: Path, config: dict) -> None:
 
     mock_get.assert_not_called()
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# First-run bootstrap: no version.txt → force update
+# ---------------------------------------------------------------------------
+
+
+def test_returns_latest_when_no_version_file(tmp_path: Path, config: dict) -> None:
+    """If version.txt does not exist, treat as first run and return the latest version."""
+    # tmp_path has no version.txt
+    mock_resp = _mock_commit_response("ea029a2f524c6fe94be6ca365a7b273269ddfcc7", "2026-05-26T08:10:34Z")
+    with patch("version_check.requests.get", return_value=mock_resp):
+        result = check_for_update(config, tmp_path)
+
+    assert result == "20260526-ea029a2"
+

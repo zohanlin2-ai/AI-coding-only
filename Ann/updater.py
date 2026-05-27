@@ -59,7 +59,10 @@ class Updater:
         raise ValueError("Could not fetch latest commit from main or master branch.")
 
     def _current_version(self) -> str:
-        return self.version_file.read_text(encoding="utf-8").strip()
+        """Return local version string, or empty string if version.txt doesn't exist yet."""
+        if not self.version_file.exists():
+            return ""
+        return self.version_file.read_text(encoding="utf-8-sig").strip()
 
     def _download_tree(self, ref: str, remote_path: str, local_dir: Path) -> None:
         """Recursively download a remote directory via GitHub Contents API."""
@@ -96,12 +99,13 @@ class Updater:
 
     def _backup_current(self, old_version: str) -> None:
         self.versions.mkdir(exist_ok=True)
-        dest = self.versions / f"v{old_version}"
+        label = old_version if old_version else "unknown"
+        dest = self.versions / f"v{label}"
         if dest.exists():
             shutil.rmtree(dest)
         if self.current.exists():
             shutil.copytree(self.current, dest)
-            logging.info("Backed up current -> versions/v%s", old_version)
+            logging.info("Backed up current -> versions/v%s", label)
 
     def _swap(self) -> None:
         """Replace current/ with staging/ (atomic-ish on same filesystem)."""
@@ -118,7 +122,10 @@ class Updater:
         try:
             ref, version = self._latest_commit_version()
             old_version = self._current_version()
-            logging.info("Updating %s -> %s", old_version, version)
+            if old_version:
+                logging.info("Updating %s -> %s", old_version, version)
+            else:
+                logging.info("First run — no version.txt found. Installing %s", version)
 
             if old_version == version:
                 logging.info("Already at the latest version %s. No update needed.", version)
