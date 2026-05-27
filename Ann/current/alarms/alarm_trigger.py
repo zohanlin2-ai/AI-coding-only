@@ -9,10 +9,10 @@ logger = logging.getLogger(__name__)
 PYGAME_AVAILABLE = False
 try:
     import pygame
-    pygame.mixer.init()
-    PYGAME_AVAILABLE = True
+    if hasattr(pygame, "mixer"):
+        PYGAME_AVAILABLE = True
 except Exception as e:
-    logger.warning("pygame.mixer is not available or failed to initialize: %s. Sound will be disabled.", e)
+    logger.warning("pygame is not available: %s. Sound will be disabled.", e)
 
 # Import PyQt6 or PySide6 for GUI animations
 GUI_AVAILABLE = False
@@ -70,6 +70,14 @@ class AlarmTrigger:
             logger.error("Sound file not found: %s. Continuing with visual effect only.", sound_file)
             return
 
+        # Initialize pygame mixer dynamically to prevent stale audio drivers
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+        except Exception as e:
+            logger.error("Failed to initialize pygame.mixer: %s. Continuing without sound.", e)
+            return
+
         self.sound_stop_event.clear()
         self.sound_thread = threading.Thread(target=self._run_sound_loop, args=(sound_file,), daemon=True)
         self.sound_thread.start()
@@ -92,9 +100,20 @@ class AlarmTrigger:
             pygame.mixer.music.stop()
         except Exception as e:
             logger.error("Error playing alarm sound: %s", e)
+        finally:
+            try:
+                if pygame.mixer.get_init():
+                    pygame.mixer.quit()
+            except Exception as e:
+                logger.error("Failed to quit pygame mixer: %s", e)
 
     def stop_sound(self):
         self.sound_stop_event.set()
+        if PYGAME_AVAILABLE and pygame.mixer.get_init():
+            try:
+                pygame.mixer.music.stop()
+            except Exception as e:
+                logger.error("Failed to stop pygame music: %s", e)
         if self.sound_thread:
             self.sound_thread.join(timeout=1.0)
             self.sound_thread = None
