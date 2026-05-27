@@ -437,8 +437,8 @@ class FloatingBubble(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         grad = QLinearGradient(0, 0, 0, self.height())
         if alarm_active:
-            grad.setColorAt(0, QColor(95, 55, 14))  # Dark orange
-            grad.setColorAt(1, QColor(45, 25, 5))
+            grad.setColorAt(0, QColor(63, 55, 14))  # Dark yellow
+            grad.setColorAt(1, QColor(30, 25, 5))
         else:
             grad.setColorAt(0, QColor(45, 55, 72))  # Slate Gray
             grad.setColorAt(1, QColor(26, 32, 44))
@@ -447,7 +447,7 @@ class FloatingBubble(QWidget):
 
         # Glowing border
         if alarm_active:
-            pen = QPen(QColor(237, 137, 54, 230), 3)  # Flashing orange border
+            pen = QPen(QColor(246, 224, 94, 230), 3)  # Flashing yellow border
         else:
             pen = QPen(QColor(49, 130, 206, 200), 2)  # Blue glow border
         painter.setPen(pen)

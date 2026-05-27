@@ -154,11 +154,11 @@ class AlarmTrigger:
             # For the bubble, we toggle a border glow property or repaint.
             # We can update a custom property or toggle a stylesheet.
             if self.flash_state:
-                # Orange flashing glow style
+                # Yellow flashing glow style
                 self.target_widget.setStyleSheet(
                     "QLabel { color: white; font-size: 14px; font-weight: bold; }"
                 )
-                # Let's set a flag on the bubble for paintEvent to draw orange glow
+                # Let's set a flag on the bubble for paintEvent to draw yellow glow
                 self.target_widget.setProperty("alarm_active", True)
             else:
                 self.target_widget.setStyleSheet(self.original_style)
@@ -172,7 +172,7 @@ class AlarmTrigger:
             card = getattr(self.target_widget, "card", self.target_widget)
             if self.flash_state:
                 card.setStyleSheet(
-                    "QFrame { background-color: #5F370E; border: 2px solid #ED8936; border-radius: 16px; }"
+                    "QFrame { background-color: #3F370E; border: 2px solid #ECC94B; border-radius: 16px; }"
                 )
             else:
                 card.setStyleSheet(
