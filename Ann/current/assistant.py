@@ -142,6 +142,9 @@ def main() -> None:
 
     if not has_qt:
         # Run CLI loop
+        if not use_cli:
+            print("\n[Notice] PyQt6 or PySide6 is not installed on this system.")
+            print("         To enable the floating GUI interface, please run: pip install PyQt6")
         print(f"\n{'='*50}")
         print(f"  Ann AI Assistant (CLI)  v{version}")
         print(f"  Model: {config['llm']['model']}")
