@@ -52,6 +52,43 @@ graph TD
     Staging -->|4. Tests pass: atomic swap| Assistant
     Launcher -.->|Tests fail: rollback| Versions
 ```
+---
+
+## ⚙️ Installation & Usage (安裝與使用)
+
+### 1. Prerequisites (環境要求)
+- **Python**: Version 3.10 or higher.
+- **Ollama**: Local LLM server running on your machine.
+  - Install Ollama from [ollama.com](https://ollama.com).
+  - Pull and run the default model specified in [config.yml](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/config.yml) (typically `gemma4:e4b`):
+    ```bash
+    ollama run gemma4:e4b
+    ```
+
+### 2. Dependency Installation (安裝依賴)
+Install the required packages from the dependency manifest:
+```bash
+pip install -r current/requirements.txt
+```
+This installs `PyQt6` (for GUI), `pygame` (for audio alarms), and `ollama` (for API integration).
+
+### 3. Running Ann (啟動方式)
+You can run Ann in two modes. The launcher automatically monitors and updates the core:
+- **GUI Mode (Default)**:
+  ```bash
+  python launcher.py
+  ```
+  Launches a floating bubble avatar. Click to expand into a full dark-mode chat window, drag to reposition, and click the dismiss button or the bubble itself to shut off active alarms.
+
+- **CLI Mode (Terminal)**:
+  ```bash
+  python launcher.py --cli
+  ```
+  Runs as a conversational shell in the terminal. If an alarm triggers, it prints reminder alerts every 2 seconds and can be dismissed by pressing Enter.
+
+### ⏰ Alarm Module (鬧鐘功能)
+Ann supports conversational alarm management (create, delete, list) through natural conversation. You can set relative/absolute alarms, check active alarms, and cancel them.
+For complete architectural details, audio loop specs, and UI animations, see [alarm_module_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/alarm_module_spec.md).
 
 ---
 

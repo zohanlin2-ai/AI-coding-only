@@ -100,10 +100,15 @@ class ChatWindow(QWidget):
     """Main Chat Window (State 2 of Scheme B)."""
     closed_to_bubble = pyqtSignal(QPoint)
 
-    def __init__(self, config: dict, evaluator: MoralEvaluator):
+    def __init__(self, config: dict, evaluator: MoralEvaluator, bubble, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser):
         super().__init__()
         self.config = config
         self.evaluator = evaluator
+        self.bubble = bubble
+        self.alarm_manager = alarm_manager
+        self.alarm_trigger = alarm_trigger
+        self.alarm_scheduler = alarm_scheduler
+        self.intent_parser = intent_parser
         self.conversation: list[dict] = []
         self.drag_position = QPoint()
 
@@ -165,6 +170,17 @@ class ChatWindow(QWidget):
 
         card_layout.addWidget(self.scroll_area)
 
+        # --- Dismiss Alarm Button ---
+        self.dismiss_btn = QPushButton("🔔 關閉鬧鐘 🔔")
+        self.dismiss_btn.setStyleSheet(
+            "QPushButton { color: white; background-color: #E53E3E; border: none; "
+            "border-radius: 12px; padding: 10px; font-size: 14px; font-weight: bold; margin-bottom: 5px; }"
+            "QPushButton:hover { background-color: #C53030; }"
+        )
+        self.dismiss_btn.clicked.connect(self.dismiss_alarm)
+        self.dismiss_btn.hide()
+        card_layout.addWidget(self.dismiss_btn)
+
         # --- Bottom Input Area ---
         input_layout = QHBoxLayout()
 
@@ -205,8 +221,16 @@ class ChatWindow(QWidget):
 
     def shrink_back(self) -> None:
         """Collapse the chat window back into the floating bubble."""
+        # If alarm is active, transfer visual target back to bubble
+        if self.bubble.active_triggered_alarms:
+            self.alarm_trigger.stop_visual_effects()
+            self.alarm_trigger.start_visual_effects(self.bubble)
+            
         self.closed_to_bubble.emit(self.pos() + self.rect().center())
         self.hide()
+
+    def dismiss_alarm(self) -> None:
+        self.bubble.dismiss_alarm()
 
     def add_message(self, text: str, is_user: bool, is_refusal: bool = False) -> None:
         """Add a bubble message to the chat view."""
@@ -243,6 +267,76 @@ class ChatWindow(QWidget):
 
         if result.decision == Decision.ESCALATE_OR_PAUSE:
             self.add_message(f"⚠️ {result.rationale}", is_user=False, is_refusal=True)
+            return
+
+        # --- Alarm Intent Handling ---
+        parsed = self.intent_parser.parse_intent(user_text)
+        if parsed["intent"] != "none":
+            intent = parsed["intent"]
+            reply_prompt = ""
+            if intent == "set_alarm":
+                time_str = parsed["time"]
+                label = parsed["label"]
+                if not time_str:
+                    reply_prompt = "請告訴我您想設定鬧鐘的具體時間。"
+                else:
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(time_str)
+                        success, msg_or_list, _ = self.alarm_manager.add_alarm(dt, label)
+                        if success:
+                            reply_prompt = f"System instruction: The alarm was successfully set for {dt.strftime('%Y-%m-%d %H:%M')} with label '{label or '無'}'. Confirm this to the user in a friendly way."
+                        else:
+                            reply_prompt = (
+                                f"System instruction: The user wants to set an alarm but the limit of 10 active alarms has been reached.\n"
+                                f"Here is the list of active alarms:\n{msg_or_list}\n"
+                                f"Please inform the user about the limit and present this list of current alarms with their IDs, asking which one they would like to delete to make room."
+                            )
+                    except Exception as ex:
+                        self.add_message(f"設定鬧鐘時發生錯誤：{ex}", is_user=False, is_refusal=True)
+                        return
+            elif intent == "list_alarms":
+                alarms = self.alarm_manager.get_alarms()
+                if not alarms:
+                    reply_prompt = "System instruction: Tell the user in a friendly way that they have no active alarms."
+                else:
+                    alarms_list = "\n".join(
+                        f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M:%S')} — {a.label or '無備註'}"
+                        for a in alarms
+                    )
+                    reply_prompt = f"System instruction: Present the following active alarms list to the user in a friendly way:\n{alarms_list}"
+            elif intent == "delete_alarm":
+                alarm_id = parsed["alarm_id"]
+                label = parsed["label"]
+                deleted = False
+                if alarm_id:
+                    deleted = self.alarm_manager.delete_alarm(alarm_id)
+                elif label:
+                    deleted = self.alarm_manager.delete_alarm_by_label(label)
+                
+                if deleted:
+                    reply_prompt = f"System instruction: The alarm (ID/label: {alarm_id or label}) has been successfully deleted. Confirm this to the user in a friendly way."
+                else:
+                    self.add_message(f"找不到符合條件的鬧鐘（ID: {alarm_id or '無'}, 標籤: {label or '無'}），請確認後再試。", is_user=False, is_refusal=True)
+                    return
+
+            # Call Ollama Worker asynchronously for response generation
+            self.send_btn.setEnabled(False)
+            self.input_field.setEnabled(False)
+            self.title_label.setText("Ann is typing...")
+            
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": reply_prompt}
+            ]
+            
+            self.worker = OllamaWorker(
+                self.config["llm"].get("base_url", "http://localhost:11434"),
+                self.config["llm"]["model"],
+                messages
+            )
+            self.worker.finished.connect(self.handle_reply)
+            self.worker.start()
             return
 
         # Prepare message payload
@@ -292,10 +386,15 @@ class ChatWindow(QWidget):
 
 class FloatingBubble(QWidget):
     """Draggable Floating Bubble (State 1 of Scheme B)."""
-    def __init__(self, config: dict, evaluator: MoralEvaluator):
+    def __init__(self, config: dict, evaluator: MoralEvaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser):
         super().__init__()
         self.config = config
         self.evaluator = evaluator
+        self.alarm_manager = alarm_manager
+        self.alarm_trigger = alarm_trigger
+        self.alarm_scheduler = alarm_scheduler
+        self.intent_parser = intent_parser
+        self.active_triggered_alarms = []
         self.drag_position = QPoint()
         self.click_start_pos = QPoint()
 
@@ -313,27 +412,39 @@ class FloatingBubble(QWidget):
         )
 
         # Initialize Chat Window
-        self.chat_window = ChatWindow(self.config, self.evaluator)
+        self.chat_window = ChatWindow(self.config, self.evaluator, self, self.alarm_manager, self.alarm_trigger, self.alarm_scheduler, self.intent_parser)
         self.chat_window.closed_to_bubble.connect(self.collapse_from_chat)
 
         # Position bubble in the bottom right corner initially
         screen = QApplication.primaryScreen().availableGeometry()
         self.move(screen.right() - 100, screen.bottom() - 100)
 
+        # Start GUI Scheduler
+        self.alarm_scheduler.start_gui_scheduler(self, self.on_alarm_triggered)
+
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+        alarm_active = self.property("alarm_active")
+
         # Draw bubble circle gradient
         painter.setPen(Qt.PenStyle.NoPen)
         grad = QLinearGradient(0, 0, 0, self.height())
-        grad.setColorAt(0, QColor(45, 55, 72))  # Slate Gray
-        grad.setColorAt(1, QColor(26, 32, 44))
+        if alarm_active:
+            grad.setColorAt(0, QColor(139, 45, 45))  # Dark red
+            grad.setColorAt(1, QColor(45, 20, 20))
+        else:
+            grad.setColorAt(0, QColor(45, 55, 72))  # Slate Gray
+            grad.setColorAt(1, QColor(26, 32, 44))
         painter.setBrush(QBrush(grad))
         painter.drawEllipse(5, 5, self.width() - 10, self.height() - 10)
 
         # Glowing border
-        pen = QPen(QColor(49, 130, 206, 200), 2)  # Blue glow border
+        if alarm_active:
+            pen = QPen(QColor(239, 68, 68, 230), 3)  # Flashing red border
+        else:
+            pen = QPen(QColor(49, 130, 206, 200), 2)  # Blue glow border
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawEllipse(5, 5, self.width() - 10, self.height() - 10)
@@ -355,11 +466,19 @@ class FloatingBubble(QWidget):
             # Check if this was a click (no significant dragging)
             moved = (event.globalPosition().toPoint() - self.click_start_pos).manhattanLength()
             if moved < 5:
-                self.expand_to_chat()
+                if self.active_triggered_alarms:
+                    self.dismiss_alarm()
+                else:
+                    self.expand_to_chat()
             event.accept()
 
     def expand_to_chat(self) -> None:
         """Morph/Expand from bubble to chat window."""
+        if self.active_triggered_alarms:
+            self.alarm_trigger.stop_visual_effects()
+            self.alarm_trigger.start_visual_effects(self.chat_window)
+            self.chat_window.dismiss_btn.show()
+
         bubble_center = self.pos() + self.rect().center()
         
         chat_width, chat_height = 360, 500
@@ -389,10 +508,24 @@ class FloatingBubble(QWidget):
         self.move(bubble_x, bubble_y)
         self.show()
 
+    def on_alarm_triggered(self, alarm) -> None:
+        logging.info("Alarm triggered in GUI: %s", alarm.label)
+        self.active_triggered_alarms.append(alarm)
+        
+        target = self.chat_window if self.chat_window.isVisible() else self
+        self.alarm_trigger.start_trigger(target)
+        self.chat_window.dismiss_btn.show()
+        self.chat_window.add_message(f"⏰ [鬧鐘提醒] {alarm.label or '無備註'} 時間到了！", is_user=False)
 
-def start_gui(config: dict, evaluator: MoralEvaluator) -> None:
+    def dismiss_alarm(self) -> None:
+        self.alarm_trigger.stop_trigger()
+        self.active_triggered_alarms.clear()
+        self.chat_window.dismiss_btn.hide()
+
+
+def start_gui(config: dict, evaluator: MoralEvaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser) -> None:
     """Launch the PyQt6 application loop."""
     app = QApplication(sys.argv)
-    bubble = FloatingBubble(config, evaluator)
+    bubble = FloatingBubble(config, evaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser)
     bubble.show()
     sys.exit(app.exec())

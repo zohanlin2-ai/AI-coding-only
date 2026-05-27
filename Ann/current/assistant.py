@@ -96,6 +96,30 @@ def main() -> None:
     version = (BASE_DIR / "version.txt").read_text(encoding="utf-8").strip()
     evaluator = MoralEvaluator(BASE_DIR / "moral_module_spec.md")
 
+    # Check for pygame availability on startup
+    try:
+        import pygame  # noqa: F401
+    except ImportError:
+        print("\n[Notice] pygame is not installed. Alarm audio notifications will be disabled.")
+        print("         To enable sound, please run: pip install pygame\n")
+
+    # Initialize Alarm components
+    from alarms.alarm_manager import AlarmManager
+    from alarms.alarm_trigger import AlarmTrigger
+    from alarms.alarm_scheduler import AlarmScheduler
+    from alarms.intent_parser import IntentParser
+
+    alarm_config = config.get("alarm", {})
+    sound_filename = alarm_config.get("sound_path", "428157__setuniman__charade-1q62b.wav")
+    sound_path = BASE_DIR / sound_filename
+    alarm_manager = AlarmManager()
+    alarm_trigger = AlarmTrigger(sound_path=str(sound_path), volume=alarm_config.get("volume", 0.8))
+    alarm_scheduler = AlarmScheduler(alarm_manager, alarm_trigger)
+    intent_parser = IntentParser(
+        base_url=config["llm"].get("base_url", "http://localhost:11434"),
+        model=config["llm"]["model"]
+    )
+
     # --- Step 2: version check ---
     new_tag = check_for_update(config, BASE_DIR)
 
@@ -156,69 +180,161 @@ def main() -> None:
 
         # --- CLI Conversation loop ---
         conversation: list[dict] = []
-        while True:
-            try:
-                user_input = input("You: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print("\nAnn: Goodbye!")
-                sys.exit(0)
+        
+        def cli_alarm_callback(alarm):
+            alarm_scheduler.active_triggered_alarms.append(alarm)
+            alarm_trigger.play_sound()
+            alarm_scheduler.start_cli_alerts(alarm.label or "無備註", alarm.datetime.strftime("%Y-%m-%d %H:%M"))
 
-            if not user_input:
-                continue
+        try:
+            alarm_scheduler.start_cli_scheduler(cli_alarm_callback)
+            while True:
+                try:
+                    user_input = input("You: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    print("\nAnn: Goodbye!")
+                    sys.exit(0)
 
-            if user_input.lower() == "exit":
-                print("Ann: Goodbye!")
-                sys.exit(0)
+                if alarm_scheduler.active_triggered_alarms:
+                    # Dismiss triggered alarms
+                    alarm_trigger.stop_trigger()
+                    alarm_scheduler.stop_cli_alerts()
+                    alarm_scheduler.active_triggered_alarms.clear()
+                    print("\nAnn: 鬧鐘已關閉。\n")
+                    continue
 
-            if user_input.lower() == "update":
-                sys.exit(EXIT_UPDATE)
+                if not user_input:
+                    continue
 
-            # --- Moral evaluation (every message, no exceptions) ---
-            result = evaluator.evaluate(user_input)
-            logging.info(
-                "Moral eval | risk=%s decision=%s confidence=%.2f | %r",
-                result.risk_level.value,
-                result.decision.value,
-                result.confidence,
-                user_input[:80],
-            )
+                if user_input.lower() == "exit":
+                    print("Ann: Goodbye!")
+                    sys.exit(0)
 
-            if result.decision == Decision.REFUSE:
-                print(f"\nAnn: I'm unable to help with that.\n     ({result.rationale})\n")
-                continue
+                if user_input.lower() == "update":
+                    sys.exit(EXIT_UPDATE)
 
-            if result.decision == Decision.ESCALATE_OR_PAUSE:
-                print(f"\nAnn: ⚠️  {result.rationale}\n")
-                continue
-
-            # Build the message for the LLM
-            if result.decision == Decision.COMPLY_WITH_SAFEGUARDS:
-                llm_message = (
-                    f"[Important: {result.rationale} Respond carefully and include "
-                    f"appropriate disclaimers.]\n\nUser: {user_input}"
+                # --- Moral evaluation (every message, no exceptions) ---
+                result = evaluator.evaluate(user_input)
+                logging.info(
+                    "Moral eval | risk=%s decision=%s confidence=%.2f | %r",
+                    result.risk_level.value,
+                    result.decision.value,
+                    result.confidence,
+                    user_input[:80],
                 )
-            else:
-                llm_message = user_input
 
-            conversation.append({"role": "user", "content": llm_message})
+                if result.decision == Decision.REFUSE:
+                    print(f"\nAnn: I'm unable to help with that.\n     ({result.rationale})\n")
+                    continue
 
-            try:
-                messages_with_system = [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    *conversation,
-                ]
-                reply = call_ollama(llm_base_url, llm_model, messages_with_system)
-            except Exception as e:
-                print(f"\nAnn: (LLM error — is Ollama running? {e})\n")
-                conversation.pop()  # don't store failed turn
-                continue
+                if result.decision == Decision.ESCALATE_OR_PAUSE:
+                    print(f"\nAnn: ⚠️  {result.rationale}\n")
+                    continue
 
-            conversation.append({"role": "assistant", "content": reply})
-            print(f"\nAnn: {reply}\n")
+                # --- Alarm Intent Handling ---
+                from datetime import datetime
+                parsed = intent_parser.parse_intent(user_input)
+                if parsed["intent"] != "none":
+                    intent = parsed["intent"]
+                    reply = ""
+                    if intent == "set_alarm":
+                        time_str = parsed["time"]
+                        label = parsed["label"]
+                        if not time_str:
+                            reply = "請告訴我您想設定鬧鐘的具體時間。"
+                        else:
+                            try:
+                                # Ollama's ISO format parsing
+                                dt = datetime.fromisoformat(time_str)
+                                success, msg_or_list, _ = alarm_manager.add_alarm(dt, label)
+                                if success:
+                                    prompt = f"System instruction: The alarm was successfully set for {dt.strftime('%Y-%m-%d %H:%M')} with label '{label or '無'}'. Confirm this to the user in a friendly way."
+                                    reply = call_ollama(llm_base_url, llm_model, [
+                                        {"role": "system", "content": SYSTEM_PROMPT},
+                                        {"role": "user", "content": prompt}
+                                    ])
+                                else:
+                                    limit_prompt = (
+                                        f"System instruction: The user wants to set an alarm but the limit of 10 active alarms has been reached.\n"
+                                        f"Here is the list of active alarms:\n{msg_or_list}\n"
+                                        f"Please inform the user about the limit and present this list of current alarms with their IDs, asking which one they would like to delete to make room."
+                                    )
+                                    reply = call_ollama(llm_base_url, llm_model, [
+                                        {"role": "system", "content": SYSTEM_PROMPT},
+                                        {"role": "user", "content": limit_prompt}
+                                    ])
+                            except Exception as ex:
+                                reply = f"設定鬧鐘時發生錯誤：{ex}"
+                                
+                    elif intent == "list_alarms":
+                        alarms = alarm_manager.get_alarms()
+                        if not alarms:
+                            reply = "您目前沒有設定 any 鬧鐘。"
+                        else:
+                            alarms_list = "\n".join(
+                                f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M:%S')} — {a.label or '無備註'}"
+                                for a in alarms
+                            )
+                            format_prompt = (
+                                f"System instruction: Present the following active alarms list to the user in a friendly way:\n{alarms_list}"
+                            )
+                            reply = call_ollama(llm_base_url, llm_model, [
+                                {"role": "system", "content": SYSTEM_PROMPT},
+                                {"role": "user", "content": format_prompt}
+                            ])
+                            
+                    elif intent == "delete_alarm":
+                        alarm_id = parsed["alarm_id"]
+                        label = parsed["label"]
+                        deleted = False
+                        if alarm_id:
+                            deleted = alarm_manager.delete_alarm(alarm_id)
+                        elif label:
+                            deleted = alarm_manager.delete_alarm_by_label(label)
+                        
+                        if deleted:
+                            prompt = f"System instruction: The alarm (ID/label: {alarm_id or label}) has been successfully deleted. Confirm this to the user in a friendly way."
+                            reply = call_ollama(llm_base_url, llm_model, [
+                                {"role": "system", "content": SYSTEM_PROMPT},
+                                {"role": "user", "content": prompt}
+                            ])
+                        else:
+                            reply = f"找不到符合條件的鬧鐘（ID: {alarm_id or '無'}, 標籤: {label or '無'}），請確認後再試。"
+
+                    print(f"\nAnn: {reply}\n")
+                    continue
+
+                # Build the message for the LLM
+                if result.decision == Decision.COMPLY_WITH_SAFEGUARDS:
+                    llm_message = (
+                        f"[Important: {result.rationale} Respond carefully and include "
+                        f"appropriate disclaimers.]\n\nUser: {user_input}"
+                    )
+                else:
+                    llm_message = user_input
+
+                conversation.append({"role": "user", "content": llm_message})
+
+                try:
+                    messages_with_system = [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        *conversation,
+                    ]
+                    reply = call_ollama(llm_base_url, llm_model, messages_with_system)
+                except Exception as e:
+                    print(f"\nAnn: (LLM error — is Ollama running? {e})\n")
+                    conversation.pop()  # don't store failed turn
+                    continue
+
+                conversation.append({"role": "assistant", "content": reply})
+                print(f"\nAnn: {reply}\n")
+        finally:
+            alarm_scheduler.stop_cli_scheduler()
+            alarm_trigger.stop_trigger()
     else:
         # Run GUI loop
         import assistant_gui
-        assistant_gui.start_gui(config, evaluator)
+        assistant_gui.start_gui(config, evaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser)
 
 
 if __name__ == "__main__":

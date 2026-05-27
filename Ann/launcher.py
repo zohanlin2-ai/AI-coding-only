@@ -38,7 +38,7 @@ def setup_logging() -> None:
 
 def run_assistant() -> int:
     """Launch assistant.py as a child process and return its exit code."""
-    proc = subprocess.Popen([sys.executable, str(ASSISTANT)])
+    proc = subprocess.Popen([sys.executable, str(ASSISTANT)] + sys.argv[1:])
     proc.wait()
     return proc.returncode
 
