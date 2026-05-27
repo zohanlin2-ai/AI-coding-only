@@ -193,15 +193,24 @@ def main() -> None:
 
                 user_input_lower = user_input.lower().strip()
                 if awaiting_update_confirm:
-                    if any(w in user_input_lower for w in ["不要", "不", "否", "later", "no", "n", "暫時", "取消", "晚點", "拒絕", "skip"]):
+                    if "沒問題" in user_input_lower or "沒有問題" in user_input_lower:
+                        intent = "yes"
+                    elif any(w in user_input_lower for w in ["不要", "不", "否", "later", "no", "n", "暫時", "取消", "晚點", "拒絕", "skip", "先不要", "等一下", "等會", "待會", "下次", "沒空", "忙", "暫不", "以後", "不升", "沒興趣", "沒時間", "改天", "忽略"]):
+                        intent = "no"
+                    elif any(w in user_input_lower for w in ["好", "要", "更新", "ok", "yes", "y", "update", "sure", "確定", "可以", "對", "行", "同意", "升級", "安裝", "upgrade", "confirm", "現在", "即刻"]):
+                        intent = "yes"
+                    else:
+                        intent = "unknown"
+
+                    if intent == "yes":
+                        print("\nAnn: 好的，即將進行更新並重新啟動應用程式...\n")
+                        sys.exit(EXIT_UPDATE)
+                    elif intent == "no":
                         awaiting_update_confirm = False
                         pending_version = None
                         print("\nAnn: 好的，那我們先不更新。如果您想再次檢查，可以隨時對我說『更新』。\n")
-                    elif any(w in user_input_lower for w in ["好", "要", "更新", "ok", "yes", "y", "update", "sure", "確定", "可以", "對", "行"]):
-                        print("\nAnn: 好的，即將進行更新並重新啟動應用程式...\n")
-                        sys.exit(EXIT_UPDATE)
                     else:
-                        print("\nAnn: 請回答『要』或『不要』以確認是否更新到最新版本。\n")
+                        print("\nAnn: 我不太確定您的意思。請問您現在需要更新程式嗎？（您可以回答「好/要」來更新，或回答「不用/先不要」跳過）\n")
                     continue
 
                 # Intercept update check requests

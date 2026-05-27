@@ -287,18 +287,28 @@ class ChatWindow(QWidget):
             self.input_field.clear()
             self.add_message(user_text, is_user=True)
             user_input_lower = user_text.lower()
-            if any(w in user_input_lower for w in ["不要", "不", "否", "later", "no", "n", "暫時", "取消", "晚點", "拒絕", "skip"]):
-                self.awaiting_update_confirm = False
-                self.pending_version = None
-                self.add_message("好的，那我們先不更新。如果您想再次檢查，可以隨時對我說『更新』。", is_user=False)
-                return
-            elif any(w in user_input_lower for w in ["好", "要", "更新", "ok", "yes", "y", "update", "sure", "確定", "可以", "對", "行"]):
+            
+            if "沒問題" in user_input_lower or "沒有問題" in user_input_lower:
+                intent = "yes"
+            elif any(w in user_input_lower for w in ["不要", "不", "否", "later", "no", "n", "暫時", "取消", "晚點", "拒絕", "skip", "先不要", "等一下", "等會", "待會", "下次", "沒空", "忙", "暫不", "以後", "不升", "沒興趣", "沒時間", "改天", "忽略"]):
+                intent = "no"
+            elif any(w in user_input_lower for w in ["好", "要", "更新", "ok", "yes", "y", "update", "sure", "確定", "可以", "對", "行", "同意", "升級", "安裝", "upgrade", "confirm", "現在", "即刻"]):
+                intent = "yes"
+            else:
+                intent = "unknown"
+
+            if intent == "yes":
                 self.add_message("好的，即將進行更新並重新啟動應用程式...", is_user=False)
                 QApplication.processEvents()
                 QApplication.exit(EXIT_UPDATE)
                 return
+            elif intent == "no":
+                self.awaiting_update_confirm = False
+                self.pending_version = None
+                self.add_message("好的，那我們先不更新。如果您想再次檢查，可以隨時對我說『更新』。", is_user=False)
+                return
             else:
-                self.add_message("請回答『要』或『不要』以確認是否更新到最新版本。", is_user=False)
+                self.add_message("我不太確定您的意思。請問您現在需要更新程式嗎？（您可以回答「好/要」來更新，或回答「不用/先不要」跳過）", is_user=False)
                 return
 
         # Intercept update check requests
