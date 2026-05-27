@@ -307,8 +307,8 @@ project/
 │   │   ├── alarm_scheduler.py     # QTimer-based polling and trigger dispatch
 │   │   ├── alarm_trigger.py       # Sound + visual effect on trigger
 │   │   └── intent_parser.py       # Ollama JSON intent extraction
+│   ├── 428157__setuniman__charade-1q62b.wav  # Sound asset (CC0)
 │   └── requirements.txt           # Python dependency specifications
-├── 428157__setuniman__charade-1q62b.wav  # Sound asset (CC0)
 └── ~/.ai-assistant/
     └── alarms.json            # Persistent alarm store (user home directory)
 ```

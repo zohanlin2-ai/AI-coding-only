@@ -111,7 +111,7 @@ def main() -> None:
 
     alarm_config = config.get("alarm", {})
     sound_filename = alarm_config.get("sound_path", "428157__setuniman__charade-1q62b.wav")
-    sound_path = BASE_DIR / sound_filename
+    sound_path = CURRENT_DIR / sound_filename
     alarm_manager = AlarmManager()
     alarm_trigger = AlarmTrigger(sound_path=str(sound_path), volume=alarm_config.get("volume", 0.8))
     alarm_scheduler = AlarmScheduler(alarm_manager, alarm_trigger)
