@@ -2,6 +2,16 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.1.3] - 2026-05-27
+
+### Added
+- Implemented a premium, minimalist PyQt6/PySide6 graphical user interface (GUI) based on Scheme B.
+- Created `current/assistant_gui.py` containing:
+  - `FloatingBubble`: A draggable, circular, transparent floating widget named "Ann".
+  - `ChatWindow`: A dark-themed frameless chat window with custom header, scrollable conversation, styled bubbles, and enter key bindings.
+- Added automatic Dual-Mode Fallback: launches in GUI mode if PyQt6/PySide6 is available, but automatically downgrades to CLI mode if they are absent or if `--cli` is passed.
+- Added `current/tests/test_gui_imports.py` to verify import and fallback mechanics.
+
 ## [0.1.2] - 2026-05-26
 
 ### Changed
