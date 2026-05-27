@@ -114,6 +114,32 @@ class TestAlarmManager(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(len(manager.get_alarms()), 0)
 
+    def test_delete_alarm_by_target(self):
+        manager = AlarmManager(filepath=self.test_file)
+        dt = datetime.now() + timedelta(hours=1)
+        
+        _, _, alarm1 = manager.add_alarm(dt, "Breakfast")
+        _, _, alarm2 = manager.add_alarm(dt, "Meeting")
+        
+        self.assertEqual(len(manager.get_alarms()), 2)
+        
+        # Match by ID
+        self.assertTrue(manager.delete_alarm_by_target(alarm1.id))
+        self.assertEqual(len(manager.get_alarms()), 1)
+        
+        # Match by label substring
+        self.assertTrue(manager.delete_alarm_by_target("meet"))
+        self.assertEqual(len(manager.get_alarms()), 0)
+        
+        # Add another and match by time substring
+        _, _, alarm3 = manager.add_alarm(dt, "Dinner")
+        time_str = dt.strftime("%H:%M")
+        self.assertTrue(manager.delete_alarm_by_target(time_str))
+        self.assertEqual(len(manager.get_alarms()), 0)
+        
+        # Non-existent
+        self.assertFalse(manager.delete_alarm_by_target("non-existent"))
+
     def test_check_and_trigger_due_alarms(self):
         manager = AlarmManager(filepath=self.test_file)
         

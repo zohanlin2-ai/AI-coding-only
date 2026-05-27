@@ -313,16 +313,19 @@ class ChatWindow(QWidget):
             elif intent == "delete_alarm":
                 alarm_id = parsed["alarm_id"]
                 label = parsed["label"]
+                target_alarm = parsed["target_alarm"]
                 deleted = False
                 if alarm_id:
                     deleted = self.alarm_manager.delete_alarm(alarm_id)
+                elif target_alarm:
+                    deleted = self.alarm_manager.delete_alarm_by_target(target_alarm)
                 elif label:
                     deleted = self.alarm_manager.delete_alarm_by_label(label)
                 
                 if deleted:
-                    reply_prompt = f"System instruction: The alarm (ID/label: {alarm_id or label}) has been successfully deleted. Confirm this to the user in a friendly way."
+                    reply_prompt = f"System instruction: The alarm (ID/label/target: {alarm_id or target_alarm or label}) has been successfully deleted. Confirm this to the user in a friendly way."
                 else:
-                    self.add_message(f"找不到符合條件的鬧鐘（ID: {alarm_id or '無'}, 標籤: {label or '無'}），請確認後再試。", is_user=False, is_refusal=True)
+                    self.add_message(f"找不到符合條件的鬧鐘（ID: {alarm_id or '無'}, 標籤/時間: {target_alarm or label or '無'}），請確認後再試。", is_user=False, is_refusal=True)
                     return
             elif intent == "update_alarm":
                 alarm_id = parsed["alarm_id"]

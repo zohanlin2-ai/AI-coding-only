@@ -162,6 +162,46 @@ class AlarmManager:
                 return True
             return False
 
+    def delete_alarm_by_target(self, target: str) -> bool:
+        """
+        Deletes an alarm matching the target string (which could be ID, label substring, or time substring).
+        """
+        if not target:
+            return False
+            
+        with self.lock:
+            matched_idx = -1
+            target_lower = target.lower()
+            
+            # 1. Match by ID (exact or prefix)
+            for idx, alarm in enumerate(self.alarms):
+                if alarm.id == target_lower or alarm.id.startswith(target_lower):
+                    matched_idx = idx
+                    break
+                    
+            # 2. Match by label substring
+            if matched_idx == -1:
+                for idx, alarm in enumerate(self.alarms):
+                    if alarm.label and target_lower in alarm.label.lower():
+                        matched_idx = idx
+                        break
+                        
+            # 3. Match by time substring
+            if matched_idx == -1:
+                for idx, alarm in enumerate(self.alarms):
+                    alarm_time_str = alarm.datetime.strftime("%H:%M")
+                    if target_lower in alarm_time_str or alarm_time_str in target_lower:
+                        matched_idx = idx
+                        break
+                        
+            if matched_idx != -1:
+                self.alarms.pop(matched_idx)
+                self._save_alarms_unlocked()
+                return True
+                
+            return False
+
+
     def get_alarms(self) -> list[Alarm]:
         with self.lock:
             # Clean expired first
