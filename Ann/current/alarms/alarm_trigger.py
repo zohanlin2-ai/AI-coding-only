@@ -122,12 +122,12 @@ class AlarmTrigger:
         # We build a sequential animation for one full shake cycle
         self.shake_group = QSequentialAnimationGroup(widget)
         
-        # Shake offsets: left/right/decay
-        offsets = [12, -12, 9, -9, 6, -6, 3, -3, 0]
+        # Shake offsets: left/right/decay (gentler shake)
+        offsets = [6, -6, 4, -4, 2, -2, 1, -1, 0]
         
         for offset in offsets:
             anim = QPropertyAnimation(widget, b"pos")
-            anim.setDuration(40) # 40ms per step
+            anim.setDuration(60) # 60ms per step (slower/gentler)
             anim.setStartValue(widget.pos())
             anim.setEndValue(self.original_pos + QPoint(offset, 0))
             self.shake_group.addAnimation(anim)
@@ -154,11 +154,11 @@ class AlarmTrigger:
             # For the bubble, we toggle a border glow property or repaint.
             # We can update a custom property or toggle a stylesheet.
             if self.flash_state:
-                # Red flashing glow style
+                # Orange flashing glow style
                 self.target_widget.setStyleSheet(
                     "QLabel { color: white; font-size: 14px; font-weight: bold; }"
                 )
-                # Let's set a flag on the bubble for paintEvent to draw red glow
+                # Let's set a flag on the bubble for paintEvent to draw orange glow
                 self.target_widget.setProperty("alarm_active", True)
             else:
                 self.target_widget.setStyleSheet(self.original_style)
@@ -172,7 +172,7 @@ class AlarmTrigger:
             card = getattr(self.target_widget, "card", self.target_widget)
             if self.flash_state:
                 card.setStyleSheet(
-                    "QFrame { background-color: #6B2D2D; border: 2px solid #EF4444; border-radius: 16px; }"
+                    "QFrame { background-color: #5F370E; border: 2px solid #ED8936; border-radius: 16px; }"
                 )
             else:
                 card.setStyleSheet(
