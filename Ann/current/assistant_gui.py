@@ -377,9 +377,9 @@ class ChatWindow(QWidget):
                 deleted = False
                 if alarm_id:
                     deleted = self.alarm_manager.delete_alarm(alarm_id)
-                elif target_alarm:
+                if not deleted and target_alarm:
                     deleted = self.alarm_manager.delete_alarm_by_target(target_alarm)
-                elif label:
+                if not deleted and label:
                     deleted = self.alarm_manager.delete_alarm_by_label(label)
                 
                 if deleted:

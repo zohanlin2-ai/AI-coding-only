@@ -7,10 +7,10 @@ logger = logging.getLogger(__name__)
 
 # Keywords to pre-filter normal chat messages to optimize latency
 ALARM_KEYWORDS = [
-    "鬧鐘", "提醒", "鬧鈴", "定時", 
-    "刪除", "取消", "列表", "清單", "查看", 
-    "改", "修改", "更改", "重設",
-    "明天", "早上", "下午", "晚上", "今晚", "明早",
+    "\u9b27\u9418", "\u63d0\u9192", "\u9b27\u9230", "\u5b9a\u6642", 
+    "\u522a\u9664", "\u53d6\u6d88", "\u5217\u8868", "\u6e05\u55ae", "\u67e5\u770b", 
+    "\u6539", "\u4fee\u6539", "\u66f4\u6539", "\u91cd\u8a2d",
+    "\u660e\u5929", "\u65e9\u4e0a", "\u4e0b\u5348", "\u665a\u4e0a", "\u4eca\u665a", "\u660e\u65e9",
     "alarm", "timer", "remind", "delete", "cancel", "list", "show", "clock",
     "change", "update", "edit"
 ]
@@ -27,7 +27,7 @@ class IntentParser:
         if any(keyword in text_lower for keyword in ALARM_KEYWORDS):
             return True
         # 2. Time-related digits/Chinese numbers patterns (e.g., 3點, 八點, 30分, 半小時)
-        if re.search(r'(?:[0-9一二三四五六七八九十百半]+)\s*(?:點|分|秒|小時|分鐘|hour|min|sec|hr|m|s|:|：)', text_lower):
+        if re.search('(?:[0-9\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u767e\u534a]+)\\s*(?:\u9ede|\u5206|\u79d2|\u5c0f\u6642|\u5206\u9418|hour|min|sec|hr|m|s|:|\uff1a)', text_lower):
             return True
         return False
 
@@ -116,13 +116,20 @@ class IntentParser:
             if result.get("intent") not in ["set_alarm", "list_alarms", "delete_alarm", "update_alarm", "none"]:
                 result["intent"] = "none"
                 
+            def clean_val(v):
+                if isinstance(v, str):
+                    v_clean = v.strip().lower()
+                    if v_clean in ("null", "none", "無", "nil", ""):
+                        return None
+                return v
+
             return {
                 "intent": result.get("intent", "none"),
-                "time": result.get("time"),
-                "label": result.get("label"),
-                "alarm_id": result.get("alarm_id"),
-                "target_alarm": result.get("target_alarm"),
-                "repeat": result.get("repeat")
+                "time": clean_val(result.get("time")),
+                "label": clean_val(result.get("label")),
+                "alarm_id": clean_val(result.get("alarm_id")),
+                "target_alarm": clean_val(result.get("target_alarm")),
+                "repeat": clean_val(result.get("repeat"))
             }
         except Exception as e:
             logger.warning("Could not parse JSON from Ollama reply %r: %s", reply, e)
@@ -140,7 +147,7 @@ class IntentParser:
         text_lower = text.lower()
         
         # Check list intent
-        if any(w in text_lower for w in ["有哪些鬧鐘", "鬧鐘清單", "鬧鐘列表", "查看鬧鐘", "list alarm", "show alarm"]):
+        if any(w in text_lower for w in ["\u6709\u54ea\u4e9b\u9b27\u9418", "\u9b27\u9418\u6e05\u55ae", "\u9b27\u9418\u5217\u8868", "\u67e5\u770b\u9b27\u9418", "list alarm", "show alarm"]):
             return {
                 "intent": "list_alarms",
                 "time": None,
@@ -151,22 +158,33 @@ class IntentParser:
             }
             
         # Check delete intent
-        delete_match = re.search(r"(?:刪除|取消|delete|cancel)(?:\s*鬧鐘)?\s*([a-zA-Z0-9]+)", text_lower)
+        delete_match = re.search("(?:\u522a\u9664|\u53d6\u6d88|delete|cancel)(?:\\s*\u9b27\u9418)?\\s*(\\S+)", text_lower)
         if delete_match:
-            alarm_id = delete_match.group(1)
-            return {
-                "intent": "delete_alarm",
-                "time": None,
-                "label": None,
-                "alarm_id": alarm_id,
-                "target_alarm": None,
-                "repeat": None
-            }
+            val = delete_match.group(1).strip()
+            # If val looks like a short hex ID (8 chars of hex or <= 8 ASCII alphanumeric)
+            if re.match(r"^[a-f0-9]{8}$", val) or (len(val) <= 8 and re.match(r"^[a-zA-Z0-9]+$", val)):
+                return {
+                    "intent": "delete_alarm",
+                    "time": None,
+                    "label": None,
+                    "alarm_id": val,
+                    "target_alarm": None,
+                    "repeat": None
+                }
+            else:
+                return {
+                    "intent": "delete_alarm",
+                    "time": None,
+                    "label": None,
+                    "alarm_id": None,
+                    "target_alarm": val,
+                    "repeat": None
+                }
             
         # Check update intent
-        update_match = re.search(r"(?:改|修改|更改|重設|change|update|edit)(?:\s*鬧鐘)?\s*(.+?)\s*(?:為|到|改成|to)\s*(.+)", text_lower)
+        update_match = re.search("(?:\u6539|\u4fee\u6539|\u66f4\u6539|\u91cd\u8a2d|change|update|edit)(?:\\s*\u9b27\u9418)?\\s*(.+?)\\s*(?:\u70ba|\u5230|\u6539\u6210|to)\\s*(.+)", text_lower)
         if update_match:
-            target = update_match.group(1)
+            target = update_match.group(1).strip()
             return {
                 "intent": "update_alarm",
                 "time": None,
@@ -177,13 +195,13 @@ class IntentParser:
             }
 
         # Check set repeating alarm fallback
-        interval_match = re.search(r"每(?:隔)?\s*([0-9一二三四五六七八九十]*)\s*分鐘", text_lower)
+        interval_match = re.search("\u6bcf(?:\\u9694)?\\s*([0-9\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]*)\\s*\u5206\u9418", text_lower)
         if interval_match:
             num_str = interval_match.group(1)
             if not num_str:
                 minutes = 1
             else:
-                chinese_digits = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+                chinese_digits = {"\u4e00": 1, "\u4e8c": 2, "\u4e09": 3, "\u56db": 4, "\u4e94": 5, "\u516d": 6, "\u4e03": 7, "\u516b": 8, "\u4e5d": 9, "\u5341": 10}
                 if num_str in chinese_digits:
                     minutes = chinese_digits[num_str]
                 else:

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import unittest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
@@ -257,13 +258,13 @@ class TestIntentParser(unittest.TestCase):
         parser = IntentParser(base_url="http://mock", model="mock")
         
         # Alarm queries
-        self.assertTrue(parser.should_parse("提醒我下午3點開會"))
-        self.assertTrue(parser.should_parse("鬧鐘列表"))
+        self.assertTrue(parser.should_parse("\u63d0\u9192\u6211\u4e0b\u53483\u9ede\u958b\u6703"))
+        self.assertTrue(parser.should_parse("\u9b27\u9418\u5217\u8868"))
         self.assertTrue(parser.should_parse("delete alarm 1"))
         
         # Normal chat
-        self.assertFalse(parser.should_parse("你好嗎？請問什麼是微積分？"))
-        self.assertFalse(parser.should_parse("寫一個 python 貪食蛇遊戲"))
+        self.assertFalse(parser.should_parse("\u4f60\u597d\u55ce\uff1f\u8acb\u554f\u4ec0\u9ebc\u662f\u5fae\u7a4d\u5206\uff1f"))
+        self.assertFalse(parser.should_parse("\u5beb\u4e00\u500b python \u8caa\u98df\u86c7\u904a\u6232"))
 
     @patch("assistant.call_ollama")
     def test_intent_parsing_success(self, mock_call):
@@ -273,15 +274,15 @@ class TestIntentParser(unittest.TestCase):
         json_resp = {
             "intent": "set_alarm",
             "time": "2026-05-28T08:00:00",
-            "label": "吃藥",
+            "label": "\u5403\u85e5",
             "alarm_id": None
         }
         mock_call.return_value = json.dumps(json_resp)
         
-        res = parser.parse_intent("明天早上八點叫我，備註吃藥")
+        res = parser.parse_intent("\u660e\u5929\u65e9\u4e0a\u516b\u9ede\u53eb\u6211\uff0c\u5099\u8a3b\u5403\u85e5")
         self.assertEqual(res["intent"], "set_alarm")
         self.assertEqual(res["time"], "2026-05-28T08:00:00")
-        self.assertEqual(res["label"], "吃藥")
+        self.assertEqual(res["label"], "\u5403\u85e5")
         self.assertIsNone(res["alarm_id"])
 
     @patch("assistant.call_ollama")
@@ -291,7 +292,7 @@ class TestIntentParser(unittest.TestCase):
         # Mock non-JSON response
         mock_call.return_value = "Sorry, I can't do that."
         
-        res = parser.parse_intent("刪除鬧鐘 123")
+        res = parser.parse_intent("\u522a\u9664\u9b27\u9418 123")
         # Should fallback to regex rules
         self.assertEqual(res["intent"], "delete_alarm")
         self.assertEqual(res["alarm_id"], "123")
@@ -299,6 +300,58 @@ class TestIntentParser(unittest.TestCase):
     def test_intent_parsing_update_fallback(self):
         parser = IntentParser(base_url="http://mock", model="mock")
         with patch("assistant.call_ollama", side_effect=Exception("offline")):
-            res = parser.parse_intent("修改鬧鐘下午3點為下午4點")
+            res = parser.parse_intent("\u4fee\u6539\u9b27\u9418\u4e0b\u53483\u9ede\u70ba\u4e0b\u53484\u9ede")
             self.assertEqual(res["intent"], "update_alarm")
-            self.assertEqual(res["target_alarm"], "下午3點")
+            self.assertEqual(res["target_alarm"], "\u4e0b\u53483\u9ede")
+
+    def test_bidirectional_label_matching(self):
+        # Create alarms and test matches target
+        alarm = Alarm(datetime_val=datetime.now(), label="\u958b\u6703")
+        # Use a temporary file path
+        import tempfile
+        temp_file = tempfile.NamedTemporaryFile(delete=False)
+        temp_file.close()
+        try:
+            manager = AlarmManager(filepath=temp_file.name)
+            
+            # Exact match
+            self.assertTrue(manager._alarm_matches_target(alarm, "\u958b\u6703"))
+            # Bidirectional substring matches
+            self.assertTrue(manager._alarm_matches_target(alarm, "\u958b\u6703\u7684\u9b27\u9418"))
+            self.assertTrue(manager._alarm_matches_target(alarm, "\u958b"))
+            
+            # Test delete by target
+            manager.alarms = [alarm]
+            self.assertTrue(manager.delete_alarm_by_target("\u958b\u6703\u7684\u9b27\u9418"))
+            self.assertEqual(len(manager.alarms), 0)
+        finally:
+            import os
+            if os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+
+    def test_regex_fallback_chinese_characters(self):
+        parser = IntentParser(base_url="http://mock", model="mock")
+        with patch("assistant.call_ollama", side_effect=Exception("offline")):
+            res = parser.parse_intent("\u522a\u9664\u958b\u6703")
+            self.assertEqual(res["intent"], "delete_alarm")
+            self.assertEqual(res["target_alarm"], "\u958b\u6703")
+            self.assertIsNone(res["alarm_id"])
+
+    @patch("assistant.call_ollama")
+    def test_clean_val_null_dummy_values(self, mock_call):
+        parser = IntentParser(base_url="http://mock", model="mock")
+        
+        # Mock JSON response with string "無", "None", "null"
+        json_resp = {
+            "intent": "delete_alarm",
+            "alarm_id": "\u7121",
+            "target_alarm": "null",
+            "label": "None"
+        }
+        mock_call.return_value = json.dumps(json_resp)
+        
+        res = parser.parse_intent("\u522a\u9664\u9b27\u9418")
+        self.assertEqual(res["intent"], "delete_alarm")
+        self.assertIsNone(res["alarm_id"])
+        self.assertIsNone(res["target_alarm"])
+        self.assertIsNone(res["label"])

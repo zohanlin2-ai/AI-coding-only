@@ -200,8 +200,8 @@ class AlarmManager:
         if alarm.id == target_lower or alarm.id.startswith(target_lower):
             return True
             
-        # 2. Match by label substring
-        if alarm.label and target_lower in alarm.label.lower():
+        # 2. Match by label substring (bidirectional)
+        if alarm.label and (target_lower in alarm.label.lower() or alarm.label.lower() in target_lower):
             return True
             
         # 3. Match by time substring (e.g. "15:00" or "下午3點")
@@ -267,7 +267,7 @@ class AlarmManager:
         with self.lock:
             matched_index = -1
             for idx, alarm in enumerate(self.alarms):
-                if alarm.label and label.lower() in alarm.label.lower():
+                if alarm.label and (label.lower() in alarm.label.lower() or alarm.label.lower() in label.lower()):
                     matched_index = idx
                     break
             
