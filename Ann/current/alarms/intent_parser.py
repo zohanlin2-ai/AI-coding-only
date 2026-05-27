@@ -9,8 +9,10 @@ logger = logging.getLogger(__name__)
 ALARM_KEYWORDS = [
     "鬧鐘", "提醒", "鬧鈴", "定時", 
     "刪除", "取消", "列表", "清單", "查看", 
+    "改", "修改", "更改", "重設",
     "明天", "早上", "下午", "晚上", "今晚", "明早",
-    "alarm", "timer", "remind", "delete", "cancel", "list", "show", "clock"
+    "alarm", "timer", "remind", "delete", "cancel", "list", "show", "clock",
+    "change", "update", "edit"
 ]
 
 class IntentParser:
@@ -39,7 +41,8 @@ class IntentParser:
                 "intent": "none",
                 "time": None,
                 "label": None,
-                "alarm_id": None
+                "alarm_id": None,
+                "target_alarm": None
             }
 
         now_str = datetime.now().isoformat()
@@ -51,10 +54,11 @@ class IntentParser:
             "Respond ONLY with a valid JSON object. No explanation, no markdown.\n\n"
             "JSON schema:\n"
             "{\n"
-            '  "intent": "set_alarm | list_alarms | delete_alarm | none",\n'
-            '  "time": "ISO-8601 datetime or null",\n'
-            '  "label": "string or null",\n'
-            '  "alarm_id": "string or null"\n'
+            '  "intent": "set_alarm | list_alarms | delete_alarm | update_alarm | none",\n'
+            '  "time": "ISO-8601 datetime of the new time or null",\n'
+            '  "label": "string or null (new label/remark if setting or updating)",\n'
+            '  "alarm_id": "string or null (ID for delete or update)",\n'
+            '  "target_alarm": "string or null (old label, old time, description, or ID to match which alarm to update or delete)"\n'
             "}\n\n"
             "Rules:\n"
             "- For relative times like '30 minutes later', calculate from current datetime.\n"
@@ -62,7 +66,8 @@ class IntentParser:
             "- For 'tomorrow morning at 8', use tomorrow's date.\n"
             "- If the user says a time without a date and it has already passed today, assume today unless context implies otherwise.\n"
             "- label is optional free text the user wants attached to the alarm.\n"
-            "- alarm_id is used only for delete_alarm intent.\n"
+            "- alarm_id is used only for delete_alarm or update_alarm intent if user specifies ID.\n"
+            "- target_alarm is used for delete_alarm or update_alarm to identify which alarm (e.g. '下午3點', '開會').\n"
         )
 
         messages = [
@@ -105,14 +110,15 @@ class IntentParser:
             # Basic validation of schema fields
             if "intent" not in result:
                 result["intent"] = "none"
-            if result.get("intent") not in ["set_alarm", "list_alarms", "delete_alarm", "none"]:
+            if result.get("intent") not in ["set_alarm", "list_alarms", "delete_alarm", "update_alarm", "none"]:
                 result["intent"] = "none"
                 
             return {
                 "intent": result.get("intent", "none"),
                 "time": result.get("time"),
                 "label": result.get("label"),
-                "alarm_id": result.get("alarm_id")
+                "alarm_id": result.get("alarm_id"),
+                "target_alarm": result.get("target_alarm")
             }
         except Exception as e:
             logger.warning("Could not parse JSON from Ollama reply %r: %s", reply, e)
@@ -120,7 +126,8 @@ class IntentParser:
                 "intent": "none",
                 "time": None,
                 "label": None,
-                "alarm_id": None
+                "alarm_id": None,
+                "target_alarm": None
             }
 
     def _regex_fallback(self, text: str) -> dict:
@@ -133,7 +140,8 @@ class IntentParser:
                 "intent": "list_alarms",
                 "time": None,
                 "label": None,
-                "alarm_id": None
+                "alarm_id": None,
+                "target_alarm": None
             }
             
         # Check delete intent
@@ -144,12 +152,26 @@ class IntentParser:
                 "intent": "delete_alarm",
                 "time": None,
                 "label": None,
-                "alarm_id": alarm_id
+                "alarm_id": alarm_id,
+                "target_alarm": None
+            }
+            
+        # Check update intent
+        update_match = re.search(r"(?:改|修改|更改|重設|change|update|edit)(?:\s*鬧鐘)?\s*(.+?)\s*(?:為|到|改成|to)\s*(.+)", text_lower)
+        if update_match:
+            target = update_match.group(1)
+            return {
+                "intent": "update_alarm",
+                "time": None,
+                "label": None,
+                "alarm_id": None,
+                "target_alarm": target
             }
 
         return {
             "intent": "none",
             "time": None,
             "label": None,
-            "alarm_id": None
+            "alarm_id": None,
+            "target_alarm": None
         }

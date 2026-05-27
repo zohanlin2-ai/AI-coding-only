@@ -192,3 +192,42 @@ class AlarmManager:
                 self._save_alarms_unlocked()
                 
         return due_alarms
+
+    def update_alarm(self, alarm_id: str = None, target_alarm: str = None, new_datetime = None) -> tuple[bool, str]:
+        """
+        Updates an alarm matching the criteria to a new datetime.
+        Returns:
+            (success, message)
+        """
+        if not new_datetime:
+            return False, "未指定新的鬧鐘時間。"
+            
+        with self.lock:
+            matched_alarm = None
+            if alarm_id:
+                for alarm in self.alarms:
+                    if alarm.id == alarm_id or alarm.id.startswith(alarm_id):
+                        matched_alarm = alarm
+                        break
+                        
+            if not matched_alarm and target_alarm:
+                target_lower = target_alarm.lower()
+                for alarm in self.alarms:
+                    # Match by label substring
+                    if alarm.label and target_lower in alarm.label.lower():
+                        matched_alarm = alarm
+                        break
+                    # Match by time substring (e.g. "15:00" or "下午3點")
+                    alarm_time_str = alarm.datetime.strftime("%H:%M")
+                    if target_lower in alarm_time_str or alarm_time_str in target_lower:
+                        matched_alarm = alarm
+                        break
+                        
+            if matched_alarm:
+                old_time_str = matched_alarm.datetime.strftime("%Y-%m-%d %H:%M")
+                matched_alarm.datetime = new_datetime
+                matched_alarm.triggered = False # Reset triggered state
+                self._save_alarms_unlocked()
+                return True, f"已成功將鬧鐘（原時間: {old_time_str}，備註: {matched_alarm.label or '無'}）更改為 {new_datetime.strftime('%Y-%m-%d %H:%M')}。"
+                
+            return False, f"找不到符合條件 '{target_alarm or alarm_id}' 的鬧鐘。"

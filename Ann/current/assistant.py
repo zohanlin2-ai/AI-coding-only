@@ -301,6 +301,31 @@ def main() -> None:
                         else:
                             reply = f"找不到符合條件的鬧鐘（ID: {alarm_id or '無'}, 標籤: {label or '無'}），請確認後再試。"
 
+                    elif intent == "update_alarm":
+                        alarm_id = parsed["alarm_id"]
+                        target_alarm = parsed["target_alarm"]
+                        time_str = parsed["time"]
+                        if not time_str:
+                            reply = "請告訴我您想將鬧鐘修改成什麼時間。"
+                        else:
+                            try:
+                                dt = datetime.fromisoformat(time_str)
+                                success, msg = alarm_manager.update_alarm(
+                                    alarm_id=alarm_id, 
+                                    target_alarm=target_alarm, 
+                                    new_datetime=dt
+                                )
+                                if success:
+                                    prompt = f"System instruction: {msg} Confirm this successful update to the user in a friendly way."
+                                    reply = call_ollama(llm_base_url, llm_model, [
+                                        {"role": "system", "content": SYSTEM_PROMPT},
+                                        {"role": "user", "content": prompt}
+                                    ])
+                                else:
+                                    reply = msg
+                            except Exception as ex:
+                                reply = f"修改鬧鐘時發生錯誤：{ex}"
+
                     print(f"\nAnn: {reply}\n")
                     continue
 

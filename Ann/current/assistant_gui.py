@@ -11,14 +11,14 @@ try:
         QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
         QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy
     )
-    from PyQt6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, pyqtSignal, QObject, QThread
+    from PyQt6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, pyqtSignal, QObject, QThread, QTimer
     from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush
 except ImportError:
     from PySide6.QtWidgets import (
         QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
         QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy
     )
-    from PySide6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, Signal, QObject, QThread
+    from PySide6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, Signal, QObject, QThread, QTimer
     from PySide6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush
     # Map PySide6 Signal to pyqtSignal name
     pyqtSignal = Signal
@@ -243,9 +243,9 @@ class ChatWindow(QWidget):
         
         QApplication.processEvents()
         
-        # Scroll to bottom
+        # Scroll to bottom with a short delay to ensure layout has calculated new size
         scroll_bar = self.scroll_area.verticalScrollBar()
-        scroll_bar.setValue(scroll_bar.maximum())
+        QTimer.singleShot(50, lambda: scroll_bar.setValue(scroll_bar.maximum()))
 
     def send_message(self) -> None:
         user_text = self.input_field.text().strip()
@@ -324,6 +324,30 @@ class ChatWindow(QWidget):
                 else:
                     self.add_message(f"找不到符合條件的鬧鐘（ID: {alarm_id or '無'}, 標籤: {label or '無'}），請確認後再試。", is_user=False, is_refusal=True)
                     return
+            elif intent == "update_alarm":
+                alarm_id = parsed["alarm_id"]
+                target_alarm = parsed["target_alarm"]
+                time_str = parsed["time"]
+                if not time_str:
+                    self.add_message("請告訴我您想將鬧鐘修改成什麼時間。", is_user=False, is_refusal=True)
+                    return
+                else:
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(time_str)
+                        success, msg = self.alarm_manager.update_alarm(
+                            alarm_id=alarm_id, 
+                            target_alarm=target_alarm, 
+                            new_datetime=dt
+                        )
+                        if success:
+                            reply_prompt = f"System instruction: {msg} Confirm this successful update to the user in a friendly way."
+                        else:
+                            self.add_message(msg, is_user=False, is_refusal=True)
+                            return
+                    except Exception as ex:
+                        self.add_message(f"修改鬧鐘時發生錯誤：{ex}", is_user=False, is_refusal=True)
+                        return
 
             # Call Ollama Worker asynchronously for response generation
             self.send_btn.setEnabled(False)

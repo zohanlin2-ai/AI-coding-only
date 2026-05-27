@@ -68,6 +68,7 @@ After the system executes the action, Ollama generates a natural language reply 
 | `set_alarm` | 「明天早上八點叫我」、「三十分鐘後提醒我」、「晚上十一點五十分，備註吃藥」 |
 | `list_alarms` | 「我設了哪些鬧鐘」、「現在有幾個鬧鐘」、「列出所有提醒」 |
 | `delete_alarm` | 「刪掉早上八點的鬧鐘」、「取消 ID 3 的提醒」、「刪掉吃藥那個」 |
+| `update_alarm` | 「把下午3點的鬧鐘改成4點」、「將開會的鬧鐘時間改成下午5點」 |
 | `none` | 與鬧鐘無關的對話 |
 
 ### 4.2 Ollama Parsing Prompt
@@ -83,10 +84,11 @@ Respond ONLY with a valid JSON object. No explanation, no markdown.
 
 JSON schema:
 {
-  "intent": "set_alarm | list_alarms | delete_alarm | none",
+  "intent": "set_alarm | list_alarms | delete_alarm | update_alarm | none",
   "time": "ISO-8601 datetime or null",
   "label": "string or null",
-  "alarm_id": "string or null"
+  "alarm_id": "string or null",
+  "target_alarm": "string or null"
 }
 
 Rules:
@@ -95,7 +97,8 @@ Rules:
 - For "tomorrow morning at 8", use tomorrow's date.
 - If the user says a time without a date and it has already passed today, assume today unless context implies otherwise.
 - label is optional free text the user wants attached to the alarm.
-- alarm_id is used only for delete_alarm intent.
+- alarm_id is used only for delete_alarm or update_alarm intent if user specifies ID.
+- target_alarm is used for delete_alarm or update_alarm to identify which alarm (e.g. '下午3點', '開會').
 ```
 
 ### 4.3 Parsed Output Example
@@ -263,6 +266,21 @@ System: 目前有 2 個鬧鐘：
 ```
 User:   刪掉開會那個鬧鐘
 System: 已刪除 2026-05-28 07:30 的鬧鐘（開會）。
+```
+
+### 10.4 Update Alarm
+
+**Flow:**
+1. Ollama parses intent → `update_alarm` with alarm_id, target_alarm, and the new time.
+2. System locates the alarm.
+   - If found: updates the target datetime, resets triggered status, and saves.
+   - If not found: informs the user.
+3. Ollama confirms the modification.
+
+**Example exchange:**
+```
+User:   把下午3點的鬧鐘改成4點
+System: 已成功將鬧鐘（原時間: 15:00）更改為 16:00。
 ```
 
 ---

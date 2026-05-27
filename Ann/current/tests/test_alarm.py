@@ -140,6 +140,37 @@ class TestAlarmManager(unittest.TestCase):
         self.assertEqual(len(manager.get_alarms()), 1)
         self.assertEqual(manager.get_alarms()[0].label, "Future Alarm")
 
+    def test_update_alarm(self):
+        manager = AlarmManager(filepath=self.test_file)
+        dt = datetime.now() + timedelta(hours=1)
+        
+        _, _, alarm1 = manager.add_alarm(dt, "Breakfast Meeting")
+        
+        # Update by ID
+        new_dt = dt + timedelta(hours=1)
+        success, msg = manager.update_alarm(alarm_id=alarm1.id, new_datetime=new_dt)
+        self.assertTrue(success)
+        self.assertIn("已成功將鬧鐘", msg)
+        self.assertEqual(manager.get_alarms()[0].datetime, new_dt)
+        
+        # Update by label substring
+        new_dt2 = dt + timedelta(hours=2)
+        success, msg = manager.update_alarm(target_alarm="breakfast", new_datetime=new_dt2)
+        self.assertTrue(success)
+        self.assertEqual(manager.get_alarms()[0].datetime, new_dt2)
+        
+        # Update by time substring
+        time_str = new_dt2.strftime("%H:%M")
+        new_dt3 = dt + timedelta(hours=3)
+        success, msg = manager.update_alarm(target_alarm=time_str, new_datetime=new_dt3)
+        self.assertTrue(success)
+        self.assertEqual(manager.get_alarms()[0].datetime, new_dt3)
+        
+        # Update non-existent
+        success, msg = manager.update_alarm(target_alarm="non-existent", new_datetime=new_dt3)
+        self.assertFalse(success)
+        self.assertIn("找不到符合條件", msg)
+
 
 class TestIntentParser(unittest.TestCase):
     def test_keyword_pre_filtering(self):
@@ -184,3 +215,10 @@ class TestIntentParser(unittest.TestCase):
         # Should fallback to regex rules
         self.assertEqual(res["intent"], "delete_alarm")
         self.assertEqual(res["alarm_id"], "123")
+
+    def test_intent_parsing_update_fallback(self):
+        parser = IntentParser(base_url="http://mock", model="mock")
+        with patch("assistant.call_ollama", side_effect=Exception("offline")):
+            res = parser.parse_intent("修改鬧鐘下午3點為下午4點")
+            self.assertEqual(res["intent"], "update_alarm")
+            self.assertEqual(res["target_alarm"], "下午3點")
