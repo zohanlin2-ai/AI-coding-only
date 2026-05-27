@@ -49,6 +49,24 @@ class OllamaWorker(QThread):
             self.finished.emit("", str(e))
 
 
+class UpdateCheckWorker(QThread):
+    """Worker thread to run GitHub update check asynchronously without freezing the GUI."""
+    finished = pyqtSignal(str, str)  # Emits (new_version, error_message)
+
+    def __init__(self, config: dict, base_dir: Path):
+        super().__init__()
+        self.config = config
+        self.base_dir = base_dir
+
+    def run(self) -> None:
+        try:
+            from version_check import check_for_update
+            new_tag = check_for_update(self.config, self.base_dir)
+            self.finished.emit(new_tag or "", "")
+        except Exception as e:
+            self.finished.emit("", str(e))
+
+
 class MessageBubble(QFrame):
     """Custom styled chat message bubble."""
     def __init__(self, text: str, is_user: bool, is_refusal: bool = False):
@@ -100,7 +118,7 @@ class ChatWindow(QWidget):
     """Main Chat Window (State 2 of Scheme B)."""
     closed_to_bubble = pyqtSignal(QPoint)
 
-    def __init__(self, config: dict, evaluator: MoralEvaluator, bubble, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser):
+    def __init__(self, config: dict, evaluator: MoralEvaluator, bubble, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag: str = None):
         super().__init__()
         self.config = config
         self.evaluator = evaluator
@@ -111,6 +129,9 @@ class ChatWindow(QWidget):
         self.intent_parser = intent_parser
         self.conversation: list[dict] = []
         self.drag_position = QPoint()
+        self.awaiting_update_confirm = False
+        self.pending_version = None
+        self.update_worker = None
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -206,7 +227,12 @@ class ChatWindow(QWidget):
         card_layout.addLayout(input_layout)
 
         # Welcome message
-        self.add_message("Hello! I am Ann, your safety-conscious assistant. How can I help you today?", is_user=False)
+        if new_tag:
+            self.awaiting_update_confirm = True
+            self.pending_version = new_tag
+            self.add_message(f"Hello! I am Ann, your safety-conscious assistant. 偵測到新版本 {new_tag}。請問您現在需要更新嗎？", is_user=False)
+        else:
+            self.add_message("Hello! I am Ann, your safety-conscious assistant. How can I help you today?", is_user=False)
 
     # Window Dragging
     def mousePressEvent(self, event) -> None:
@@ -256,8 +282,39 @@ class ChatWindow(QWidget):
             QApplication.quit()
             return
 
-        if user_text.lower() == "update":
-            QApplication.exit(EXIT_UPDATE)
+        # Intercept update confirmation replies
+        if self.awaiting_update_confirm:
+            self.input_field.clear()
+            self.add_message(user_text, is_user=True)
+            user_input_lower = user_text.lower()
+            if any(w in user_input_lower for w in ["不要", "不", "否", "later", "no", "n", "暫時", "取消", "晚點", "拒絕", "skip"]):
+                self.awaiting_update_confirm = False
+                self.pending_version = None
+                self.add_message("好的，那我們先不更新。如果您想再次檢查，可以隨時對我說『更新』。", is_user=False)
+                return
+            elif any(w in user_input_lower for w in ["好", "要", "更新", "ok", "yes", "y", "update", "sure", "確定", "可以", "對", "行"]):
+                self.add_message("好的，即將進行更新並重新啟動應用程式...", is_user=False)
+                QApplication.processEvents()
+                QApplication.exit(EXIT_UPDATE)
+                return
+            else:
+                self.add_message("請回答『要』或『不要』以確認是否更新到最新版本。", is_user=False)
+                return
+
+        # Intercept update check requests
+        user_input_lower = user_text.lower()
+        if any(w in user_input_lower for w in ["update", "更新", "檢查更新", "升級", "check update"]):
+            self.input_field.clear()
+            self.add_message(user_text, is_user=True)
+            self.add_message("正在檢查更新，請稍候...", is_user=False)
+
+            self.send_btn.setEnabled(False)
+            self.input_field.setEnabled(False)
+            self.title_label.setText("Checking for updates...")
+
+            self.update_worker = UpdateCheckWorker(self.config, BASE_DIR)
+            self.update_worker.finished.connect(self.handle_update_check_finished)
+            self.update_worker.start()
             return
 
         self.input_field.clear()
@@ -418,10 +475,27 @@ class ChatWindow(QWidget):
         self.add_message(reply, is_user=False)
         self.input_field.setFocus()
 
+    def handle_update_check_finished(self, new_version: str, error: str) -> None:
+        self.send_btn.setEnabled(True)
+        self.input_field.setEnabled(True)
+        self.title_label.setText("Ann")
+
+        if error:
+            self.add_message(f"(檢查更新時發生錯誤：{error})", is_user=False, is_refusal=True)
+            return
+
+        if new_version:
+            self.awaiting_update_confirm = True
+            self.pending_version = new_version
+            self.add_message(f"偵測到新版本 {new_version}。請問您現在要更新嗎？", is_user=False)
+        else:
+            self.add_message("您目前已是最新版本，不需要更新。", is_user=False)
+        self.input_field.setFocus()
+
 
 class FloatingBubble(QWidget):
     """Draggable Floating Bubble (State 1 of Scheme B)."""
-    def __init__(self, config: dict, evaluator: MoralEvaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser):
+    def __init__(self, config: dict, evaluator: MoralEvaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag: str = None):
         super().__init__()
         self.config = config
         self.evaluator = evaluator
@@ -447,7 +521,7 @@ class FloatingBubble(QWidget):
         )
 
         # Initialize Chat Window
-        self.chat_window = ChatWindow(self.config, self.evaluator, self, self.alarm_manager, self.alarm_trigger, self.alarm_scheduler, self.intent_parser)
+        self.chat_window = ChatWindow(self.config, self.evaluator, self, self.alarm_manager, self.alarm_trigger, self.alarm_scheduler, self.intent_parser, new_tag)
         self.chat_window.closed_to_bubble.connect(self.collapse_from_chat)
 
         # Position bubble in the bottom right corner initially
@@ -558,9 +632,9 @@ class FloatingBubble(QWidget):
         self.chat_window.dismiss_btn.hide()
 
 
-def start_gui(config: dict, evaluator: MoralEvaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser) -> None:
+def start_gui(config: dict, evaluator: MoralEvaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag: str = None) -> None:
     """Launch the PyQt6 application loop."""
     app = QApplication(sys.argv)
-    bubble = FloatingBubble(config, evaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser)
+    bubble = FloatingBubble(config, evaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag)
     bubble.show()
     sys.exit(app.exec())

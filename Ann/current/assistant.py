@@ -137,32 +137,7 @@ def main() -> None:
             except ImportError:
                 has_qt = False
 
-    if new_tag:
-        if not has_qt:
-            print(f"\nAnn: New version {new_tag} is available.")
-            answer = input("     Update now? (yes / later / skip): ").strip().lower()
-            print()
-            if answer in ("yes", "y"):
-                sys.exit(EXIT_UPDATE)
-        else:
-            # Ask via QMessageBox using available Qt library
-            try:
-                from PyQt6.QtWidgets import QApplication, QMessageBox
-            except ImportError:
-                from PySide6.QtWidgets import QApplication, QMessageBox
-            app = QApplication(sys.argv)
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Icon.Information)
-            msg.setText(f"New version {new_tag} is available.")
-            msg.setWindowTitle("Ann Update")
-            msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            msg.setDefaultButton(QMessageBox.StandardButton.Yes)
-            msg.button(QMessageBox.StandardButton.No).setText("Later")
-
-            retval = msg.exec()
-            if retval == QMessageBox.StandardButton.Yes:
-                sys.exit(EXIT_UPDATE)
-            app.quit()
+    # Startup blocking updates removed in favor of conversational updates.
 
     if not has_qt:
         # Run CLI loop
@@ -180,6 +155,12 @@ def main() -> None:
 
         # --- CLI Conversation loop ---
         conversation: list[dict] = []
+        awaiting_update_confirm = False
+        pending_version = None
+        if new_tag:
+            awaiting_update_confirm = True
+            pending_version = new_tag
+            print(f"\nAnn: 偵測到新版本 {new_tag}。請問您現在需要更新嗎？\n")
         
         def cli_alarm_callback(alarm):
             alarm_scheduler.active_triggered_alarms.append(alarm)
@@ -210,8 +191,30 @@ def main() -> None:
                     print("Ann: Goodbye!")
                     sys.exit(0)
 
-                if user_input.lower() == "update":
-                    sys.exit(EXIT_UPDATE)
+                user_input_lower = user_input.lower().strip()
+                if awaiting_update_confirm:
+                    if any(w in user_input_lower for w in ["不要", "不", "否", "later", "no", "n", "暫時", "取消", "晚點", "拒絕", "skip"]):
+                        awaiting_update_confirm = False
+                        pending_version = None
+                        print("\nAnn: 好的，那我們先不更新。如果您想再次檢查，可以隨時對我說『更新』。\n")
+                    elif any(w in user_input_lower for w in ["好", "要", "更新", "ok", "yes", "y", "update", "sure", "確定", "可以", "對", "行"]):
+                        print("\nAnn: 好的，即將進行更新並重新啟動應用程式...\n")
+                        sys.exit(EXIT_UPDATE)
+                    else:
+                        print("\nAnn: 請回答『要』或『不要』以確認是否更新到最新版本。\n")
+                    continue
+
+                # Intercept update check requests
+                if any(w in user_input_lower for w in ["update", "更新", "檢查更新", "升級", "check update"]):
+                    print("\nAnn: 正在檢查更新，請稍候...")
+                    new_version = check_for_update(config, BASE_DIR)
+                    if new_version:
+                        awaiting_update_confirm = True
+                        pending_version = new_version
+                        print(f"\nAnn: 偵測到新版本 {new_version}。請問您現在要更新嗎？\n")
+                    else:
+                        print("\nAnn: 您目前已是最新版本，不需要更新。\n")
+                    continue
 
                 # --- Moral evaluation (every message, no exceptions) ---
                 result = evaluator.evaluate(user_input)
@@ -366,7 +369,7 @@ def main() -> None:
     else:
         # Run GUI loop
         import assistant_gui
-        assistant_gui.start_gui(config, evaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser)
+        assistant_gui.start_gui(config, evaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag)
 
 
 if __name__ == "__main__":
