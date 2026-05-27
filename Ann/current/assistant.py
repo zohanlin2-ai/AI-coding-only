@@ -94,91 +94,128 @@ def main() -> None:
     setup_logging(config)
 
     version = (BASE_DIR / "version.txt").read_text(encoding="utf-8").strip()
-    print(f"\n{'='*50}")
-    print(f"  Ann AI Assistant  v{version}")
-    print(f"  Model: {config['llm']['model']}")
-    print(f"{'='*50}")
-    print("  Commands: 'exit' to quit | 'update' to update\n")
-
     evaluator = MoralEvaluator(BASE_DIR / "moral_module_spec.md")
-
-    llm_model = config["llm"]["model"]
-    llm_base_url = config["llm"].get("base_url", "http://localhost:11434")
 
     # --- Step 2: version check ---
     new_tag = check_for_update(config, BASE_DIR)
+
+    # Mode determination
+    use_cli = "--cli" in sys.argv
+    has_qt = False
+    if not use_cli:
+        try:
+            import PyQt6  # noqa: F401
+            has_qt = True
+        except ImportError:
+            try:
+                import PySide6  # noqa: F401
+                has_qt = True
+            except ImportError:
+                has_qt = False
+
     if new_tag:
-        print(f"Ann: New version {new_tag} is available.")
-        answer = input("     Update now? (yes / later / skip): ").strip().lower()
-        print()
-        if answer in ("yes", "y"):
-            sys.exit(EXIT_UPDATE)
-
-    # --- Conversation loop ---
-    conversation: list[dict] = []
-
-    while True:
-        try:
-            user_input = input("You: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nAnn: Goodbye!")
-            sys.exit(0)
-
-        if not user_input:
-            continue
-
-        if user_input.lower() == "exit":
-            print("Ann: Goodbye!")
-            sys.exit(0)
-
-        if user_input.lower() == "update":
-            sys.exit(EXIT_UPDATE)
-
-        # --- Moral evaluation (every message, no exceptions) ---
-        result = evaluator.evaluate(user_input)
-        logging.info(
-            "Moral eval | risk=%s decision=%s confidence=%.2f | %r",
-            result.risk_level.value,
-            result.decision.value,
-            result.confidence,
-            user_input[:80],
-        )
-
-        if result.decision == Decision.REFUSE:
-            print(f"\nAnn: I'm unable to help with that.\n     ({result.rationale})\n")
-            continue
-
-        if result.decision == Decision.ESCALATE_OR_PAUSE:
-            print(f"\nAnn: ⚠️  {result.rationale}\n")
-            continue
-
-        # Build the message for the LLM
-        # For COMPLY_WITH_SAFEGUARDS, prepend a system note to guide the model
-        if result.decision == Decision.COMPLY_WITH_SAFEGUARDS:
-            llm_message = (
-                f"[Important: {result.rationale} Respond carefully and include "
-                f"appropriate disclaimers.]\n\nUser: {user_input}"
-            )
+        if not has_qt:
+            print(f"\nAnn: New version {new_tag} is available.")
+            answer = input("     Update now? (yes / later / skip): ").strip().lower()
+            print()
+            if answer in ("yes", "y"):
+                sys.exit(EXIT_UPDATE)
         else:
-            llm_message = user_input
+            # Ask via QMessageBox using available Qt library
+            try:
+                from PyQt6.QtWidgets import QApplication, QMessageBox
+            except ImportError:
+                from PySide6.QtWidgets import QApplication, QMessageBox
+            app = QApplication(sys.argv)
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Icon.Information)
+            msg.setText(f"New version {new_tag} is available.")
+            msg.setWindowTitle("Ann Update")
+            msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            msg.setDefaultButton(QMessageBox.StandardButton.Yes)
+            msg.button(QMessageBox.StandardButton.No).setText("Later")
 
-        conversation.append({"role": "user", "content": llm_message})
+            retval = msg.exec()
+            if retval == QMessageBox.StandardButton.Yes:
+                sys.exit(EXIT_UPDATE)
+            app.quit()
 
-        try:
-            # Always inject the system prompt as the first message so Ann's
-            # identity is established regardless of conversation history length.
-            messages_with_system = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                *conversation,
-            ]
-            reply = call_ollama(llm_base_url, llm_model, messages_with_system)
-        except Exception as e:
-            print(f"\nAnn: (LLM error — is Ollama running? {e})\n")
-            conversation.pop()  # don't store failed turn
-            continue
+    if not has_qt:
+        # Run CLI loop
+        print(f"\n{'='*50}")
+        print(f"  Ann AI Assistant (CLI)  v{version}")
+        print(f"  Model: {config['llm']['model']}")
+        print(f"{'='*50}")
+        print("  Commands: 'exit' to quit | 'update' to update\n")
 
-        conversation.append({"role": "assistant", "content": reply})
-        print(f"\nAnn: {reply}\n")
+        llm_model = config["llm"]["model"]
+        llm_base_url = config["llm"].get("base_url", "http://localhost:11434")
+
+        # --- CLI Conversation loop ---
+        conversation: list[dict] = []
+        while True:
+            try:
+                user_input = input("You: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\nAnn: Goodbye!")
+                sys.exit(0)
+
+            if not user_input:
+                continue
+
+            if user_input.lower() == "exit":
+                print("Ann: Goodbye!")
+                sys.exit(0)
+
+            if user_input.lower() == "update":
+                sys.exit(EXIT_UPDATE)
+
+            # --- Moral evaluation (every message, no exceptions) ---
+            result = evaluator.evaluate(user_input)
+            logging.info(
+                "Moral eval | risk=%s decision=%s confidence=%.2f | %r",
+                result.risk_level.value,
+                result.decision.value,
+                result.confidence,
+                user_input[:80],
+            )
+
+            if result.decision == Decision.REFUSE:
+                print(f"\nAnn: I'm unable to help with that.\n     ({result.rationale})\n")
+                continue
+
+            if result.decision == Decision.ESCALATE_OR_PAUSE:
+                print(f"\nAnn: ⚠️  {result.rationale}\n")
+                continue
+
+            # Build the message for the LLM
+            if result.decision == Decision.COMPLY_WITH_SAFEGUARDS:
+                llm_message = (
+                    f"[Important: {result.rationale} Respond carefully and include "
+                    f"appropriate disclaimers.]\n\nUser: {user_input}"
+                )
+            else:
+                llm_message = user_input
+
+            conversation.append({"role": "user", "content": llm_message})
+
+            try:
+                messages_with_system = [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    *conversation,
+                ]
+                reply = call_ollama(llm_base_url, llm_model, messages_with_system)
+            except Exception as e:
+                print(f"\nAnn: (LLM error — is Ollama running? {e})\n")
+                conversation.pop()  # don't store failed turn
+                continue
+
+            conversation.append({"role": "assistant", "content": reply})
+            print(f"\nAnn: {reply}\n")
+    else:
+        # Run GUI loop
+        import assistant_gui
+        assistant_gui.start_gui(config, evaluator)
 
 
 if __name__ == "__main__":
