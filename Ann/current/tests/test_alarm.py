@@ -192,6 +192,23 @@ class TestAlarmManager(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(manager.get_alarms()[0].datetime, new_dt3)
         
+        # Update by relative date (e.g., "tomorrow", "明天", "後天", "兩天後")
+        dt_2days = datetime.now() + timedelta(days=2)
+        _, _, alarm2 = manager.add_alarm(dt_2days, "Vacation")
+        new_dt4 = dt_2days + timedelta(hours=1)
+        success, msg = manager.update_alarm(target_alarm="兩天後", new_datetime=new_dt4)
+        self.assertTrue(success)
+        updated_alarm2 = [a for a in manager.get_alarms() if a.label == "Vacation"][0]
+        self.assertEqual(updated_alarm2.datetime, new_dt4)
+
+        # Update by explicit date format (e.g., "5/29")
+        new_dt5 = dt_2days + timedelta(hours=2)
+        date_str = dt_2days.strftime("%m/%d")
+        success, msg = manager.update_alarm(target_alarm=date_str, new_datetime=new_dt5)
+        self.assertTrue(success)
+        updated_alarm2 = [a for a in manager.get_alarms() if a.label == "Vacation"][0]
+        self.assertEqual(updated_alarm2.datetime, new_dt5)
+
         # Update non-existent
         success, msg = manager.update_alarm(target_alarm="non-existent", new_datetime=new_dt3)
         self.assertFalse(success)

@@ -132,6 +132,63 @@ class AlarmManager:
             self._save_alarms_unlocked()
             return True, "鬧鐘設定成功", alarm
 
+    def _alarm_matches_target(self, alarm, target: str) -> bool:
+        if not target:
+            return False
+            
+        target_lower = target.lower().strip()
+        
+        # 1. Match by ID (exact or prefix)
+        if alarm.id == target_lower or alarm.id.startswith(target_lower):
+            return True
+            
+        # 2. Match by label substring
+        if alarm.label and target_lower in alarm.label.lower():
+            return True
+            
+        # 3. Match by time substring (e.g. "15:00" or "下午3點")
+        alarm_time_str = alarm.datetime.strftime("%H:%M")
+        if target_lower in alarm_time_str or alarm_time_str in target_lower:
+            return True
+            
+        # 4. Match by relative date names
+        now_date = datetime.now().date()
+        alarm_date = alarm.datetime.date()
+        delta_days = (alarm_date - now_date).days
+        
+        relative_names = []
+        if delta_days == 0:
+            relative_names.extend(["今天", "today"])
+        elif delta_days == 1:
+            relative_names.extend(["明天", "明早", "明晚", "tomorrow", "一天後", "1天後", "1 day later"])
+        elif delta_days == 2:
+            relative_names.extend(["後天", "兩天後", "2天後", "2 days later"])
+        elif delta_days == 3:
+            relative_names.extend(["大後天", "三天後", "3天後", "3 days later"])
+        elif delta_days > 3:
+            relative_names.extend([f"{delta_days}天後", f"{delta_days} days later"])
+        elif delta_days < 0:
+            relative_names.extend(["昨天", "yesterday"])
+            
+        for name in relative_names:
+            if name in target_lower or target_lower in name:
+                return True
+                
+        # 5. Match by explicit date formats
+        date_formats = [
+            alarm.datetime.strftime("%Y-%m-%d"),
+            alarm.datetime.strftime("%m-%d"),
+            alarm.datetime.strftime("%m/%d"),
+            f"{alarm.datetime.month}月{alarm.datetime.day}日",
+            f"{alarm.datetime.month}月{alarm.datetime.day}號",
+            f"{alarm.datetime.month}/{alarm.datetime.day}",
+        ]
+        for fmt in date_formats:
+            if fmt in target_lower or target_lower in fmt:
+                return True
+                
+        return False
+
     def delete_alarm(self, alarm_id: str) -> bool:
         """Deletes an alarm by its ID (exact match or prefix)."""
         with self.lock:
@@ -171,28 +228,10 @@ class AlarmManager:
             
         with self.lock:
             matched_idx = -1
-            target_lower = target.lower()
-            
-            # 1. Match by ID (exact or prefix)
             for idx, alarm in enumerate(self.alarms):
-                if alarm.id == target_lower or alarm.id.startswith(target_lower):
+                if self._alarm_matches_target(alarm, target):
                     matched_idx = idx
                     break
-                    
-            # 2. Match by label substring
-            if matched_idx == -1:
-                for idx, alarm in enumerate(self.alarms):
-                    if alarm.label and target_lower in alarm.label.lower():
-                        matched_idx = idx
-                        break
-                        
-            # 3. Match by time substring
-            if matched_idx == -1:
-                for idx, alarm in enumerate(self.alarms):
-                    alarm_time_str = alarm.datetime.strftime("%H:%M")
-                    if target_lower in alarm_time_str or alarm_time_str in target_lower:
-                        matched_idx = idx
-                        break
                         
             if matched_idx != -1:
                 self.alarms.pop(matched_idx)
@@ -200,7 +239,6 @@ class AlarmManager:
                 return True
                 
             return False
-
 
     def get_alarms(self) -> list[Alarm]:
         with self.lock:
@@ -251,15 +289,8 @@ class AlarmManager:
                         break
                         
             if not matched_alarm and target_alarm:
-                target_lower = target_alarm.lower()
                 for alarm in self.alarms:
-                    # Match by label substring
-                    if alarm.label and target_lower in alarm.label.lower():
-                        matched_alarm = alarm
-                        break
-                    # Match by time substring (e.g. "15:00" or "下午3點")
-                    alarm_time_str = alarm.datetime.strftime("%H:%M")
-                    if target_lower in alarm_time_str or alarm_time_str in target_lower:
+                    if self._alarm_matches_target(alarm, target_alarm):
                         matched_alarm = alarm
                         break
                         
