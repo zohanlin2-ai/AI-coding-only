@@ -91,6 +91,31 @@ def setup_logging(config: dict) -> None:
 
 
 def main() -> None:
+    if "--self-test" in sys.argv:
+        try:
+            # 1. Load config
+            load_config()
+            # 2. Check UI framework import if GUI mode
+            use_cli = "--cli" in sys.argv
+            if not use_cli:
+                try:
+                    import PyQt6  # noqa: F401
+                    has_qt = True
+                except ImportError:
+                    try:
+                        import PySide6  # noqa: F401
+                        has_qt = True
+                    except ImportError:
+                        has_qt = False
+                
+                if has_qt:
+                    import assistant_gui  # noqa: F401
+            print("Self-test passed.")
+            sys.exit(0)
+        except Exception as e:
+            print(f"Self-test failed: {e}", file=sys.stderr)
+            sys.exit(1)
+
     config = load_config()
     setup_logging(config)
 

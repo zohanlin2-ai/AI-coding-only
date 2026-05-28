@@ -2,6 +2,16 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.1.5] - 2026-05-28
+
+### Added
+- Implemented update self-test and automatic rollback (fail-safe) mechanism to prevent startup crashes.
+- Added `--self-test` mode to `current/assistant.py` to verify config load and library imports on startup.
+- Updated `updater.py` to run background self-test after file swapping, rolling back automatically to the previous backup in `versions/` if it fails.
+- Enhanced `launcher.py` with a 10-second startup monitoring watchdog, triggering rollback and restarting the previous stable version if a startup crash occurs immediately after an update.
+- Updated `update_flow_architecture.md` documentation and Mermaid diagrams to reflect the post-update self-test and rollback paths.
+- Added unit tests in `current/tests/test_rollback.py` to cover rollback and self-test scenarios.
+
 ## [0.1.4] - 2026-05-28
 
 ### Added

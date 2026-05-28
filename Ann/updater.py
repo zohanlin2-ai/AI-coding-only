@@ -118,6 +118,58 @@ class Updater:
         if self.staging.exists():
             shutil.rmtree(self.staging)
 
+    def _run_self_test(self) -> bool:
+        """Run self-test on the newly swapped current/assistant.py."""
+        assistant_path = self.current / "assistant.py"
+        if not assistant_path.exists():
+            logging.error("assistant.py not found in current/ after swap.")
+            return False
+
+        try:
+            args = [sys.executable, str(assistant_path), "--self-test"]
+            if "--cli" in sys.argv:
+                args.append("--cli")
+
+            result = subprocess.run(
+                args,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                logging.error("Self-test process returned non-zero code %d", result.returncode)
+                logging.error("Self-test stdout:\n%s", result.stdout)
+                logging.error("Self-test stderr:\n%s", result.stderr)
+                return False
+
+            logging.info("Self-test passed successfully on new version.")
+            return True
+        except Exception as e:
+            logging.exception("Exception occurred during self-test: %s", e)
+            return False
+
+    def rollback(self, old_version: str) -> bool:
+        """Roll back current/ directory to a previously backed up version."""
+        if not old_version:
+            logging.error("Rollback failed: No old version string provided.")
+            return False
+
+        backup_dir = self.versions / f"v{old_version}"
+        if not backup_dir.exists():
+            logging.error("Rollback failed: Backup directory %s does not exist.", backup_dir)
+            return False
+
+        try:
+            logging.info("Initiating rollback to version %s...", old_version)
+            if self.current.exists():
+                shutil.rmtree(self.current)
+            shutil.copytree(backup_dir, self.current)
+            self.version_file.write_text(old_version, encoding="utf-8")
+            logging.info("Rollback to version %s complete.", old_version)
+            return True
+        except Exception as e:
+            logging.exception("Rollback failed with exception: %s", e)
+            return False
+
     def run(self) -> bool:
         try:
             ref, version = self._latest_commit_version()
@@ -146,6 +198,14 @@ class Updater:
             # Commit the swap
             self._backup_current(old_version)
             self._swap()
+
+            # Post-swap self-test
+            if not self._run_self_test():
+                logging.error("Self-test FAILED after swap. Initiating rollback...")
+                self.rollback(old_version)
+                self._cleanup_staging()
+                return False
+
             self._cleanup_staging()
 
             # Record new version
