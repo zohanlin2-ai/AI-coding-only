@@ -24,6 +24,7 @@ except ImportError:
     pyqtSignal = Signal
 
 # Import core elements from assistant.py and moral_evaluator.py
+from alarm_handler import detect_update_intent, handle_alarm_intent
 from assistant import load_config, call_ollama, SYSTEM_PROMPT, BASE_DIR, EXIT_UPDATE
 from moral_evaluator import MoralEvaluator, Decision
 
@@ -287,15 +288,7 @@ class ChatWindow(QWidget):
             self.input_field.clear()
             self.add_message(user_text, is_user=True)
             user_input_lower = user_text.lower()
-            
-            if "沒問題" in user_input_lower or "沒有問題" in user_input_lower:
-                intent = "yes"
-            elif any(w in user_input_lower for w in ["不要", "不", "否", "later", "no", "n", "暫時", "取消", "晚點", "拒絕", "skip", "先不要", "等一下", "等會", "待會", "下次", "沒空", "忙", "暫不", "以後", "不升", "沒興趣", "沒時間", "改天", "忽略"]):
-                intent = "no"
-            elif any(w in user_input_lower for w in ["好", "要", "更新", "ok", "yes", "y", "update", "sure", "確定", "可以", "對", "行", "同意", "升級", "安裝", "upgrade", "confirm", "現在", "即刻"]):
-                intent = "yes"
-            else:
-                intent = "unknown"
+            intent = detect_update_intent(user_input_lower)
 
             if intent == "yes":
                 self.add_message("好的，即將進行更新並重新啟動應用程式...", is_user=False)
@@ -344,133 +337,39 @@ class ChatWindow(QWidget):
         # --- Alarm Intent Handling ---
         parsed = self.intent_parser.parse_intent(user_text)
         if parsed["intent"] != "none":
-            intent = parsed["intent"]
-            reply_prompt = ""
-            if intent == "set_alarm":
-                time_str = parsed["time"]
-                label = parsed["label"]
-                repeat_pattern = parsed.get("repeat")
-                if not time_str:
-                    reply_prompt = "請告訴我您想設定鬧鐘的具體時間。"
-                else:
-                    try:
-                        from datetime import datetime
-                        dt = datetime.fromisoformat(time_str)
-                        success, msg_or_list, _ = self.alarm_manager.add_alarm(dt, label, repeat_pattern)
-                        if success:
-                            repeat_msg = f" repeating '{repeat_pattern}'" if repeat_pattern else ""
-                            reply_prompt = f"System instruction: The alarm was successfully set for {dt.strftime('%Y-%m-%d %H:%M')}{repeat_msg} with label '{label or '無'}'. Confirm this to the user in a friendly way."
-                        else:
-                            reply_prompt = (
-                                f"System instruction: The user wants to set an alarm but the limit of 10 active alarms has been reached.\n"
-                                f"Here is the list of active alarms:\n{msg_or_list}\n"
-                                f"Please inform the user about the limit and present this list of current alarms with their IDs, asking which one they would like to delete to make room."
-                            )
-                    except Exception as ex:
-                        self.add_message(f"設定鬧鐘時發生錯誤：{ex}", is_user=False, is_refusal=True)
-                        return
-            elif intent == "list_alarms":
-                alarms = self.alarm_manager.get_alarms()
-                if not alarms:
-                    reply_prompt = "System instruction: Tell the user in a friendly way that they have no active alarms."
-                else:
-                    alarms_list = "\n".join(
-                        f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M:%S')} — {a.label or '無備註'}" +
-                        (f" (重複: {a.repeat_pattern})" if a.repeat_pattern else "")
-                        for a in alarms
-                    )
-                    reply_prompt = f"System instruction: Present the following active alarms list to the user in a friendly way:\n{alarms_list}"
-            elif intent == "delete_alarm":
-                alarm_id = parsed["alarm_id"]
-                label = parsed["label"]
-                target_alarm = parsed["target_alarm"]
-                
-                try:
-                    success, msg, matches = self.alarm_manager.delete_alarm_flow(
-                        alarm_id=alarm_id,
-                        target_alarm=target_alarm,
-                        label=label
-                    )
-                    if not success and len(matches) > 1:
-                        alarms_list = "\n".join(
-                            f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M')} — {a.label or '無備註'}"
-                            for a in matches
-                        )
-                        reply_prompt = (
-                            f"System instruction: Multiple alarms matched the deletion query. "
-                            f"Present the list of matching alarms below and ask the user to clarify which one they wish to delete by typing its ID (e.g. 'a1'):\n"
-                            f"{alarms_list}"
-                        )
-                    elif success:
-                        reply_prompt = f"System instruction: {msg} Confirm this successful deletion to the user in a friendly way."
-                    else:
-                        self.add_message(msg, is_user=False, is_refusal=True)
-                        return
-                except Exception as ex:
-                    self.add_message(f"刪除鬧鐘時發生錯誤：{ex}", is_user=False, is_refusal=True)
-                    return
+            def _gui_call_llm(prompt: str) -> str:
+                return None  # placeholder; actual call dispatched via OllamaWorker below
 
-            elif intent == "update_alarm":
-                alarm_id = parsed["alarm_id"]
-                target_alarm = parsed["target_alarm"]
-                time_str = parsed["time"]
-                new_label = parsed["label"]
-                
-                dt = None
-                if time_str:
-                    try:
-                        from datetime import datetime
-                        dt = datetime.fromisoformat(time_str)
-                    except Exception:
-                        pass
-                
-                if not time_str and not new_label:
-                    self.add_message("請告訴我您想將鬧鐘修改成什麼時間或什麼備註名稱。", is_user=False, is_refusal=True)
-                    return
-                else:
-                    try:
-                        success, msg, matches = self.alarm_manager.update_alarm_flow(
-                            alarm_id=alarm_id,
-                            target_alarm=target_alarm,
-                            new_datetime=dt,
-                            new_label=new_label
-                        )
-                        if not success and len(matches) > 1:
-                            alarms_list = "\n".join(
-                                f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M')} — {a.label or '無備註'}"
-                                for a in matches
-                            )
-                            reply_prompt = (
-                                f"System instruction: Multiple alarms matched the update query. "
-                                f"Present the list of matching alarms below and ask the user to clarify which one they wish to update by typing its ID (e.g. 'a1'):\n"
-                                f"{alarms_list}"
-                            )
-                        elif success:
-                            reply_prompt = f"System instruction: {msg} Confirm this successful update to the user in a friendly way."
-                        else:
-                            self.add_message(msg, is_user=False, is_refusal=True)
-                            return
-                    except Exception as ex:
-                        self.add_message(f"修改鬧鐘時發生錯誤：{ex}", is_user=False, is_refusal=True)
-                        return
+            # Build the prompt via alarm_handler, then send it to OllamaWorker
+            # We need the prompt string, so we temporarily capture it.
+            _prompt_holder: list[str] = []
 
-            # Call Ollama Worker asynchronously for response generation
-            self.send_btn.setEnabled(False)
-            self.input_field.setEnabled(False)
-            self.title_label.setText("Ann is typing...")
-            
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": reply_prompt}
-            ]
-            
-            self.worker = OllamaWorker(
-                self.config["llm"].get("base_url", "http://localhost:11434"),
-                self.config["llm"]["model"],
-                messages
-            )
-            self.worker.finished.connect(self.handle_reply)
-            self.worker.start()
+            def _capture_llm(prompt: str) -> str:  # type: ignore[misc]
+                _prompt_holder.append(prompt)
+                return ""
+
+            result_or_direct = handle_alarm_intent(parsed, self.alarm_manager, _capture_llm)
+
+            if _prompt_holder:
+                # Alarm handler wants an LLM call — dispatch asynchronously
+                reply_prompt = _prompt_holder[0]
+                self.send_btn.setEnabled(False)
+                self.input_field.setEnabled(False)
+                self.title_label.setText("Ann is typing...")
+                messages = [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": reply_prompt},
+                ]
+                self.worker = OllamaWorker(
+                    self.config["llm"].get("base_url", "http://localhost:11434"),
+                    self.config["llm"]["model"],
+                    messages,
+                )
+                self.worker.finished.connect(self.handle_reply)
+                self.worker.start()
+            else:
+                # Direct reply (no LLM needed, e.g. validation error message)
+                self.add_message(result_or_direct or "", is_user=False, is_refusal=True)
             return
 
         # Prepare message payload

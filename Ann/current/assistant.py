@@ -27,6 +27,7 @@ BASE_DIR = CURRENT_DIR.parent
 
 sys.path.insert(0, str(CURRENT_DIR))
 
+from alarm_handler import detect_update_intent, handle_alarm_intent  # noqa: E402
 from moral_evaluator import Decision, MoralEvaluator  # noqa: E402
 from version_check import check_for_update  # noqa: E402
 
@@ -193,14 +194,7 @@ def main() -> None:
 
                 user_input_lower = user_input.lower().strip()
                 if awaiting_update_confirm:
-                    if "沒問題" in user_input_lower or "沒有問題" in user_input_lower:
-                        intent = "yes"
-                    elif any(w in user_input_lower for w in ["不要", "不", "否", "later", "no", "n", "暫時", "取消", "晚點", "拒絕", "skip", "先不要", "等一下", "等會", "待會", "下次", "沒空", "忙", "暫不", "以後", "不升", "沒興趣", "沒時間", "改天", "忽略"]):
-                        intent = "no"
-                    elif any(w in user_input_lower for w in ["好", "要", "更新", "ok", "yes", "y", "update", "sure", "確定", "可以", "對", "行", "同意", "升級", "安裝", "upgrade", "confirm", "現在", "即刻", "yer", "yeah", "yep", "yea"]):
-                        intent = "yes"
-                    else:
-                        intent = "unknown"
+                    intent = detect_update_intent(user_input_lower)
 
                     if intent == "yes":
                         print("\nAnn: 好的，即將進行更新並重新啟動應用程式...\n")
@@ -244,145 +238,14 @@ def main() -> None:
                     continue
 
                 # --- Alarm Intent Handling ---
-                from datetime import datetime
                 parsed = intent_parser.parse_intent(user_input)
-                if parsed["intent"] != "none":
-                    intent = parsed["intent"]
-                    reply = ""
-                    if intent == "set_alarm":
-                        time_str = parsed["time"]
-                        label = parsed["label"]
-                        repeat_pattern = parsed.get("repeat")
-                        if not time_str:
-                            reply = "請告訴我您想設定鬧鐘的具體時間。"
-                        else:
-                            try:
-                                # Ollama's ISO format parsing
-                                dt = datetime.fromisoformat(time_str)
-                                success, msg_or_list, _ = alarm_manager.add_alarm(dt, label, repeat_pattern)
-                                if success:
-                                    repeat_msg = f" repeating '{repeat_pattern}'" if repeat_pattern else ""
-                                    prompt = f"System instruction: The alarm was successfully set for {dt.strftime('%Y-%m-%d %H:%M')}{repeat_msg} with label '{label or '無'}'. Confirm this to the user in a friendly way."
-                                    reply = call_ollama(llm_base_url, llm_model, [
-                                        {"role": "system", "content": SYSTEM_PROMPT},
-                                        {"role": "user", "content": prompt}
-                                    ])
-                                  
-                                else:
-                                    limit_prompt = (
-                                        f"System instruction: The user wants to set an alarm but the limit of 10 active alarms has been reached.\n"
-                                        f"Here is the list of active alarms:\n{msg_or_list}\n"
-                                        f"Please inform the user about the limit and present this list of current alarms with their IDs, asking which one they would like to delete to make room."
-                                    )
-                                    reply = call_ollama(llm_base_url, llm_model, [
-                                        {"role": "system", "content": SYSTEM_PROMPT},
-                                        {"role": "user", "content": limit_prompt}
-                                    ])
-                            except Exception as ex:
-                                reply = f"設定鬧鐘時發生錯誤：{ex}"
-                                
-                    elif intent == "list_alarms":
-                        alarms = alarm_manager.get_alarms()
-                        if not alarms:
-                            reply = "您目前沒有設定 any 鬧鐘。"
-                        else:
-                            alarms_list = "\n".join(
-                                f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M:%S')} — {a.label or '無備註'}" +
-                                (f" (重複: {a.repeat_pattern})" if a.repeat_pattern else "")
-                                for a in alarms
-                            )
-                            format_prompt = (
-                                f"System instruction: Present the following active alarms list to the user in a friendly way:\n{alarms_list}"
-                            )
-                            reply = call_ollama(llm_base_url, llm_model, [
-                                {"role": "system", "content": SYSTEM_PROMPT},
-                                {"role": "user", "content": format_prompt}
-                            ])
-                            
-                    elif intent == "delete_alarm":
-                        alarm_id = parsed["alarm_id"]
-                        label = parsed["label"]
-                        target_alarm = parsed["target_alarm"]
-                        
-                        try:
-                            success, msg, matches = alarm_manager.delete_alarm_flow(
-                                alarm_id=alarm_id,
-                                target_alarm=target_alarm,
-                                label=label
-                            )
-                            if not success and len(matches) > 1:
-                                alarms_list = "\n".join(
-                                    f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M')} — {a.label or '無備註'}"
-                                    for a in matches
-                                )
-                                prompt = (
-                                    f"System instruction: Multiple alarms matched the deletion query. "
-                                    f"Present the list of matching alarms below and ask the user to clarify which one they wish to delete by typing its ID (e.g. 'a1'):\n"
-                                    f"{alarms_list}"
-                                )
-                                reply = call_ollama(llm_base_url, llm_model, [
-                                    {"role": "system", "content": SYSTEM_PROMPT},
-                                    {"role": "user", "content": prompt}
-                                ])
-                            elif success:
-                                prompt = f"System instruction: {msg} Confirm this successful deletion to the user in a friendly way."
-                                reply = call_ollama(llm_base_url, llm_model, [
-                                    {"role": "system", "content": SYSTEM_PROMPT},
-                                    {"role": "user", "content": prompt}
-                                ])
-                            else:
-                                reply = msg
-                        except Exception as ex:
-                            reply = f"刪除鬧鐘時發生錯誤：{ex}"
-
-                    elif intent == "update_alarm":
-                        alarm_id = parsed["alarm_id"]
-                        target_alarm = parsed["target_alarm"]
-                        time_str = parsed["time"]
-                        new_label = parsed["label"]
-                        
-                        dt = None
-                        if time_str:
-                            try:
-                                dt = datetime.fromisoformat(time_str)
-                            except Exception:
-                                pass
-                        
-                        if not time_str and not new_label:
-                            reply = "請告訴我您想將鬧鐘修改成什麼時間或什麼備註名稱。"
-                        else:
-                            try:
-                                success, msg, matches = alarm_manager.update_alarm_flow(
-                                    alarm_id=alarm_id,
-                                    target_alarm=target_alarm,
-                                    new_datetime=dt,
-                                    new_label=new_label
-                                )
-                                if not success and len(matches) > 1:
-                                    alarms_list = "\n".join(
-                                        f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M')} — {a.label or '無備註'}"
-                                        for a in matches
-                                    )
-                                    prompt = (
-                                        f"System instruction: Multiple alarms matched the update query. "
-                                        f"Present the list of matching alarms below and ask the user to clarify which one they wish to update by typing its ID (e.g. 'a1'):\n"
-                                        f"{alarms_list}"
-                                    )
-                                    reply = call_ollama(llm_base_url, llm_model, [
-                                        {"role": "system", "content": SYSTEM_PROMPT},
-                                        {"role": "user", "content": prompt}
-                                    ])
-                                elif success:
-                                    prompt = f"System instruction: {msg} Confirm this successful update to the user in a friendly way."
-                                    reply = call_ollama(llm_base_url, llm_model, [
-                                        {"role": "system", "content": SYSTEM_PROMPT},
-                                        {"role": "user", "content": prompt}
-                                    ])
-                                else:
-                                    reply = msg
-                            except Exception as ex:
-                                reply = f"修改鬧鐘時發生錯誤：{ex}"
-
+                def _cli_call_llm(prompt: str) -> str:
+                    return call_ollama(llm_base_url, llm_model, [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ])
+                reply = handle_alarm_intent(parsed, alarm_manager, _cli_call_llm)
+                if reply is not None:
                     print(f"\nAnn: {reply}\n")
                     continue
 
