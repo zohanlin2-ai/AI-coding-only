@@ -90,6 +90,10 @@ You can run Ann in two modes. The launcher automatically monitors and updates th
 Ann supports conversational alarm management (create, delete, list) through natural conversation. You can set relative/absolute alarms, check active alarms, and cancel them.
 For complete architectural details, audio loop specs, and UI animations, see [alarm_module_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/alarm_module_spec.md).
 
+### 📂 Drag & Drop Module (拖放功能)
+Ann supports dragging and dropping plain text and image files onto the floating bubble or the chat window. Dropped files are attached to the conversation context and can be clicked to display a popup preview (viewing full text or images).
+For detailed interaction specifications, see [drag_drop_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/drag_drop_spec.md).
+
 ---
 
 ## 📂 Recommended Directory Structure

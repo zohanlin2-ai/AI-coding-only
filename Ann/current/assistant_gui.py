@@ -9,17 +9,17 @@ from pathlib import Path
 try:
     from PyQt6.QtWidgets import (
         QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
-        QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy
+        QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QDialog, QTextEdit
     )
     from PyQt6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, pyqtSignal, QObject, QThread, QTimer
-    from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush
+    from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush, QPixmap
 except ImportError:
     from PySide6.QtWidgets import (
         QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
-        QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy
+        QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QDialog, QTextEdit
     )
     from PySide6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, Signal, QObject, QThread, QTimer
-    from PySide6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush
+    from PySide6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush, QPixmap
     # Map PySide6 Signal to pyqtSignal name
     pyqtSignal = Signal
 
@@ -66,6 +66,173 @@ class UpdateCheckWorker(QThread):
             self.finished.emit(new_tag or "", "")
         except Exception as e:
             self.finished.emit("", str(e))
+
+
+class DragDropOverlay(QWidget):
+    """Semi-transparent overlay shown when files are dragged over the window."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.hide()
+        
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Semitransparent background matching the sleek dark theme
+        painter.fillRect(self.rect(), QColor(26, 29, 36, 210))
+        
+        # Draw dashed border
+        pen = QPen(QColor(72, 187, 120), 2, Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(10, 10, self.width() - 20, self.height() - 20, 12, 12)
+        
+        # Draw text
+        painter.setPen(QColor(226, 232, 240))
+        font = painter.font()
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setFamily("Segoe UI")
+        painter.setFont(font)
+        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "松開滑鼠以載入檔案\n(Drop files to load)")
+
+
+class AttachmentViewerDialog(QDialog):
+    """Dialog to preview attached text contents or images."""
+    def __init__(self, file_path: Path, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Preview: {file_path.name}")
+        self.resize(600, 500)
+        self.setStyleSheet("background-color: #1A1D24; color: #E2E8F0; border: 1px solid #2D3748;")
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
+        
+        # Title text (file name)
+        title_lbl = QLabel(file_path.name)
+        title_lbl.setStyleSheet("font-size: 15px; font-weight: bold; color: #E2E8F0; border: none;")
+        layout.addWidget(title_lbl)
+        
+        suffix = file_path.suffix.lower()
+        is_image = suffix in ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
+        
+        if is_image:
+            scroll_area = QScrollArea()
+            scroll_area.setStyleSheet("QScrollArea { border: 1px solid #2D3748; background-color: #111317; border-radius: 8px; }")
+            scroll_area.setWidgetResizable(True)
+            
+            img_label = QLabel()
+            img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            img_label.setStyleSheet("background-color: transparent; border: none;")
+            
+            pixmap = QPixmap(str(file_path))
+            if not pixmap.isNull():
+                img_label.setPixmap(pixmap)
+                img_label.setScaledContents(False)
+            else:
+                img_label.setText("Failed to load image.")
+                
+            scroll_area.setWidget(img_label)
+            layout.addWidget(scroll_area)
+        else:
+            # Assume text file
+            text_edit = QTextEdit()
+            text_edit.setReadOnly(True)
+            text_edit.setStyleSheet(
+                "QTextEdit { background-color: #2D3748; border: 1px solid #4A5568; "
+                "border-radius: 8px; color: #E2E8F0; font-family: 'Consolas', 'Courier New', monospace; "
+                "font-size: 13px; padding: 10px; }"
+            )
+            
+            # Read file safely
+            try:
+                if file_path.stat().st_size > 5 * 1024 * 1024:
+                    text_content = "File is too large to preview (limit 5MB)."
+                else:
+                    try:
+                        text_content = file_path.read_text(encoding='utf-8')
+                    except UnicodeDecodeError:
+                        try:
+                            text_content = file_path.read_text(encoding='utf-8-sig')
+                        except UnicodeDecodeError:
+                            text_content = file_path.read_text(encoding='latin-1')
+            except Exception as e:
+                text_content = f"Error reading file: {str(e)}"
+                
+            text_edit.setPlainText(text_content)
+            layout.addWidget(text_edit)
+            
+        # Action Row containing Close button
+        actions_layout = QHBoxLayout()
+        actions_layout.addStretch()
+        
+        close_btn = QPushButton("Close")
+        close_btn.setStyleSheet(
+            "QPushButton { color: white; background-color: #3182CE; border: none; "
+            "border-radius: 8px; padding: 8px 20px; font-weight: bold; font-family: 'Segoe UI'; font-size: 13px; }"
+            "QPushButton:hover { background-color: #2B6CB0; }"
+        )
+        close_btn.clicked.connect(self.accept)
+        actions_layout.addWidget(close_btn)
+        layout.addLayout(actions_layout)
+
+
+class AttachmentItem(QFrame):
+    """Badge widget for individual file attachments in the tray."""
+    clicked_file = pyqtSignal(Path)
+    removed = pyqtSignal(Path)
+    
+    def __init__(self, file_path: Path):
+        super().__init__()
+        self.file_path = file_path
+        self.setStyleSheet(
+            "QFrame { background-color: #2D3748; border: 1px solid #4A5568; "
+            "border-radius: 12px; padding: 2px 8px; }"
+        )
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(6, 2, 6, 2)
+        layout.setSpacing(6)
+        
+        # Icon / Thumbnail
+        suffix = file_path.suffix.lower()
+        is_image = suffix in ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
+        
+        icon_label = QLabel()
+        icon_label.setFixedSize(16, 16)
+        icon_label.setStyleSheet("border: none; background-color: transparent;")
+        if is_image:
+            pixmap = QPixmap(str(file_path))
+            if not pixmap.isNull():
+                scaled_pixmap = pixmap.scaled(16, 16, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+                icon_label.setPixmap(scaled_pixmap)
+            else:
+                icon_label.setText("🖼️")
+        else:
+            icon_label.setText("📄")
+        layout.addWidget(icon_label)
+        
+        # Clickable File Name Link
+        name_btn = QPushButton(file_path.name)
+        name_btn.setStyleSheet(
+            "QPushButton { color: #63B3ED; border: none; background-color: transparent; "
+            "text-align: left; font-family: 'Segoe UI'; font-size: 12px; padding: 0px; text-decoration: underline; }"
+            "QPushButton:hover { color: #90CDF4; }"
+        )
+        name_btn.clicked.connect(lambda: self.clicked_file.emit(self.file_path))
+        layout.addWidget(name_btn)
+        
+        # Remove button
+        remove_btn = QPushButton("×")
+        remove_btn.setFixedSize(16, 16)
+        remove_btn.setStyleSheet(
+            "QPushButton { color: #E53E3E; border: none; background-color: transparent; "
+            "font-size: 14px; font-weight: bold; padding: 0px; }"
+            "QPushButton:hover { color: #FC8181; }"
+        )
+        remove_btn.clicked.connect(lambda: self.removed.emit(self.file_path))
+        layout.addWidget(remove_btn)
 
 
 class MessageBubble(QFrame):
@@ -225,7 +392,23 @@ class ChatWindow(QWidget):
         self.send_btn.clicked.connect(self.send_message)
         input_layout.addWidget(self.send_btn)
 
+        # --- Attachment Tray ---
+        self.attachments = []
+        self.attachment_tray = QWidget()
+        self.attachment_tray.setStyleSheet("background-color: transparent;")
+        self.tray_layout = QHBoxLayout(self.attachment_tray)
+        self.tray_layout.setContentsMargins(4, 2, 4, 2)
+        self.tray_layout.setSpacing(6)
+        self.tray_layout.addStretch()
+        self.attachment_tray.hide()
+        card_layout.addWidget(self.attachment_tray)
+
         card_layout.addLayout(input_layout)
+
+        # Drag and Drop support
+        self.setAcceptDrops(True)
+        self.drag_overlay = DragDropOverlay(self)
+        self.drag_overlay.setGeometry(self.rect())
 
         # Welcome message
         if new_tag:
@@ -245,6 +428,79 @@ class ChatWindow(QWidget):
         if event.buttons() == Qt.MouseButton.LeftButton:
             self.move(event.globalPosition().toPoint() - self.drag_position)
             event.accept()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, 'drag_overlay') and self.drag_overlay:
+            self.drag_overlay.setGeometry(self.rect())
+
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            if hasattr(self, 'drag_overlay') and self.drag_overlay:
+                self.drag_overlay.show()
+
+    def dragLeaveEvent(self, event) -> None:
+        if hasattr(self, 'drag_overlay') and self.drag_overlay:
+            self.drag_overlay.hide()
+
+    def dropEvent(self, event) -> None:
+        if hasattr(self, 'drag_overlay') and self.drag_overlay:
+            self.drag_overlay.hide()
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            for url in event.mimeData().urls():
+                file_path = Path(url.toLocalFile())
+                if file_path.is_file():
+                    suffix = file_path.suffix.lower()
+                    allowed_text = ['.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.yaml', '.yml', '.ini', '.cfg', '.log']
+                    allowed_img = ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
+                    if suffix in allowed_text or suffix in allowed_img:
+                        self.add_attachment(file_path)
+                    else:
+                        logging.info("Dropped unsupported file format: %s", suffix)
+
+    def add_attachment(self, file_path: Path) -> None:
+        if file_path in self.attachments:
+            return
+        try:
+            if file_path.stat().st_size > 5 * 1024 * 1024:
+                self.add_message(f"⚠️ 檔案過大: {file_path.name} 超過 5MB 限制。", is_user=False, is_refusal=True)
+                return
+        except Exception as e:
+            logging.error("Error checking file size: %s", e)
+            return
+
+        self.attachments.append(file_path)
+        item = AttachmentItem(file_path)
+        item.clicked_file.connect(self.show_attachment_preview)
+        item.removed.connect(self.remove_attachment)
+        self.tray_layout.insertWidget(self.tray_layout.count() - 1, item)
+        self.attachment_tray.show()
+
+    def remove_attachment(self, file_path: Path) -> None:
+        if file_path in self.attachments:
+            self.attachments.remove(file_path)
+            for i in range(self.tray_layout.count()):
+                widget = self.tray_layout.itemAt(i).widget()
+                if isinstance(widget, AttachmentItem) and widget.file_path == file_path:
+                    widget.deleteLater()
+                    break
+            if not self.attachments:
+                self.attachment_tray.hide()
+
+    def clear_attachments(self) -> None:
+        self.attachments.clear()
+        for i in reversed(range(self.tray_layout.count())):
+            item = self.tray_layout.itemAt(i)
+            widget = item.widget()
+            if isinstance(widget, AttachmentItem):
+                widget.deleteLater()
+        self.attachment_tray.hide()
+
+    def show_attachment_preview(self, file_path: Path) -> None:
+        dialog = AttachmentViewerDialog(file_path, self)
+        dialog.exec()
 
     def shrink_back(self) -> None:
         """Collapse the chat window back into the floating bubble."""
@@ -320,8 +576,35 @@ class ChatWindow(QWidget):
             self.update_worker.start()
             return
 
+        # Capture attachments and read content
+        attachment_text = ""
+        attached_names = []
+        for file_path in self.attachments:
+            attached_names.append(file_path.name)
+            suffix = file_path.suffix.lower()
+            if suffix in ['.png', '.jpg', '.jpeg', '.webp', '.bmp']:
+                attachment_text += f"\n\n[Attached Image: {file_path.name}]\n"
+            else:
+                try:
+                    try:
+                        content = file_path.read_text(encoding='utf-8')
+                    except UnicodeDecodeError:
+                        try:
+                            content = file_path.read_text(encoding='utf-8-sig')
+                        except UnicodeDecodeError:
+                            content = file_path.read_text(encoding='latin-1')
+                    lang = suffix[1:] if suffix.startswith('.') else ""
+                    attachment_text += f"\n\n[Attached File: {file_path.name}]\n```{lang}\n{content}\n```\n"
+                except Exception as e:
+                    attachment_text += f"\n\n[Error reading attached file {file_path.name}: {str(e)}]\n"
+
+        ui_display_text = user_text
+        if attached_names:
+            ui_display_text += "\n\n📎 " + ", ".join(attached_names)
+
         self.input_field.clear()
-        self.add_message(user_text, is_user=True)
+        self.add_message(ui_display_text, is_user=True)
+        self.clear_attachments()
 
         # --- Moral Evaluation ---
         result = self.evaluator.evaluate(user_text)
@@ -376,10 +659,10 @@ class ChatWindow(QWidget):
         if result.decision == Decision.COMPLY_WITH_SAFEGUARDS:
             llm_message = (
                 f"[Important: {result.rationale} Respond carefully and include "
-                f"appropriate disclaimers.]\n\nUser: {user_text}"
+                f"appropriate disclaimers.]\n\nUser: {user_text}{attachment_text}"
             )
         else:
-            llm_message = user_text
+            llm_message = user_text + attachment_text
 
         self.conversation.append({"role": "user", "content": llm_message})
 
@@ -447,6 +730,8 @@ class FloatingBubble(QWidget):
         self.active_triggered_alarms = []
         self.drag_position = QPoint()
         self.click_start_pos = QPoint()
+        self.drag_active = False
+        self.setAcceptDrops(True)
 
         # Frameless, stays on top, tool window (no taskbar icon)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
@@ -484,20 +769,27 @@ class FloatingBubble(QWidget):
         if alarm_active:
             grad.setColorAt(0, QColor(63, 55, 14))  # Dark yellow
             grad.setColorAt(1, QColor(30, 25, 5))
+        elif self.drag_active:
+            grad.setColorAt(0, QColor(34, 84, 61))  # Dark green
+            grad.setColorAt(1, QColor(20, 50, 35))
         else:
             grad.setColorAt(0, QColor(45, 55, 72))  # Slate Gray
             grad.setColorAt(1, QColor(26, 32, 44))
         painter.setBrush(QBrush(grad))
-        painter.drawEllipse(5, 5, self.width() - 10, self.height() - 10)
+        
+        pad = 2 if self.drag_active else 5
+        painter.drawEllipse(pad, pad, self.width() - (pad * 2), self.height() - (pad * 2))
 
         # Glowing border
         if alarm_active:
             pen = QPen(QColor(246, 224, 94, 230), 3)  # Flashing yellow border
+        elif self.drag_active:
+            pen = QPen(QColor(72, 187, 120, 230), 3)  # Glowing green border for drop target
         else:
             pen = QPen(QColor(49, 130, 206, 200), 2)  # Blue glow border
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawEllipse(5, 5, self.width() - 10, self.height() - 10)
+        painter.drawEllipse(pad, pad, self.width() - (pad * 2), self.height() - (pad * 2))
 
     # Mouse Events
     def mousePressEvent(self, event) -> None:
@@ -571,6 +863,35 @@ class FloatingBubble(QWidget):
         self.alarm_trigger.stop_trigger()
         self.active_triggered_alarms.clear()
         self.chat_window.dismiss_btn.hide()
+
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            self.drag_active = True
+            self.update()
+            
+    def dragLeaveEvent(self, event) -> None:
+        self.drag_active = False
+        self.update()
+        
+    def dropEvent(self, event) -> None:
+        self.drag_active = False
+        self.update()
+        
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            self.expand_to_chat()
+            
+            for url in event.mimeData().urls():
+                file_path = Path(url.toLocalFile())
+                if file_path.is_file():
+                    suffix = file_path.suffix.lower()
+                    allowed_text = ['.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.yaml', '.yml', '.ini', '.cfg', '.log']
+                    allowed_img = ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
+                    if suffix in allowed_text or suffix in allowed_img:
+                        self.chat_window.add_attachment(file_path)
+                    else:
+                        logging.info("Dropped unsupported file format in bubble: %s", suffix)
 
 
 def start_gui(config: dict, evaluator: MoralEvaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag: str = None) -> None:

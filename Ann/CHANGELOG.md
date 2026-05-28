@@ -2,6 +2,12 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.1.4] - 2026-05-28
+
+### Added
+- Created design and implementation specification for the Drag and Drop (DND) file attachment feature ([drag_drop_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/drag_drop_spec.md)).
+- Formulated an implementation plan for DND event handling in the PyQt6/PySide6 GUI.
+
 ## [0.1.3] - 2026-05-27
 
 ### Added
