@@ -252,6 +252,77 @@ class TestAlarmManager(unittest.TestCase):
         self.assertTrue(active[0].datetime > datetime.now())
         self.assertFalse(active[0].triggered)
 
+    def test_alarm_id_sequential_and_recycling(self):
+        manager = AlarmManager(filepath=self.test_file)
+        dt = datetime.now() + timedelta(hours=1)
+
+        # Add three alarms
+        _, _, a1 = manager.add_alarm(dt, "Alarm 1")
+        _, _, a2 = manager.add_alarm(dt, "Alarm 2")
+        _, _, a3 = manager.add_alarm(dt, "Alarm 3")
+
+        self.assertEqual(a1.id, "a1")
+        self.assertEqual(a2.id, "a2")
+        self.assertEqual(a3.id, "a3")
+
+        # Delete a2
+        self.assertTrue(manager.delete_alarm("a2"))
+
+        # Next alarm should recycle "a2"
+        _, _, a_new = manager.add_alarm(dt, "Alarm New")
+        self.assertEqual(a_new.id, "a2")
+
+        # Following alarm should get "a4"
+        _, _, a_next = manager.add_alarm(dt, "Alarm Next")
+        self.assertEqual(a_next.id, "a4")
+
+    def test_update_alarm_flow_success_and_ambiguity(self):
+        manager = AlarmManager(filepath=self.test_file)
+        dt = datetime.now() + timedelta(hours=1)
+
+        # Add two alarms with same label
+        _, _, a1 = manager.add_alarm(dt, "Meeting")
+        _, _, a2 = manager.add_alarm(dt + timedelta(hours=1), "Meeting")
+
+        # Attempt ambiguous update (by label substring)
+        new_dt = dt + timedelta(hours=2)
+        success, msg, matches = manager.update_alarm_flow(target_alarm="Meeting", new_datetime=new_dt)
+        self.assertFalse(success)
+        self.assertEqual(len(matches), 2)
+        self.assertIn("找到了多個", msg)
+
+        # Successful update of label and time by exact ID (case-insensitive)
+        success, msg, matches = manager.update_alarm_flow(alarm_id="A1", new_datetime=new_dt, new_label="Morning Meeting")
+        self.assertTrue(success)
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0].id, "a1")
+        self.assertEqual(matches[0].label, "Morning Meeting")
+        self.assertEqual(matches[0].datetime, new_dt)
+
+        # Verify a2 is untouched
+        self.assertEqual(a2.label, "Meeting")
+
+    def test_delete_alarm_flow_success_and_ambiguity(self):
+        manager = AlarmManager(filepath=self.test_file)
+        dt = datetime.now() + timedelta(hours=1)
+
+        # Add two alarms with same label
+        _, _, a1 = manager.add_alarm(dt, "Gym")
+        _, _, a2 = manager.add_alarm(dt + timedelta(hours=1), "Gym")
+
+        # Attempt ambiguous delete
+        success, msg, matches = manager.delete_alarm_flow(target_alarm="Gym")
+        self.assertFalse(success)
+        self.assertEqual(len(matches), 2)
+        self.assertEqual(len(manager.get_alarms()), 2)
+
+        # Successful delete by ID
+        success, msg, matches = manager.delete_alarm_flow(alarm_id="a2")
+        self.assertTrue(success)
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(len(manager.get_alarms()), 1)
+        self.assertEqual(manager.get_alarms()[0].id, "a1")
+
 
 class TestIntentParser(unittest.TestCase):
     def test_keyword_pre_filtering(self):

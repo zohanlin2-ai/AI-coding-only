@@ -384,36 +384,68 @@ class ChatWindow(QWidget):
                 alarm_id = parsed["alarm_id"]
                 label = parsed["label"]
                 target_alarm = parsed["target_alarm"]
-                deleted = False
-                if alarm_id:
-                    deleted = self.alarm_manager.delete_alarm(alarm_id)
-                if not deleted and target_alarm:
-                    deleted = self.alarm_manager.delete_alarm_by_target(target_alarm)
-                if not deleted and label:
-                    deleted = self.alarm_manager.delete_alarm_by_label(label)
                 
-                if deleted:
-                    reply_prompt = f"System instruction: The alarm (ID/label/target: {alarm_id or target_alarm or label}) has been successfully deleted. Confirm this to the user in a friendly way."
-                else:
-                    self.add_message(f"找不到符合條件的鬧鐘（ID: {alarm_id or '無'}, 標籤/時間: {target_alarm or label or '無'}），請確認後再試。", is_user=False, is_refusal=True)
+                try:
+                    success, msg, matches = self.alarm_manager.delete_alarm_flow(
+                        alarm_id=alarm_id,
+                        target_alarm=target_alarm,
+                        label=label
+                    )
+                    if not success and len(matches) > 1:
+                        alarms_list = "\n".join(
+                            f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M')} — {a.label or '無備註'}"
+                            for a in matches
+                        )
+                        reply_prompt = (
+                            f"System instruction: Multiple alarms matched the deletion query. "
+                            f"Present the list of matching alarms below and ask the user to clarify which one they wish to delete by typing its ID (e.g. 'a1'):\n"
+                            f"{alarms_list}"
+                        )
+                    elif success:
+                        reply_prompt = f"System instruction: {msg} Confirm this successful deletion to the user in a friendly way."
+                    else:
+                        self.add_message(msg, is_user=False, is_refusal=True)
+                        return
+                except Exception as ex:
+                    self.add_message(f"刪除鬧鐘時發生錯誤：{ex}", is_user=False, is_refusal=True)
                     return
+
             elif intent == "update_alarm":
                 alarm_id = parsed["alarm_id"]
                 target_alarm = parsed["target_alarm"]
                 time_str = parsed["time"]
-                if not time_str:
-                    self.add_message("請告訴我您想將鬧鐘修改成什麼時間。", is_user=False, is_refusal=True)
-                    return
-                else:
+                new_label = parsed["label"]
+                
+                dt = None
+                if time_str:
                     try:
                         from datetime import datetime
                         dt = datetime.fromisoformat(time_str)
-                        success, msg = self.alarm_manager.update_alarm(
-                            alarm_id=alarm_id, 
-                            target_alarm=target_alarm, 
-                            new_datetime=dt
+                    except Exception:
+                        pass
+                
+                if not time_str and not new_label:
+                    self.add_message("請告訴我您想將鬧鐘修改成什麼時間或什麼備註名稱。", is_user=False, is_refusal=True)
+                    return
+                else:
+                    try:
+                        success, msg, matches = self.alarm_manager.update_alarm_flow(
+                            alarm_id=alarm_id,
+                            target_alarm=target_alarm,
+                            new_datetime=dt,
+                            new_label=new_label
                         )
-                        if success:
+                        if not success and len(matches) > 1:
+                            alarms_list = "\n".join(
+                                f"- [ID: {a.id}] {a.datetime.strftime('%Y-%m-%d %H:%M')} — {a.label or '無備註'}"
+                                for a in matches
+                            )
+                            reply_prompt = (
+                                f"System instruction: Multiple alarms matched the update query. "
+                                f"Present the list of matching alarms below and ask the user to clarify which one they wish to update by typing its ID (e.g. 'a1'):\n"
+                                f"{alarms_list}"
+                            )
+                        elif success:
                             reply_prompt = f"System instruction: {msg} Confirm this successful update to the user in a friendly way."
                         else:
                             self.add_message(msg, is_user=False, is_refusal=True)

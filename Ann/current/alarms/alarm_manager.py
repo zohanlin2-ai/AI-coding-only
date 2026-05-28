@@ -185,7 +185,17 @@ class AlarmManager:
                 )
                 return False, alarms_list, None
             
-            alarm = Alarm(datetime_val=datetime_val, label=label, repeat_pattern=repeat_pattern)
+            existing_ids = {a.id.lower() for a in self.alarms}
+            allocated_id = None
+            for idx in range(1, 11):
+                candidate = f"a{idx}"
+                if candidate not in existing_ids:
+                    allocated_id = candidate
+                    break
+            if not allocated_id:
+                allocated_id = "a1"
+            
+            alarm = Alarm(datetime_val=datetime_val, label=label, repeat_pattern=repeat_pattern, id_val=allocated_id)
             self.alarms.append(alarm)
             self._save_alarms_unlocked()
             return True, "鬧鐘設定成功", alarm
@@ -196,8 +206,8 @@ class AlarmManager:
             
         target_lower = target.lower().strip()
         
-        # 1. Match by ID (exact or prefix)
-        if alarm.id == target_lower or alarm.id.startswith(target_lower):
+        # 1. Match by ID (exact or prefix, case-insensitive)
+        if alarm.id.lower() == target_lower or alarm.id.lower().startswith(target_lower):
             return True
             
         # 2. Match by label substring (bidirectional)
@@ -252,7 +262,7 @@ class AlarmManager:
         with self.lock:
             matched_index = -1
             for idx, alarm in enumerate(self.alarms):
-                if alarm.id == alarm_id or alarm.id.startswith(alarm_id):
+                if alarm.id.lower() == alarm_id.lower() or alarm.id.lower().startswith(alarm_id.lower()):
                     matched_index = idx
                     break
             
@@ -357,7 +367,7 @@ class AlarmManager:
             matched_alarm = None
             if alarm_id:
                 for alarm in self.alarms:
-                    if alarm.id == alarm_id or alarm.id.startswith(alarm_id):
+                    if alarm.id.lower() == alarm_id.lower() or alarm.id.lower().startswith(alarm_id.lower()):
                         matched_alarm = alarm
                         break
                         
@@ -375,3 +385,107 @@ class AlarmManager:
                 return True, f"已成功將鬧鐘（原時間: {old_time_str}，備註: {matched_alarm.label or '無'}）更改為 {new_datetime.strftime('%Y-%m-%d %H:%M')}。"
                 
             return False, f"找不到符合條件 '{target_alarm or alarm_id}' 的鬧鐘。"
+
+    def find_matching_alarms(self, alarm_id: str = None, target_alarm: str = None, label: str = None) -> list[Alarm]:
+        """Returns a list of all active alarms that match the criteria."""
+        if alarm_id:
+            alarm_id_lower = alarm_id.lower().strip()
+            matches = [a for a in self.alarms if a.id.lower() == alarm_id_lower or a.id.lower().startswith(alarm_id_lower)]
+            if matches:
+                return matches
+
+        matches = []
+        targets = []
+        if target_alarm:
+            targets.append(target_alarm)
+        if label:
+            targets.append(label)
+
+        if not targets:
+            return []
+
+        for alarm in self.alarms:
+            for tgt in targets:
+                if self._alarm_matches_target(alarm, tgt):
+                    if alarm not in matches:
+                        matches.append(alarm)
+                        break
+        return matches
+
+    def delete_alarm_flow(self, alarm_id: str = None, target_alarm: str = None, label: str = None) -> tuple[bool, str, list[Alarm]]:
+        """
+        Attempts to delete matching alarms. Handles ambiguity when multiple alarms match.
+        Returns:
+            (success, message, matching_alarms_list)
+        """
+        with self.lock:
+            # Clean up expired/update repeating first to ensure accurate match
+            now = datetime.now()
+            active_alarms = []
+            for alarm in self.alarms:
+                if alarm.repeat_pattern:
+                    if alarm.datetime <= now:
+                        alarm.datetime = self._calculate_next_occurrence(alarm.datetime, alarm.repeat_pattern, now)
+                        alarm.triggered = False
+                    active_alarms.append(alarm)
+                else:
+                    if not (alarm.triggered or alarm.datetime < now):
+                        active_alarms.append(alarm)
+            self.alarms = active_alarms
+
+            matches = self.find_matching_alarms(alarm_id, target_alarm, label)
+            if len(matches) == 0:
+                return False, f"找不到符合條件的鬧鐘（ID/標籤: {alarm_id or target_alarm or label or '無'}）。", []
+            elif len(matches) == 1:
+                target_to_remove = matches[0]
+                self.alarms = [a for a in self.alarms if a.id != target_to_remove.id]
+                self._save_alarms_unlocked()
+                return True, f"已成功刪除鬧鐘（ID: {target_to_remove.id}，時間: {target_to_remove.datetime.strftime('%Y-%m-%d %H:%M')}，備註: {target_to_remove.label or '無'}）。", matches
+            else:
+                return False, "找到了多個符合條件的鬧鐘，請提供 ID 來明確指定要刪除哪一個。", matches
+
+    def update_alarm_flow(self, alarm_id: str = None, target_alarm: str = None, label: str = None, new_datetime = None, new_label: str = None) -> tuple[bool, str, list[Alarm]]:
+        """
+        Attempts to update matching alarms. Handles ambiguity when multiple alarms match.
+        Supports updating either datetime, label, or both.
+        Returns:
+            (success, message, matching_alarms_list)
+        """
+        if not new_datetime and new_label is None:
+            return False, "未指定新的時間或名稱/備註。", []
+
+        with self.lock:
+            # Clean up expired/update repeating first to ensure accurate match
+            now = datetime.now()
+            active_alarms = []
+            for alarm in self.alarms:
+                if alarm.repeat_pattern:
+                    if alarm.datetime <= now:
+                        alarm.datetime = self._calculate_next_occurrence(alarm.datetime, alarm.repeat_pattern, now)
+                        alarm.triggered = False
+                    active_alarms.append(alarm)
+                else:
+                    if not (alarm.triggered or alarm.datetime < now):
+                        active_alarms.append(alarm)
+            self.alarms = active_alarms
+
+            matches = self.find_matching_alarms(alarm_id, target_alarm, label)
+            if len(matches) == 0:
+                return False, f"找不到符合條件的鬧鐘（ID/標籤: {alarm_id or target_alarm or label or '無'}）。", []
+            elif len(matches) == 1:
+                target_alarm_obj = matches[0]
+                changes = []
+                if new_datetime:
+                    old_time_str = target_alarm_obj.datetime.strftime("%Y-%m-%d %H:%M")
+                    target_alarm_obj.datetime = new_datetime
+                    target_alarm_obj.triggered = False
+                    changes.append(f"時間由 {old_time_str} 改為 {new_datetime.strftime('%Y-%m-%d %H:%M')}")
+                if new_label is not None:
+                    old_label = target_alarm_obj.label or "無"
+                    target_alarm_obj.label = new_label
+                    changes.append(f"名稱由 '{old_label}' 改為 '{new_label}'")
+
+                self._save_alarms_unlocked()
+                return True, f"已成功更新鬧鐘資訊：{', '.join(changes)}。", matches
+            else:
+                return False, "找到了多個符合條件的鬧鐘，請提供 ID 來明確指定要修改哪一個。", matches
