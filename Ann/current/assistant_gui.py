@@ -95,7 +95,7 @@ class DragDropOverlay(QWidget):
         font.setBold(True)
         font.setFamily("Segoe UI")
         painter.setFont(font)
-        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "鬆開滑鼠以載入檔案\n(Drop files to load)")
+        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "(Drop files to load)")
 
 
 class AttachmentViewerDialog(QDialog):
