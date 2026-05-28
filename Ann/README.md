@@ -234,6 +234,19 @@ Per [moral_module_spec.md](./moral_module_spec.md) §20, the moral module is a *
 
 ---
 
+## 🤖 AI Coding Guidelines (CLAUDE.md)
+
+> [!IMPORTANT]
+> All contributors — including AI coding assistants — **must read and follow [CLAUDE.md](./CLAUDE.md) before making any code changes.**
+>
+> Key principles:
+> - **Think before coding**: state assumptions, surface tradeoffs, ask when uncertain.
+> - **Simplicity first**: minimum code that solves the problem; no speculative features.
+> - **Surgical changes**: touch only what is necessary; match existing style.
+> - **Goal-driven**: define verifiable success criteria before starting.
+
+---
+
 ## 🚀 Development Roadmap
 
 To minimize complexity, implement the project in the following order:

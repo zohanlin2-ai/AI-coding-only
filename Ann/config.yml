@@ -18,3 +18,7 @@ update:
 logging:
   level: INFO
   max_log_files: 10
+
+alarm:
+  sound_path: "428157__setuniman__charade-1q62b.wav"
+  volume: 0.8
