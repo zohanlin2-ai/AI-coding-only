@@ -92,9 +92,11 @@ class Updater:
             capture_output=True,
             text=True,
         )
-        logging.info(result.stdout)
         if result.returncode != 0:
-            logging.error("Tests failed:\n%s", result.stderr)
+            logging.error("Tests failed! pytest stdout:\n%s", result.stdout)
+            logging.error("Tests failed! pytest stderr:\n%s", result.stderr)
+        else:
+            logging.info(result.stdout)
         return result.returncode == 0
 
     def _backup_current(self, old_version: str) -> None:
