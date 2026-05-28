@@ -95,8 +95,9 @@ class FileIntentParser:
         ]
 
         try:
-            from assistant import call_ollama
-            reply = call_ollama(self.base_url, self.model, messages)
+            from ollama_client import OllamaClient
+            client = OllamaClient(self.base_url)
+            reply = client.chat(self.model, messages)
             parsed = self._clean_and_parse_json(reply)
             if parsed["intent"] == "none":
                 # Fallback to regex check if Ollama returned none
