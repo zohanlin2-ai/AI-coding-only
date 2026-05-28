@@ -108,7 +108,8 @@ def main() -> None:
             
             success = do_update()
             if success:
-                logging.info("Update succeeded.")
+                version = version_file.read_text(encoding="utf-8").strip() if version_file.exists() else "unknown"
+                logging.info("Update succeeded. Now running v%s.", version)
                 just_updated = True
             else:
                 logging.info("Update FAILED — keeping current version")
