@@ -51,41 +51,58 @@ graph TD
 * **子進程生命週期監控**：使用 `subprocess` 拉起主程式，並等待其結束。
 * **結束碼語意設計**：
   * `0`：正常退出 $\rightarrow$ 結束啟動器。
-  * `42` (`EXIT_UPDATE`)：觸發更新 $\rightarrow$ 啟動 `updater.py`。
+  * `3` (`EXIT_RESTART`)：主動重啟 $\rightarrow$ 啟動器不帶延遲立刻重新拉起主程式。
+  * `42` (`EXIT_UPDATE`)：觸發更新 $\rightarrow$ 啟動 `updater.py` 進行下載與驗證。
   * 其他大於 `0` 的值：非預期崩潰 $\rightarrow$ 自動重啟主程式以保證常駐。
 
 #### 範例程式碼 (Python)
 ```python
 import subprocess
 import sys
+import time
 import yaml
 from updater import Updater
 
 EXIT_UPDATE = 42
+EXIT_RESTART = 3
 
 def main():
+    backoff = 1
+    just_updated = False
+    old_version_for_rollback = None
+
     while True:
-        # 啟動主進程
+        start_time = time.time()
         proc = subprocess.Popen([sys.executable, "current/assistant.py"] + sys.argv[1:])
         proc.wait()
-        
+        elapsed = time.time() - start_time
+
         if proc.returncode == EXIT_UPDATE:
-            print("收到更新要求，啟動更新器...")
-            # 讀取配置並執行更新
+            backoff = 1
+            old_version_for_rollback = Path("version.txt").read_text().strip()
             with open("config.yml", encoding="utf-8") as f:
                 config = yaml.safe_load(f)
-            
-            updater = Updater(config, base_dir=".")
+            updater = Updater(config, base_dir=Path("."))
             if updater.run():
-                print("更新成功，重新啟動主程式...")
+                just_updated = True
             else:
-                print("更新失敗，維持原版本並重啟...")
+                just_updated = False
+        elif proc.returncode == EXIT_RESTART:
+            backoff = 1   # intentional restart — no backoff
+            just_updated = False
         elif proc.returncode == 0:
-            print("主程式正常結束，關閉啟動器。")
             sys.exit(0)
         else:
-            print(f"主程式異常崩潰 (代碼: {proc.returncode})，將在 5 秒後重啟...")
-            time.sleep(5)
+            # Unexpected crash
+            if just_updated and old_version_for_rollback and elapsed < 10:
+                # New version crashed on startup → rollback
+                Updater(config, base_dir=Path(".")).rollback(old_version_for_rollback)
+                just_updated = False
+                backoff = 1
+            else:
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+                just_updated = False
 ```
 
 ---
@@ -170,6 +187,26 @@ class UpdateCheckWorker(QThread):
       else:
           self.add_message("您目前已是最新版本，不需要更新。", is_user=False)
   ```
+
+#### 3. LLM 驅動對話式控制標記與結束/重啟流程 (Conversational Control Markers)
+除了手動按鈕觸發更新，Ann 還支援使用自然語言對話進行關閉、重啟與更新確認。此流程利用 LLM 判斷使用者意圖並輸出特定標記：
+
+* **控制標記定義**：
+  * `[EXIT]`：使用者要結束/關閉程式。
+  * `[RESTART]`：使用者要重啟程式。
+  * `[UPDATE]`：使用者在更新確認提示下確認要進行更新（僅注入在確認呼叫的 System Instruction 中，不在全域 SYSTEM_PROMPT 裡，以避免 LLM 在無關對話中誤觸發更新）。
+* **處理流程**：
+  1. **意圖判定**：主提示詞（System Prompt）規範 LLM 偵測到對應意圖時，在溫暖道別的訊息末尾附加對應控制標記（例如 `溫暖的道別語 [EXIT]`）。
+  2. **訊號擷取與過濾**：主程式（CLI `assistant.py` 或 GUI `assistant_gui.py`）讀取 LLM 回覆，偵測到標記後將其從顯示文字中**完全移除**，避免呈現在 UI 上。
+  3. **延遲安全關閉 (GUI 專用)**：
+     - 若偵測到 `[EXIT]`、`[RESTART]` 或 `[UPDATE]`：
+       - GUI 會將對話輸入框、傳送按鈕等元件設為 `Disabled` 狀態以防二次操作。
+       - 修改視窗標題或狀態欄提示（例如「Ann 正在準備重啟...」）。
+       - 啟動 $1.5$ 秒的 `QTimer` 單次定時器，在溫暖回應完全被讀取後，再觸發系統結束。
+  4. **送出對應結束碼**：
+     - `[EXIT]` $\rightarrow$ 結束碼 `0`。
+     - `[RESTART]` $\rightarrow$ 結束碼 `3`。
+     - `[UPDATE]` $\rightarrow$ 結束碼 `42`。
 
 ---
 
