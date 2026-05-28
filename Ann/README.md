@@ -88,19 +88,28 @@ You can run Ann in two modes. The launcher automatically monitors and updates th
 
 ### ⏰ Alarm Module (鬧鐘功能)
 Ann supports conversational alarm management (create, delete, list) through natural conversation. You can set relative/absolute alarms, check active alarms, and cancel them.
-For complete architectural details, audio loop specs, and UI animations, see [alarm_module_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/alarm_module_spec.md).
+For complete architectural details, audio loop specs, and UI animations, see [alarm_module_spec.md](./alarm_module_spec.md).
 
 ### 📂 Drag & Drop Module (拖放功能)
 Ann supports dragging and dropping plain text and image files onto the floating bubble or the chat window. Dropped files are attached to the conversation context and can be clicked to display a popup preview (viewing full text or images).
-For detailed interaction specifications, see [drag_drop_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/drag_drop_spec.md).
+For detailed interaction specifications, see [drag_drop_spec.md](./drag_drop_spec.md).
 
 ### 🤖 AI Engine Module (AI 引擎模組)
 Ann encapsulates all communication with the local Ollama API into a modular `OllamaClient` component within the AI Engine. It automatically detects installed models and their capabilities (such as vision support). When an image is attached, it dynamically routes the request to a local vision-capable model (like `llava`) or guides the user if none is installed.
-For technical details, see [ai_engine_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/ai_engine_spec.md).
+For technical details, see [ai_engine_spec.md](./ai_engine_spec.md).
 
-### 📝 File Generation Module (檔案生成功能)
-Ann supports exporting and saving AI-generated code blocks and documentation directly to the local filesystem. Code blocks in the chat GUI are rendered with a custom code container displaying a language badge and a "Save File" button, allowing quick, secure, and filtered saving for `.py`, `.c`, `.cpp`, `.java`, `.sh`, `.html`, `.xml`, `.css`, `.js`, `.ts`, `.sql`, `.toml`, `.env`, `.md`, and `.txt` files.
-For design and interaction specs, see [file_generation_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/file_generation_spec.md).
+### 📝 File Generation & Export Module (檔案生成與匯出功能)
+Ann supports exporting and saving AI-generated code blocks and documentation directly to the local filesystem:
+- **UI-Based Saving**: Code blocks in the chat GUI are rendered with a custom code container displaying a language badge and a "Save File" button, allowing quick, secure, and filtered saving for `.py`, `.c`, `.cpp`, `.java`, `.sh`, `.html`, `.xml`, `.css`, `.js`, `.ts`, `.sql`, `.toml`, `.env`, `.md`, and `.txt` files.
+- **Conversational Saving (Option C)**: You can request file generation directly in the dialogue (e.g., "把剛才的 code 儲存為 app.py" or "匯出對話紀錄到 history.md"). Ann will parse the intent locally and save the file directly to the workspace directory.
+
+For complete specs, see [file_generation_spec.md](./file_generation_spec.md).
+
+### 🔄 Conversational System Commands (對話式系統指令)
+Ann supports executing system actions directly through natural conversation, featuring warm LLM response generation prior to execution:
+- **Exit Program (關閉程式)**: Commands like "再見", "關閉視窗", "exit", "close the app" trigger a warm goodbye, append `[EXIT]`, disable inputs, and shut down after a 1.5 seconds delay.
+- **Restart Program (重啟程式)**: Commands like "重啟", "重新啟動", "restart", "reboot" trigger a warm "see you later" reply, append `[RESTART]`, and relaunch the assistant immediately.
+- **Update Program (系統更新)**: Commands like "更新", "升級", "update" trigger an update check. Upon confirmation, Ann replies with a warm goodbye, appends `[UPDATE]`, and runs the self-updater.
 
 ---
 
