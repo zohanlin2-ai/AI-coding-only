@@ -120,7 +120,7 @@ class Updater:
         if self.staging.exists():
             shutil.rmtree(self.staging)
 
-    def _run_self_test(self) -> bool:
+    def _run_self_test(self, cli_mode: bool = False) -> bool:
         """Run self-test on the newly swapped current/assistant.py."""
         assistant_path = self.current / "assistant.py"
         if not assistant_path.exists():
@@ -129,7 +129,7 @@ class Updater:
 
         try:
             args = [sys.executable, str(assistant_path), "--self-test"]
-            if "--cli" in sys.argv:
+            if cli_mode:
                 args.append("--cli")
 
             result = subprocess.run(
@@ -202,7 +202,7 @@ class Updater:
             self._swap()
 
             # Post-swap self-test
-            if not self._run_self_test():
+            if not self._run_self_test(cli_mode="--cli" in sys.argv):
                 logging.error("Self-test FAILED after swap. Initiating rollback...")
                 self.rollback(old_version)
                 self._cleanup_staging()
