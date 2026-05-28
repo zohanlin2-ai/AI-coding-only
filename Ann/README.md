@@ -120,17 +120,27 @@ The recommended layout for deployment and development:
 ```text
 ~/.ai-assistant/
 ├── launcher.py              # Core launcher (rarely updated, never overwritten)
-├── moral_module_spec.md     # ⚖️ Moral & safety specification (designed by OpenAI, audited by Claude — DO NOT MODIFY)
+├── updater.py               # Update orchestrator (rarely updated, never overwritten)
+├── moral_module_spec.md     # ⚖️ Moral & safety specification (DO NOT MODIFY)
 ├── config.yml               # User configuration (preserved across updates)
+├── version.txt              # Current version string (managed by updater)
 ├── logs/                    # System logs
-├── current/                 # Active production version
-│   ├── assistant.py         # Ann AI assistant core entry point
+├── current/                 # Active production version (auto-updated)
+│   ├── assistant.py         # Ann AI assistant — CLI entry point
+│   ├── assistant_gui.py     # Ann AI assistant — GUI (PyQt6/PySide6)
+│   ├── alarm_handler.py     # Shared alarm intent dispatch (CLI + GUI)
+│   ├── ollama_client.py     # Unified Ollama API client with vision routing
+│   ├── file_handler.py      # File generation & export intent handler
+│   ├── moral_evaluator.py   # Moral/safety risk classifier
+│   ├── version_check.py     # GitHub API version check helper
+│   ├── alarms/              # Alarm storage and scheduler
+│   ├── plugins/             # Plugin extension directory
 │   ├── requirements.txt     # Dependencies for this version
-│   └── plugins/             # Plugin extension directory
-├── staging/                 # Update buffer (download, install deps, and test here)
+│   └── tests/               # Unit tests (run in staging before each update)
+├── staging/                 # Update buffer (download, test, then swap here)
 └── versions/                # Historical version backups (for rollback)
-    ├── v1.0.1/
-    └── v1.0.2/
+    ├── v20260101-abc1234/
+    └── v20260201-def5678/
 ```
 
 ---
