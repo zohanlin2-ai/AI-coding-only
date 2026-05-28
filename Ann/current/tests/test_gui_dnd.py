@@ -95,13 +95,13 @@ def test_chat_window_dnd_handlers(mock_gui_components, tmp_path):
     mime_data.hasUrls.return_value = True
     drag_event.mimeData.return_value = mime_data
     
-    # Call drag enter
-    chat_win.dragEnterEvent(drag_event)
+    # Call drag enter (using unbound method to bypass PySide6 Shiboken argument type checking)
+    ChatWindow.dragEnterEvent(chat_win, drag_event)
     assert drag_event.acceptProposedAction.called
     assert not chat_win.drag_overlay.isHidden()
     
     # Call drag leave
-    chat_win.dragLeaveEvent(drag_event)
+    ChatWindow.dragLeaveEvent(chat_win, drag_event)
     assert chat_win.drag_overlay.isHidden()
     
     # Mock drop event with text file URL
@@ -115,7 +115,7 @@ def test_chat_window_dnd_handlers(mock_gui_components, tmp_path):
     drop_event = MagicMock()
     drop_event.mimeData.return_value = mime_data
     
-    chat_win.dropEvent(drop_event)
+    ChatWindow.dropEvent(chat_win, drop_event)
     assert drop_event.acceptProposedAction.called
     assert txt_file in chat_win.attachments
     assert not chat_win.attachment_tray.isHidden()
@@ -143,7 +143,8 @@ def test_floating_bubble_dnd_handlers(mock_gui_components, tmp_path):
     mime_data.hasUrls.return_value = True
     drag_event.mimeData.return_value = mime_data
     
-    bubble.dragEnterEvent(drag_event)
+    # Call drag enter (using unbound method to bypass PySide6 Shiboken argument type checking)
+    FloatingBubble.dragEnterEvent(bubble, drag_event)
     assert drag_event.acceptProposedAction.called
     assert bubble.drag_active
     
@@ -160,7 +161,7 @@ def test_floating_bubble_dnd_handlers(mock_gui_components, tmp_path):
     
     # Mock expand_to_chat to prevent actual window visibility manipulation during test
     with patch.object(bubble, 'expand_to_chat') as mock_expand:
-        bubble.dropEvent(drop_event)
+        FloatingBubble.dropEvent(bubble, drop_event)
         assert mock_expand.called
         assert drop_event.acceptProposedAction.called
         # Check that file was passed to chat window
