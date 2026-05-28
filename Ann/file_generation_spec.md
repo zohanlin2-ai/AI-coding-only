@@ -116,18 +116,52 @@ Updated to accept a decomposed list of blocks. Instead of a single `QLabel`, its
 
 ---
 
-## 5. Verification & Testing
+## 6. Conversational File Generation (Option C)
 
-### 5.1 Automated Unit Tests
-- Test cases checking markdown parser splits text and code blocks correctly.
-- Test cases checking language-to-extension mappings.
+Conversational File Generation allows the user to output or export files using natural language dialogue instead of graphical UI interactions (e.g. clicking buttons).
 
-### 5.2 Manual Verification Scenario
+### 6.1 Intent Parsing
+
+An LLM-based intent parser `FileIntentParser` analyses incoming user queries and extracts file generation intents to a structured JSON object:
+
+```json
+{
+  "intent": "export_history | save_code | none",
+  "filename": "string or null",
+  "target": "string or null"
+}
+```
+
+* **`export_history`**: The user wants to export the conversation log to a markdown file (e.g., `"匯出對話紀錄到 history.md"`).
+* **`save_code`**: The user wants to save code blocks/snippets from the previous assistant reply into a file (e.g., `"把剛才的程式碼存成 app.py"`).
+* **`none`**: No file operations requested.
+
+### 6.2 Regex Fallback Rules
+
+If the LLM is offline or fails to output a valid JSON pattern, the parser falls back to rule-based regex parsing:
+* Matches history keywords (`對話`, `聊天`, `歷史`, `紀錄`, `log`, `history`) for `export_history`.
+* Matches code keywords (`code`, `程式`, `代碼`, `區塊`, `snippet`) or filename patterns containing code extensions for `save_code`.
+
+### 6.3 Processing & Writing
+
+- **History Exporting**: The handler formats the `conversation` message list into a clean Markdown block (stripping system safeguard wrappers) and writes it directly to the specified path in `BASE_DIR`.
+- **Code Saving**: The handler searches backwards through the conversation list to locate the latest assistant response containing fenced code blocks. If a `target` language is specified, it matches that language block. It extracts the raw code content and writes it directly to the local file.
+- **Confirmation Message**: The interface displays a success confirmation message with a clickable file link (e.g. `[filename](file:///...)`).
+
+---
+
+## 7. Verification & Testing
+
+### 7.1 Automated Unit Tests
+- **[test_file_generation.py](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/current/tests/test_file_generation.py)**: Checks markdown blocks parser and UI-based QFileDialog filters mapping.
+- **[test_file_handler.py](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/current/tests/test_file_handler.py)**: Checks conversational intent detection, regex fallback mapping, history log writing, and code block extraction.
+
+### 7.2 Manual Verification Scenario
 1. Run Ann in GUI mode.
 2. Ask Ann: "Write a python function to add two numbers, and a small html page."
-3. Verify that:
-   - The Python code and HTML code are rendered in separate dark-themed boxes.
-   - Each box has a `💾 另存新檔` button.
-4. Click `💾 另存新檔` on the Python block.
-   - Verify the save file dialog defaults to naming with a `.py` extension.
-   - Save the file and confirm the contents match the code block.
+3. Click `💾 另存新檔` on the Python block UI. Verify that saving via the dialog works.
+4. Input message: "把剛才的 HTML 程式碼儲存為 index.html".
+5. Verify that Ann directly responds with a confirmation containing a clickable `file:///` link to `index.html`.
+6. Open `index.html` from the workspace directory and confirm the HTML content is identical to the AI block.
+7. Input message: "匯出對話紀錄到 log.md".
+8. Verify that `log.md` is generated, containing the structured conversation logs.
