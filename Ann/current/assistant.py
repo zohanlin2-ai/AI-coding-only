@@ -46,7 +46,8 @@ SYSTEM_PROMPT = (
     "Your name is Ann and you should always introduce yourself as Ann. "
     "Respond in the same language the user writes in.\n"
     "When the user indicates they want to exit, close, or terminate the assistant program (e.g., 'close the window', 'shut down', 'exit', '再見', '關閉程式'), respond with a warm goodbye and append the marker '[EXIT]' at the very end of your response so the system can shut down.\n"
-    "When the user indicates they want to restart the assistant program (e.g., 'restart', 'reboot', '重啟', '重新啟動'), respond with a warm response (e.g., 'I will restart now, see you in a moment!') and append the marker '[RESTART]' at the very end of your response so the system can restart."
+    "When the user indicates they want to restart the assistant program (e.g., 'restart', 'reboot', '重啟', '重新啟動'), respond with a warm response (e.g., 'I will restart now, see you in a moment!') and append the marker '[RESTART]' at the very end of your response so the system can restart.\n"
+    "When the user indicates they want to update the assistant program (e.g., 'update', 'upgrade', '更新', '升級'), respond with a warm response confirming the update and append the marker '[UPDATE]' at the very end of your response so the system can perform the update."
 )
 
 # ---------------------------------------------------------------------------
@@ -224,7 +225,27 @@ def main() -> None:
                     intent = detect_update_intent(user_input_lower)
 
                     if intent == "yes":
-                        print("\nAnn: 好的，即將進行更新並重新啟動應用程式...\n")
+                        llm_message = (
+                            f"[System Instruction: The user confirmed they want to install the available update (version {pending_version}). "
+                            f"Reply with a warm goodbye and state that you are starting the update. "
+                            f"You MUST append the marker '[UPDATE]' at the very end of your response so the system can run the updater.]\n\n"
+                            f"User: {user_input}"
+                        )
+                        conversation.append({"role": "user", "content": llm_message})
+                        awaiting_update_confirm = False
+                        pending_version = None
+                        
+                        try:
+                            messages_with_system = [
+                                {"role": "system", "content": SYSTEM_PROMPT},
+                                *conversation,
+                            ]
+                            reply = call_ollama(llm_base_url, llm_model, messages_with_system)
+                            clean_reply = reply.replace("[UPDATE]", "").strip()
+                            conversation.append({"role": "assistant", "content": clean_reply})
+                            print(f"\nAnn: {clean_reply}\n")
+                        except Exception as e:
+                            print("\nAnn: 好的，即將進行更新並重新啟動應用程式...\n")
                         sys.exit(EXIT_UPDATE)
                     elif intent == "no":
                         awaiting_update_confirm = False
@@ -315,6 +336,11 @@ def main() -> None:
                     conversation.append({"role": "assistant", "content": clean_reply})
                     print(f"\nAnn: {clean_reply}\n")
                     sys.exit(EXIT_RESTART)
+                elif "[UPDATE]" in reply:
+                    clean_reply = reply.replace("[UPDATE]", "").strip()
+                    conversation.append({"role": "assistant", "content": clean_reply})
+                    print(f"\nAnn: {clean_reply}\n")
+                    sys.exit(EXIT_UPDATE)
                 else:
                     conversation.append({"role": "assistant", "content": reply})
                     print(f"\nAnn: {reply}\n")

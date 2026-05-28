@@ -75,9 +75,11 @@ def test_gui_update_confirm_yes(qapp) -> None:
     )
 
     chat_window.input_field.setText("\u597d")
-    with patch("PyQt6.QtWidgets.QApplication.exit" if "PyQt6" in sys.modules else "PySide6.QtWidgets.QApplication.exit") as mock_exit:
+    with patch("assistant_gui.OllamaWorker.start") as mock_worker_start:
         chat_window.send_message()
-        mock_exit.assert_called_once_with(EXIT_UPDATE)
+        mock_worker_start.assert_called_once()
+        assert chat_window.awaiting_update_confirm is False
+        assert chat_window.pending_version is None
 
 
 def test_gui_update_confirm_no(qapp) -> None:

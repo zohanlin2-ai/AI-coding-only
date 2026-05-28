@@ -699,9 +699,31 @@ class ChatWindow(QWidget):
             intent = detect_update_intent(user_input_lower)
 
             if intent == "yes":
-                self.add_message("好的，即將進行更新並重新啟動應用程式...", is_user=False)
-                QApplication.processEvents()
-                QApplication.exit(EXIT_UPDATE)
+                llm_message = (
+                    f"[System Instruction: The user confirmed they want to install the available update (version {self.pending_version}). "
+                    f"Reply with a warm goodbye and state that you are starting the update. "
+                    f"You MUST append the marker '[UPDATE]' at the very end of your response so the system can run the updater.]\n\n"
+                    f"User: {user_text}"
+                )
+                self.conversation.append({"role": "user", "content": llm_message})
+                self.awaiting_update_confirm = False
+                self.pending_version = None
+                
+                # Prepend system prompt
+                messages_with_system = [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    *self.conversation,
+                ]
+                
+                # Call Ollama asynchronously via worker thread
+                llm_base_url = self.config["llm"].get("base_url", "http://localhost:11434")
+                self.send_btn.setEnabled(False)
+                self.input_field.setEnabled(False)
+                self.title_label.setText("Ann is typing...")
+                
+                self.worker = OllamaWorker(llm_base_url, self.config["llm"]["model"], messages_with_system, None)
+                self.worker.finished.connect(self.handle_reply)
+                self.worker.start()
                 return
             elif intent == "no":
                 self.awaiting_update_confirm = False
@@ -903,6 +925,18 @@ class ChatWindow(QWidget):
             
             # Exit program with code 3 after 1.5 seconds delay
             QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_RESTART))
+        elif "[UPDATE]" in reply:
+            clean_reply = reply.replace("[UPDATE]", "").strip()
+            self.conversation.append({"role": "assistant", "content": clean_reply})
+            self.add_message(clean_reply, is_user=False)
+            
+            # Disable GUI controls
+            self.send_btn.setEnabled(False)
+            self.input_field.setEnabled(False)
+            self.title_label.setText("Updating...")
+            
+            # Exit program with code 42 after 1.5 seconds delay
+            QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_UPDATE))
         else:
             self.conversation.append({"role": "assistant", "content": reply})
             self.add_message(reply, is_user=False)
