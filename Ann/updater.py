@@ -73,7 +73,7 @@ class Updater:
         for item in items:
             dest = local_dir / item["name"]
             if item["type"] == "file":
-                content = requests.get(item["download_url"], timeout=15)
+                content = requests.get(item["download_url"], headers=self._headers, timeout=15)
                 content.raise_for_status()
                 dest.write_bytes(content.content)
                 logging.info("  fetched: %s", item["name"])

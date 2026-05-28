@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -68,11 +69,13 @@ def main() -> None:
     version = version_file.read_text(encoding="utf-8").strip() if version_file.exists() else "unknown"
     logging.info("=== Ann Launcher started (v%s) ===", version)
 
+    backoff = 1
     while True:
         logging.info("Starting assistant...")
         code = run_assistant()
 
         if code == EXIT_UPDATE:
+            backoff = 1  # reset backoff on intentional restart
             logging.info("Update requested. Running updater...")
             success = do_update()
             if success:
@@ -83,7 +86,12 @@ def main() -> None:
             logging.info("Assistant exited cleanly. Stopping launcher.")
             sys.exit(0)
         else:
-            logging.warning("Assistant exited with unexpected code %d. Restarting...", code)
+            logging.warning(
+                "Assistant exited with unexpected code %d. Restarting in %ds...",
+                code, backoff,
+            )
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 60)
 
 
 if __name__ == "__main__":
