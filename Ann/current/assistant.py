@@ -43,7 +43,8 @@ SYSTEM_PROMPT = (
     "You were created by the Ann project and run locally on the user's machine. "
     "Never refer to yourself as Gemma, a language model, or any other product name. "
     "Your name is Ann and you should always introduce yourself as Ann. "
-    "Respond in the same language the user writes in."
+    "Respond in the same language the user writes in.\n"
+    "When the user indicates they want to exit, close, or terminate the assistant program (e.g., 'close the window', 'shut down', 'exit', '再見', '關閉程式'), respond with a warm goodbye and append the marker '[EXIT]' at the very end of your response so the system can shut down."
 )
 
 # ---------------------------------------------------------------------------
@@ -302,8 +303,14 @@ def main() -> None:
                     conversation.pop()  # don't store failed turn
                     continue
 
-                conversation.append({"role": "assistant", "content": reply})
-                print(f"\nAnn: {reply}\n")
+                if "[EXIT]" in reply:
+                    clean_reply = reply.replace("[EXIT]", "").strip()
+                    conversation.append({"role": "assistant", "content": clean_reply})
+                    print(f"\nAnn: {clean_reply}\n")
+                    sys.exit(0)
+                else:
+                    conversation.append({"role": "assistant", "content": reply})
+                    print(f"\nAnn: {reply}\n")
         finally:
             alarm_scheduler.stop_cli_scheduler()
             alarm_trigger.stop_trigger()

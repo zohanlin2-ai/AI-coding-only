@@ -879,9 +879,22 @@ class ChatWindow(QWidget):
                 self.conversation.pop()
             return
 
-        self.conversation.append({"role": "assistant", "content": reply})
-        self.add_message(reply, is_user=False)
-        self.input_field.setFocus()
+        if "[EXIT]" in reply:
+            clean_reply = reply.replace("[EXIT]", "").strip()
+            self.conversation.append({"role": "assistant", "content": clean_reply})
+            self.add_message(clean_reply, is_user=False)
+            
+            # Disable GUI controls
+            self.send_btn.setEnabled(False)
+            self.input_field.setEnabled(False)
+            self.title_label.setText("Goodbye...")
+            
+            # Exit program after 1.5 seconds delay so user can read goodbye
+            QTimer.singleShot(1500, QApplication.quit)
+        else:
+            self.conversation.append({"role": "assistant", "content": reply})
+            self.add_message(reply, is_user=False)
+            self.input_field.setFocus()
 
     def handle_update_check_finished(self, new_version: str, error: str) -> None:
         self.send_btn.setEnabled(True)
