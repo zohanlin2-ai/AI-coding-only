@@ -230,7 +230,7 @@ class ChatWindow(QWidget):
         if new_tag:
             self.awaiting_update_confirm = True
             self.pending_version = new_tag
-            self.add_message(f"Hello! I am Ann, your safety-conscious assistant. 偵測到新版本 {new_tag}。請問您現在需要更新嗎？", is_user=False)
+            self.add_message(f"Hello! I am Ann, your safety-conscious assistant. 偵測到新版本 {new_tag}。請問您現在需要更新嗎？[y/n]", is_user=False)
         else:
             self.add_message("Hello! I am Ann, your safety-conscious assistant. How can I help you today?", is_user=False)
 
@@ -497,7 +497,7 @@ class ChatWindow(QWidget):
         if new_version:
             self.awaiting_update_confirm = True
             self.pending_version = new_version
-            self.add_message(f"偵測到新版本 {new_version}。請問您現在要更新嗎？", is_user=False)
+            self.add_message(f"偵測到新版本 {new_version}。請問您現在要更新嗎？[y/n]", is_user=False)
         else:
             self.add_message("您目前已是最新版本，不需要更新。", is_user=False)
         self.input_field.setFocus()

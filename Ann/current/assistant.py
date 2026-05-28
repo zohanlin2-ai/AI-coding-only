@@ -160,7 +160,7 @@ def main() -> None:
         if new_tag:
             awaiting_update_confirm = True
             pending_version = new_tag
-            print(f"\nAnn: 偵測到新版本 {new_tag}。請問您現在需要更新嗎？\n")
+            print(f"\nAnn: 偵測到新版本 {new_tag}。請問您現在需要更新嗎？[y/n]\n")
         
         def cli_alarm_callback(alarm):
             alarm_scheduler.active_triggered_alarms.append(alarm)
@@ -197,7 +197,7 @@ def main() -> None:
                         intent = "yes"
                     elif any(w in user_input_lower for w in ["不要", "不", "否", "later", "no", "n", "暫時", "取消", "晚點", "拒絕", "skip", "先不要", "等一下", "等會", "待會", "下次", "沒空", "忙", "暫不", "以後", "不升", "沒興趣", "沒時間", "改天", "忽略"]):
                         intent = "no"
-                    elif any(w in user_input_lower for w in ["好", "要", "更新", "ok", "yes", "y", "update", "sure", "確定", "可以", "對", "行", "同意", "升級", "安裝", "upgrade", "confirm", "現在", "即刻"]):
+                    elif any(w in user_input_lower for w in ["好", "要", "更新", "ok", "yes", "y", "update", "sure", "確定", "可以", "對", "行", "同意", "升級", "安裝", "upgrade", "confirm", "現在", "即刻", "yer", "yeah", "yep", "yea"]):
                         intent = "yes"
                     else:
                         intent = "unknown"
@@ -210,7 +210,7 @@ def main() -> None:
                         pending_version = None
                         print("\nAnn: 好的，那我們先不更新。如果您想再次檢查，可以隨時對我說『更新』。\n")
                     else:
-                        print("\nAnn: 我不太確定您的意思。請問您現在需要更新程式嗎？（您可以回答「好/要」來更新，或回答「不用/先不要」跳過）\n")
+                        print("\nAnn: 我不太確定您的意思。請問您現在需要更新程式嗎？[y/n]\n")
                     continue
 
                 # Intercept update check requests
@@ -220,7 +220,7 @@ def main() -> None:
                     if new_version:
                         awaiting_update_confirm = True
                         pending_version = new_version
-                        print(f"\nAnn: 偵測到新版本 {new_version}。請問您現在要更新嗎？\n")
+                        print(f"\nAnn: 偵測到新版本 {new_version}。請問您現在要更新嗎？[y/n]\n")
                     else:
                         print("\nAnn: 您目前已是最新版本，不需要更新。\n")
                     continue
