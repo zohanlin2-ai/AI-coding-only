@@ -9,14 +9,14 @@ from pathlib import Path
 try:
     from PyQt6.QtWidgets import (
         QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
-        QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QDialog, QTextEdit
+        QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QDialog, QTextEdit, QFileDialog
     )
     from PyQt6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, pyqtSignal, QObject, QThread, QTimer
     from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush, QPixmap
 except ImportError:
     from PySide6.QtWidgets import (
         QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
-        QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QDialog, QTextEdit
+        QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QDialog, QTextEdit, QFileDialog
     )
     from PySide6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, Signal, QObject, QThread, QTimer
     from PySide6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush, QPixmap
@@ -238,16 +238,174 @@ class AttachmentItem(QFrame):
         layout.addWidget(remove_btn)
 
 
+def parse_markdown_blocks(text: str) -> list[dict]:
+    """
+    Parses response text and splits it into a sequence of text and code blocks.
+    Example:
+        [
+            {"type": "text", "content": "Here is the code:\n"},
+            {"type": "code", "language": "python", "content": "print('hello')"},
+            {"type": "text", "content": "\nHope this helps!"}
+        ]
+    """
+    import re
+    # Match ```lang\ncode\n```
+    # Using non-greedy match (.*?) to allow multiple code blocks in one response
+    pattern = r"```([a-zA-Z0-9+#-]+)?\n(.*?)\n```"
+    
+    blocks = []
+    last_end = 0
+    
+    for match in re.finditer(pattern, text, re.DOTALL):
+        # Add preceding text block if it has content
+        pre_text = text[last_end:match.start()]
+        if pre_text:
+            blocks.append({"type": "text", "content": pre_text})
+            
+        language = match.group(1) or ""
+        code_content = match.group(2) or ""
+        blocks.append({
+            "type": "code",
+            "language": language.strip(),
+            "content": code_content
+        })
+        last_end = match.end()
+        
+    # Add trailing text block if any
+    post_text = text[last_end:]
+    if post_text:
+        blocks.append({"type": "text", "content": post_text})
+        
+    # If no blocks were added, return the original text as a single text block
+    if not blocks and text:
+        blocks.append({"type": "text", "content": text})
+        
+    return blocks
+
+
+class CodeBlockWidget(QFrame):
+    """Container for displaying parsed markdown code blocks with an option to save to file."""
+    def __init__(self, language: str, code_content: str, parent=None):
+        super().__init__(parent)
+        self.language = language or "txt"
+        self.code_content = code_content
+        
+        self.setStyleSheet(
+            "CodeBlockWidget { background-color: #1E222A; border: 1px solid #2D3139; "
+            "border-radius: 8px; }"
+        )
+        
+        # Vertical layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Header bar
+        header = QFrame()
+        header.setFixedHeight(28)
+        header.setStyleSheet(
+            "background-color: #181A1F; border-top-left-radius: 8px; border-top-right-radius: 8px; "
+            "border-bottom: 1px solid #2D3139;"
+        )
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(10, 0, 10, 0)
+        
+        # Language Label
+        lang_lbl = QLabel(self.language.upper())
+        lang_lbl.setStyleSheet(
+            "color: #ABB2BF; font-weight: bold; font-family: 'Segoe UI'; font-size: 11px; border: none; background: transparent;"
+        )
+        header_layout.addWidget(lang_lbl)
+        header_layout.addStretch()
+        
+        # Save Button
+        save_btn = QPushButton("💾 另存檔案")
+        save_btn.setStyleSheet(
+            "QPushButton { color: #61AFEF; border: none; background-color: transparent; "
+            "font-family: 'Segoe UI'; font-weight: bold; font-size: 11px; padding: 0px; }"
+            "QPushButton:hover { color: #56B6C2; text-decoration: underline; }"
+        )
+        save_btn.clicked.connect(self.save_to_file)
+        header_layout.addWidget(save_btn)
+        
+        layout.addWidget(header)
+        
+        # Code body
+        self.code_edit = QTextEdit()
+        self.code_edit.setPlainText(self.code_content)
+        self.code_edit.setReadOnly(True)
+        # Monospace styling for code block
+        self.code_edit.setStyleSheet(
+            "QTextEdit { background-color: #1E222A; border: none; "
+            "border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; "
+            "color: #ABB2BF; font-family: 'Consolas', 'Courier New', monospace; "
+            "font-size: 13px; padding: 8px; }"
+        )
+        
+        # Estimate height based on line count to avoid layout rendering latency issues
+        lines_count = self.code_content.count('\n') + 1
+        self.code_edit.setFixedHeight(min(max(lines_count * 18 + 20, 80), 300))
+        
+        layout.addWidget(self.code_edit)
+
+    def save_to_file(self) -> None:
+        # File type filter mapping based on code block language
+        filters = {
+            "py": "Python Files (*.py)",
+            "python": "Python Files (*.py)",
+            "c": "C Source Files (*.c *.h)",
+            "cpp": "C++ Source Files (*.cpp *.h *.hpp)",
+            "c++": "C++ Source Files (*.cpp *.h *.hpp)",
+            "java": "Java Files (*.java)",
+            "sh": "Shell Scripts (*.sh)",
+            "bash": "Shell Scripts (*.sh)",
+            "html": "HTML Files (*.html)",
+            "htm": "HTML Files (*.html)",
+            "xml": "XML Files (*.xml)",
+            "css": "CSS Files (*.css)",
+            "js": "JavaScript Files (*.js)",
+            "javascript": "JavaScript Files (*.js)",
+            "ts": "TypeScript Files (*.ts)",
+            "typescript": "TypeScript Files (*.ts)",
+            "sql": "SQL Scripts (*.sql)",
+            "toml": "TOML Files (*.toml)",
+            "json": "JSON Files (*.json)",
+            "yaml": "YAML Files (*.yaml *.yml)",
+            "yml": "YAML Files (*.yaml *.yml)",
+            "md": "Markdown Documents (*.md)",
+            "markdown": "Markdown Documents (*.md)",
+            "ini": "Config Files (*.ini *.cfg *.conf)",
+            "cfg": "Config Files (*.ini *.cfg *.conf)",
+            "conf": "Config Files (*.ini *.cfg *.conf)",
+            "env": "Environment Files (*.env)",
+        }
+        
+        lang = self.language.lower()
+        default_filter = filters.get(lang, "Text Files (*.txt);;All Files (*)")
+        default_ext = "." + lang if lang in filters else ".txt"
+        
+        # Open save file dialog
+        file_path_str, _ = QFileDialog.getSaveFileName(
+            self,
+            "另存新檔 (Save Code Block)",
+            f"code{default_ext}",
+            default_filter
+        )
+        
+        if file_path_str:
+            try:
+                Path(file_path_str).write_text(self.code_content, encoding="utf-8")
+                logging.info("Successfully saved code block to %s", file_path_str)
+            except Exception as e:
+                logging.error("Failed to save code block: %s", e)
+
+
 class MessageBubble(QFrame):
     """Custom styled chat message bubble."""
     def __init__(self, text: str, is_user: bool, is_refusal: bool = False):
         super().__init__()
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 5, 10, 5)
-
-        self.label = QLabel(text)
-        self.label.setWordWrap(True)
-        self.label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
 
         # Style colors
         if is_refusal:
@@ -263,19 +421,35 @@ class MessageBubble(QFrame):
             text_color = "#E2E8F0"
             border_color = "#1A202C"
 
-        self.label.setStyleSheet(
-            f"color: {text_color}; font-size: 13px; font-family: 'Segoe UI', Arial; "
-            f"background-color: transparent; border: none; padding: 0px;"
-        )
-
         bubble = QFrame()
         bubble.setStyleSheet(
             f"background-color: {bg_color}; border: 1px solid {border_color}; "
             f"border-radius: 12px; padding: 8px;"
         )
+        bubble.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         bubble_layout = QVBoxLayout(bubble)
         bubble_layout.setContentsMargins(8, 8, 8, 8)
-        bubble_layout.addWidget(self.label)
+        bubble_layout.setSpacing(6)
+
+        # Parse text and add labels or CodeBlockWidgets
+        blocks = parse_markdown_blocks(text)
+        for block in blocks:
+            if block["type"] == "text":
+                content = block["content"]
+                # Only add if it has non-whitespace characters or is the only block
+                if content.strip() or len(blocks) == 1:
+                    label = QLabel(content)
+                    label.setWordWrap(True)
+                    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                    label.setStyleSheet(
+                        f"color: {text_color}; font-size: 13px; font-family: 'Segoe UI', Arial; "
+                        f"background-color: transparent; border: none; padding: 0px;"
+                    )
+                    bubble_layout.addWidget(label)
+            elif block["type"] == "code":
+                code_widget = CodeBlockWidget(block["language"], block["content"])
+                code_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+                bubble_layout.addWidget(code_widget)
 
         if is_user:
             layout.addStretch()
@@ -461,7 +635,7 @@ class ChatWindow(QWidget):
                 file_path = Path(url.toLocalFile())
                 if file_path.is_file():
                     suffix = file_path.suffix.lower()
-                    allowed_text = ['.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.yaml', '.yml', '.ini', '.cfg', '.log']
+                    allowed_text = ['.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.yaml', '.yml', '.ini', '.cfg', '.log', '.c', '.cpp', '.java', '.sh', '.ts', '.sql', '.toml', '.env', '.xml']
                     allowed_img = ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
                     if suffix in allowed_text or suffix in allowed_img:
                         self.add_attachment(file_path)
@@ -914,7 +1088,7 @@ class FloatingBubble(QWidget):
                 file_path = Path(url.toLocalFile())
                 if file_path.is_file():
                     suffix = file_path.suffix.lower()
-                    allowed_text = ['.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.yaml', '.yml', '.ini', '.cfg', '.log']
+                    allowed_text = ['.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.yaml', '.yml', '.ini', '.cfg', '.log', '.c', '.cpp', '.java', '.sh', '.ts', '.sql', '.toml', '.env', '.xml']
                     allowed_img = ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
                     if suffix in allowed_text or suffix in allowed_img:
                         self.chat_window.add_attachment(file_path)

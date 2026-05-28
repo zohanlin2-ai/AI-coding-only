@@ -20,7 +20,7 @@ The goal is to allow users to easily import files (plain text and images) into t
 - **Attachment Preview**:
   - Clicking on the attachment file name opens a popup window (`AttachmentViewerDialog`) showing the file content.
 - **Supported Formats**:
-  - **Plain Text / Code**: `.txt`, `.md`, `.py`, `.js`, `.json`, `.csv`, `.html`, `.css`, `.yaml`, `.yml`.
+  - **Plain Text / Code**: `.txt`, `.md`, `.py`, `.js`, `.json`, `.csv`, `.html`, `.css`, `.yaml`, `.yml`, `.ini`, `.cfg`, `.log`, `.c`, `.cpp`, `.java`, `.sh`, `.ts`, `.sql`, `.toml`, `.env`, `.xml`.
   - **Images**: `.png`, `.jpg`, `.jpeg`, `.webp`.
 - **LLM Integration**:
   - For text files: Automatically appends the content as code blocks to the next user message sent to the LLM.
@@ -119,7 +119,7 @@ Modal or non-modal popup window to display the attachment contents.
 
 ### 5.1 File Type Identification
 Files are checked by suffix extension:
-- **Text Suffixes**: `.txt`, `.md`, `.py`, `.js`, `.json`, `.csv`, `.html`, `.css`, `.yaml`, `.yml`, `.ini`, `.cfg`, `.txt`, `.log`.
+- **Text Suffixes**: `.txt`, `.md`, `.py`, `.js`, `.json`, `.csv`, `.html`, `.css`, `.yaml`, `.yml`, `.ini`, `.cfg`, `.log`, `.c`, `.cpp`, `.java`, `.sh`, `.ts`, `.sql`, `.toml`, `.env`, `.xml`.
 - **Image Suffixes**: `.png`, `.jpg`, `.jpeg`, `.webp`, `.bmp`.
 
 ### 5.2 Plain Text Reader

@@ -2,6 +2,13 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.1.7] - 2026-05-28
+
+### Added
+- Created design and implementation specification for the File Generation module ([file_generation_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/file_generation_spec.md)) to save AI-generated code blocks directly.
+- Expanded Drag and Drop (DND) receiver file formats in [drag_drop_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/drag_drop_spec.md) to support HTML, XML, C, C++, Java, Shell, SQL, CSS, TS, TOML, and ENV formats.
+- Formulated an implementation plan for custom code block rendering and file-saving dialogs in PyQt6.
+
 ## [0.1.6] - 2026-05-28
 
 ### Added

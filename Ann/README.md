@@ -98,6 +98,10 @@ For detailed interaction specifications, see [drag_drop_spec.md](file:///c:/User
 Ann encapsulates all communication with the local Ollama API into a modular `OllamaClient` component within the AI Engine. It automatically detects installed models and their capabilities (such as vision support). When an image is attached, it dynamically routes the request to a local vision-capable model (like `llava`) or guides the user if none is installed.
 For technical details, see [ai_engine_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/ai_engine_spec.md).
 
+### 📝 File Generation Module (檔案生成功能)
+Ann supports exporting and saving AI-generated code blocks and documentation directly to the local filesystem. Code blocks in the chat GUI are rendered with a custom code container displaying a language badge and a "Save File" button, allowing quick, secure, and filtered saving for `.py`, `.c`, `.cpp`, `.java`, `.sh`, `.html`, `.xml`, `.css`, `.js`, `.ts`, `.sql`, `.toml`, `.env`, `.md`, and `.txt` files.
+For design and interaction specs, see [file_generation_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/file_generation_spec.md).
+
 ---
 
 ## 📂 Recommended Directory Structure
