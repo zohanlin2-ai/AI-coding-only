@@ -2,10 +2,14 @@
 Tests for conversational updates in both CLI and GUI modes.
 """
 import sys
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+# Force offscreen rendering for GUI tests to prevent crashes in headless environments
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

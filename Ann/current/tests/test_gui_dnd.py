@@ -2,20 +2,38 @@
 Unit tests for the Drag & Drop (DND) functionality in Ann's PyQt6 GUI.
 """
 import sys
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt, QUrl, QPoint
 import pytest
 
-# Ensure QApplication is initialized (needed for PyQt6 widget creation)
-app = QApplication.instance() or QApplication(sys.argv)
+# Force offscreen rendering for GUI tests to prevent crashes in headless environments
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
-# Add parent path to import assistant_gui
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Try to import Qt libraries dynamically
+HAS_QT = False
+try:
+    from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtCore import Qt, QUrl, QPoint
+    HAS_QT = True
+except ImportError:
+    try:
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import Qt, QUrl, QPoint
+        HAS_QT = True
+    except ImportError:
+        HAS_QT = False
 
-from assistant_gui import FloatingBubble, ChatWindow, AttachmentItem, AttachmentViewerDialog, DragDropOverlay
+# Skip all tests in this file if Qt is not available
+pytestmark = pytest.mark.skipif(not HAS_QT, reason="PyQt6 or PySide6 is required for GUI tests")
+
+if HAS_QT:
+    # Ensure QApplication is initialized (needed for widget creation)
+    app = QApplication.instance() or QApplication(sys.argv)
+    
+    # Add parent path to import assistant_gui
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from assistant_gui import FloatingBubble, ChatWindow, AttachmentItem, AttachmentViewerDialog, DragDropOverlay
 
 
 @pytest.fixture
