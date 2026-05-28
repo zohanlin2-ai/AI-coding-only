@@ -25,7 +25,7 @@ except ImportError:
 
 # Import core elements from assistant.py and moral_evaluator.py
 from alarm_handler import detect_update_intent, handle_alarm_intent
-from assistant import load_config, call_ollama, SYSTEM_PROMPT, BASE_DIR, EXIT_UPDATE
+from assistant import load_config, call_ollama, SYSTEM_PROMPT, BASE_DIR, EXIT_UPDATE, EXIT_RESTART
 from moral_evaluator import MoralEvaluator, Decision
 
 # Set up logging for GUI
@@ -891,6 +891,18 @@ class ChatWindow(QWidget):
             
             # Exit program after 1.5 seconds delay so user can read goodbye
             QTimer.singleShot(1500, QApplication.quit)
+        elif "[RESTART]" in reply:
+            clean_reply = reply.replace("[RESTART]", "").strip()
+            self.conversation.append({"role": "assistant", "content": clean_reply})
+            self.add_message(clean_reply, is_user=False)
+            
+            # Disable GUI controls
+            self.send_btn.setEnabled(False)
+            self.input_field.setEnabled(False)
+            self.title_label.setText("Restarting...")
+            
+            # Exit program with code 3 after 1.5 seconds delay
+            QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_RESTART))
         else:
             self.conversation.append({"role": "assistant", "content": reply})
             self.add_message(reply, is_user=False)

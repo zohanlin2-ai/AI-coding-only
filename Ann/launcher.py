@@ -22,6 +22,7 @@ BASE_DIR = Path(__file__).parent
 LOGS_DIR = BASE_DIR / "logs"
 ASSISTANT = BASE_DIR / "current" / "assistant.py"
 EXIT_UPDATE = 42
+EXIT_RESTART = 3
 
 
 def setup_logging() -> None:
@@ -111,6 +112,10 @@ def main() -> None:
             else:
                 logging.info("Update FAILED — keeping current version")
                 just_updated = False
+        elif code == EXIT_RESTART:
+            backoff = 1  # reset backoff on intentional restart
+            logging.info("Restart requested by assistant. Restarting immediately...")
+            just_updated = False
         elif code == 0:
             logging.info("Assistant exited cleanly. Stopping launcher.")
             sys.exit(0)

@@ -32,6 +32,7 @@ from moral_evaluator import Decision, MoralEvaluator  # noqa: E402
 from version_check import check_for_update  # noqa: E402
 
 EXIT_UPDATE = 42
+EXIT_RESTART = 3
 
 # ---------------------------------------------------------------------------
 # System prompt — establishes Ann's identity for every conversation.
@@ -44,7 +45,8 @@ SYSTEM_PROMPT = (
     "Never refer to yourself as Gemma, a language model, or any other product name. "
     "Your name is Ann and you should always introduce yourself as Ann. "
     "Respond in the same language the user writes in.\n"
-    "When the user indicates they want to exit, close, or terminate the assistant program (e.g., 'close the window', 'shut down', 'exit', '再見', '關閉程式'), respond with a warm goodbye and append the marker '[EXIT]' at the very end of your response so the system can shut down."
+    "When the user indicates they want to exit, close, or terminate the assistant program (e.g., 'close the window', 'shut down', 'exit', '再見', '關閉程式'), respond with a warm goodbye and append the marker '[EXIT]' at the very end of your response so the system can shut down.\n"
+    "When the user indicates they want to restart the assistant program (e.g., 'restart', 'reboot', '重啟', '重新啟動'), respond with a warm response (e.g., 'I will restart now, see you in a moment!') and append the marker '[RESTART]' at the very end of your response so the system can restart."
 )
 
 # ---------------------------------------------------------------------------
@@ -308,6 +310,11 @@ def main() -> None:
                     conversation.append({"role": "assistant", "content": clean_reply})
                     print(f"\nAnn: {clean_reply}\n")
                     sys.exit(0)
+                elif "[RESTART]" in reply:
+                    clean_reply = reply.replace("[RESTART]", "").strip()
+                    conversation.append({"role": "assistant", "content": clean_reply})
+                    print(f"\nAnn: {clean_reply}\n")
+                    sys.exit(EXIT_RESTART)
                 else:
                     conversation.append({"role": "assistant", "content": reply})
                     print(f"\nAnn: {reply}\n")
