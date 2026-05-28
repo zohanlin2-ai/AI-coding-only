@@ -241,46 +241,9 @@ class AttachmentItem(QFrame):
 def parse_markdown_blocks(text: str) -> list[dict]:
     """
     Parses response text and splits it into a sequence of text and code blocks.
-    Example:
-        [
-            {"type": "text", "content": "Here is the code:\n"},
-            {"type": "code", "language": "python", "content": "print('hello')"},
-            {"type": "text", "content": "\nHope this helps!"}
-        ]
     """
-    import re
-    # Match ```lang\ncode\n```
-    # Using non-greedy match (.*?) to allow multiple code blocks in one response
-    pattern = r"```([a-zA-Z0-9+#-]+)?\n(.*?)\n```"
-    
-    blocks = []
-    last_end = 0
-    
-    for match in re.finditer(pattern, text, re.DOTALL):
-        # Add preceding text block if it has content
-        pre_text = text[last_end:match.start()]
-        if pre_text:
-            blocks.append({"type": "text", "content": pre_text})
-            
-        language = match.group(1) or ""
-        code_content = match.group(2) or ""
-        blocks.append({
-            "type": "code",
-            "language": language.strip(),
-            "content": code_content
-        })
-        last_end = match.end()
-        
-    # Add trailing text block if any
-    post_text = text[last_end:]
-    if post_text:
-        blocks.append({"type": "text", "content": post_text})
-        
-    # If no blocks were added, return the original text as a single text block
-    if not blocks and text:
-        blocks.append({"type": "text", "content": text})
-        
-    return blocks
+    from file_handler import parse_markdown_blocks as parse
+    return parse(text)
 
 
 class CodeBlockWidget(QFrame):
@@ -482,6 +445,13 @@ class ChatWindow(QWidget):
         from ollama_client import OllamaClient
         llm_base_url = self.config["llm"].get("base_url", "http://localhost:11434")
         self.ollama_client = OllamaClient(llm_base_url)
+
+        # Initialize FileIntentParser
+        from file_handler import FileIntentParser
+        self.file_intent_parser = FileIntentParser(
+            base_url=llm_base_url,
+            model=self.config["llm"]["model"]
+        )
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -756,6 +726,18 @@ class ChatWindow(QWidget):
             self.update_worker = UpdateCheckWorker(self.config, BASE_DIR)
             self.update_worker.finished.connect(self.handle_update_check_finished)
             self.update_worker.start()
+            return
+
+        # Intercept file generation/export intents
+        file_parsed = self.file_intent_parser.parse_intent(user_text)
+        if file_parsed["intent"] != "none":
+            self.input_field.clear()
+            self.add_message(user_text, is_user=True)
+            
+            from file_handler import handle_file_intent
+            file_reply = handle_file_intent(file_parsed, self.conversation, BASE_DIR)
+            if file_reply:
+                self.add_message(file_reply, is_user=False)
             return
 
         # Identify images in attachments first to check vision capability

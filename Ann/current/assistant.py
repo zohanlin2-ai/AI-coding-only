@@ -139,6 +139,11 @@ def main() -> None:
         base_url=config["llm"].get("base_url", "http://localhost:11434"),
         model=config["llm"]["model"]
     )
+    from file_handler import FileIntentParser
+    file_intent_parser = FileIntentParser(
+        base_url=config["llm"].get("base_url", "http://localhost:11434"),
+        model=config["llm"]["model"]
+    )
 
     # --- Step 2: version check ---
     new_tag = check_for_update(config, BASE_DIR)
@@ -267,7 +272,14 @@ def main() -> None:
                 if reply is not None:
                     print(f"\nAnn: {reply}\n")
                     continue
-
+                # --- File Intent Handling ---
+                file_parsed = file_intent_parser.parse_intent(user_input)
+                if file_parsed["intent"] != "none":
+                    from file_handler import handle_file_intent
+                    file_reply = handle_file_intent(file_parsed, conversation, BASE_DIR)
+                    if file_reply is not None:
+                        print(f"\nAnn: {file_reply}\n")
+                        continue
                 # Build the message for the LLM
                 if result.decision == Decision.COMPLY_WITH_SAFEGUARDS:
                     llm_message = (
