@@ -36,15 +36,18 @@ class OllamaWorker(QThread):
     """Worker thread to handle blocking Ollama requests without freezing the GUI."""
     finished = pyqtSignal(str, str)  # Emits (reply_text, error_message)
 
-    def __init__(self, base_url: str, model: str, messages: list[dict]):
+    def __init__(self, base_url: str, model: str, messages: list[dict], images: list = None):
         super().__init__()
         self.base_url = base_url
         self.model = model
         self.messages = messages
+        self.images = images
 
     def run(self) -> None:
         try:
-            reply = call_ollama(self.base_url, self.model, self.messages)
+            from ollama_client import OllamaClient
+            client = OllamaClient(self.base_url)
+            reply = client.chat(self.model, self.messages, self.images)
             self.finished.emit(reply, "")
         except Exception as e:
             self.finished.emit("", str(e))
@@ -300,6 +303,11 @@ class ChatWindow(QWidget):
         self.awaiting_update_confirm = False
         self.pending_version = None
         self.update_worker = None
+
+        # Initialize OllamaClient
+        from ollama_client import OllamaClient
+        llm_base_url = self.config["llm"].get("base_url", "http://localhost:11434")
+        self.ollama_client = OllamaClient(llm_base_url)
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -576,7 +584,29 @@ class ChatWindow(QWidget):
             self.update_worker.start()
             return
 
-        # Capture attachments and read content
+        # Identify images in attachments first to check vision capability
+        attached_images = []
+        for file_path in self.attachments:
+            suffix = file_path.suffix.lower()
+            if suffix in ['.png', '.jpg', '.jpeg', '.webp', '.bmp']:
+                attached_images.append(file_path)
+
+        target_model = self.config["llm"]["model"]
+        if attached_images:
+            vision_model = self.ollama_client.find_first_vision_model()
+            if vision_model:
+                target_model = vision_model
+                logging.info("Dynamic routing: routing to vision model %s", target_model)
+            else:
+                self.add_message(
+                    "⚠️ 偵測到您上傳了圖片，但本地未安裝任何支援視覺的模型。\n"
+                    "請先在終端機執行 `ollama run llava` 下載並安裝視覺模型以進行分析。",
+                    is_user=False,
+                    is_refusal=True
+                )
+                return
+
+        # Capture text attachments and format preview logs
         attachment_text = ""
         attached_names = []
         for file_path in self.attachments:
@@ -604,6 +634,9 @@ class ChatWindow(QWidget):
 
         self.input_field.clear()
         self.add_message(ui_display_text, is_user=True)
+        
+        # Save image list to send via OllamaWorker, then clear the tray
+        images_to_send = list(attached_images)
         self.clear_attachments()
 
         # --- Moral Evaluation ---
@@ -621,20 +654,17 @@ class ChatWindow(QWidget):
         parsed = self.intent_parser.parse_intent(user_text)
         if parsed["intent"] != "none":
             def _gui_call_llm(prompt: str) -> str:
-                return None  # placeholder; actual call dispatched via OllamaWorker below
+                return None
 
-            # Build the prompt via alarm_handler, then send it to OllamaWorker
-            # We need the prompt string, so we temporarily capture it.
             _prompt_holder: list[str] = []
 
-            def _capture_llm(prompt: str) -> str:  # type: ignore[misc]
+            def _capture_llm(prompt: str) -> str:
                 _prompt_holder.append(prompt)
                 return ""
 
             result_or_direct = handle_alarm_intent(parsed, self.alarm_manager, _capture_llm)
 
             if _prompt_holder:
-                # Alarm handler wants an LLM call — dispatch asynchronously
                 reply_prompt = _prompt_holder[0]
                 self.send_btn.setEnabled(False)
                 self.input_field.setEnabled(False)
@@ -651,7 +681,6 @@ class ChatWindow(QWidget):
                 self.worker.finished.connect(self.handle_reply)
                 self.worker.start()
             else:
-                # Direct reply (no LLM needed, e.g. validation error message)
                 self.add_message(result_or_direct or "", is_user=False, is_refusal=True)
             return
 
@@ -673,14 +702,13 @@ class ChatWindow(QWidget):
         ]
 
         # Call Ollama asynchronously via worker thread
-        llm_model = self.config["llm"]["model"]
         llm_base_url = self.config["llm"].get("base_url", "http://localhost:11434")
 
         self.send_btn.setEnabled(False)
         self.input_field.setEnabled(False)
         self.title_label.setText("Ann is typing...")
 
-        self.worker = OllamaWorker(llm_base_url, llm_model, messages_with_system)
+        self.worker = OllamaWorker(llm_base_url, target_model, messages_with_system, images_to_send)
         self.worker.finished.connect(self.handle_reply)
         self.worker.start()
 

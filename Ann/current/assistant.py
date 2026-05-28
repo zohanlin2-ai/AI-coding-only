@@ -58,15 +58,9 @@ def load_config() -> dict:
 
 def call_ollama(base_url: str, model: str, messages: list[dict]) -> str:
     """Send a chat request to the local Ollama server and return the reply."""
-    import requests
-
-    resp = requests.post(
-        f"{base_url}/api/chat",
-        json={"model": model, "messages": messages, "stream": False},
-        timeout=120,
-    )
-    resp.raise_for_status()
-    return resp.json()["message"]["content"]
+    from ollama_client import OllamaClient
+    client = OllamaClient(base_url)
+    return client.chat(model, messages)
 
 
 def setup_logging(config: dict) -> None:
