@@ -6,8 +6,9 @@ Starts current/assistant.py as a subprocess and handles lifecycle events.
 
 Exit codes from assistant.py:
   0  — normal exit  → stop launcher completely
+  3  — restart requested → restart assistant immediately (no backoff)
   42 — update requested → run updater, then restart
-  other — error → log and restart
+  other — unexpected crash → log and restart with exponential backoff
 """
 from __future__ import annotations
 
