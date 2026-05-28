@@ -2,6 +2,12 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.1.6] - 2026-05-28
+
+### Added
+- Created design and implementation specification for the modular AI Engine and vision-aware dynamic model routing ([ai_engine_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/ai_engine_spec.md)).
+- Formulated an implementation plan for refactoring Ollama calls into `ollama_client.py` and implementing client-side automatic vision model detection.
+
 ## [0.1.5] - 2026-05-28
 
 ### Added

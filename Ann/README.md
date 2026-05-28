@@ -94,6 +94,10 @@ For complete architectural details, audio loop specs, and UI animations, see [al
 Ann supports dragging and dropping plain text and image files onto the floating bubble or the chat window. Dropped files are attached to the conversation context and can be clicked to display a popup preview (viewing full text or images).
 For detailed interaction specifications, see [drag_drop_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/drag_drop_spec.md).
 
+### 🤖 AI Engine Module (AI 引擎模組)
+Ann encapsulates all communication with the local Ollama API into a modular `OllamaClient` component within the AI Engine. It automatically detects installed models and their capabilities (such as vision support). When an image is attached, it dynamically routes the request to a local vision-capable model (like `llava`) or guides the user if none is installed.
+For technical details, see [ai_engine_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/ai_engine_spec.md).
+
 ---
 
 ## 📂 Recommended Directory Structure
