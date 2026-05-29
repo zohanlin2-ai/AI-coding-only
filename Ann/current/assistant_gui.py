@@ -390,6 +390,21 @@ class CodeBlockWidget(QFrame):
 
 import webbrowser
 
+def elide_text(text: str, max_weight: int = 76) -> str:
+    """Helper to truncate a title to a maximum weighted length (Chinese=2, English=1) with trailing ellipsis."""
+    weight = 0
+    elided = []
+    for char in text:
+        if ord(char) > 127:
+            weight += 2
+        else:
+            weight += 1
+            
+        if weight > max_weight:
+            return "".join(elided) + "..."
+        elided.append(char)
+    return text
+
 class NewsCardWidget(QFrame):
     """
     Custom QFrame representing a single news article as an overlay card.
@@ -413,6 +428,9 @@ class NewsCardWidget(QFrame):
         self.setMouseTracking(True)
         self.is_hovered = False
 
+        # Set tooltip showing the full title
+        self.setToolTip(self.title)
+
         # Load pixmap if local image path exists
         self.pixmap = None
         if self.local_image_path and Path(self.local_image_path).exists():
@@ -427,7 +445,8 @@ class NewsCardWidget(QFrame):
         layout.addStretch()
 
         # Title label: bold white text
-        title_lbl = QLabel(self.title)
+        display_title = elide_text(self.title, 76)
+        title_lbl = QLabel(display_title)
         title_lbl.setWordWrap(True)
         title_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         title_lbl.setStyleSheet(
@@ -1365,6 +1384,13 @@ class FloatingBubble(QWidget):
 def start_gui(config: dict, evaluator: MoralEvaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag: str = None) -> None:
     """Launch the PyQt6 application loop."""
     app = QApplication(sys.argv)
+    
+    # Premium ToolTip styling matching dark mode
+    app.setStyleSheet(
+        "QToolTip { color: #ffffff; background-color: #2D3748; border: 1px solid #4A5568; "
+        "border-radius: 6px; padding: 6px; font-family: 'Segoe UI', Arial; font-size: 12px; }"
+    )
+    
     bubble = FloatingBubble(config, evaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag)
     bubble.show()
     sys.exit(app.exec())
