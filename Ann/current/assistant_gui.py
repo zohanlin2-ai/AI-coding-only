@@ -543,6 +543,18 @@ class MessageBubble(QFrame):
         bubble_layout.setSpacing(6)
 
         # Parse text and add labels or CodeBlockWidgets
+        if articles:
+            import re
+            lines = text.split("\n")
+            cleaned_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if re.match(r"^\d+\.\s+\[", stripped) or stripped.startswith("來源：") or stripped.startswith("來源:"):
+                    continue
+                cleaned_lines.append(line)
+            text = "\n".join(cleaned_lines)
+            text = re.sub(r"\n\s*\n+", "\n\n", text).strip()
+
         blocks = parse_markdown_blocks(text)
         for block in blocks:
             if block["type"] == "text":
