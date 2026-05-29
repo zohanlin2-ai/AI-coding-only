@@ -92,6 +92,8 @@ class NewsIntentParser:
                 cleaned = match.group(0)
 
             result = json.loads(cleaned)
+            if isinstance(result, dict):
+                result = {k.strip().strip('"').strip("'").strip(): v for k, v in result.items()}
             
             # Normalize fields
             intent = result.get("intent", "none")

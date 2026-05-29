@@ -52,6 +52,17 @@ def test_news_intent_parser_regex_fallback():
     assert parsed["category"] is None
 
 
+def test_news_intent_parser_key_normalization():
+    parser = NewsIntentParser("http://localhost:11434", "test-model")
+    
+    # Test case where keys have leading whitespace/newlines and nested quotes
+    reply_with_weird_keys = '{\n  "\\n  \\"intent\\"": "query_news",\n  "  \\"keywords\\"": ["AI"],\n  "category": "technology"\n}'
+    parsed = parser._clean_and_parse_json(reply_with_weird_keys)
+    assert parsed["intent"] == "query_news"
+    assert parsed["keywords"] == ["AI"]
+    assert parsed["category"] == "technology"
+
+
 @patch("news.rss_fetcher.feedparser.parse")
 def test_rss_fetcher_normalize(mock_parse):
     # Setup mock parsed feed
