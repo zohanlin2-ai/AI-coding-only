@@ -1,0 +1,1 @@
+# news module package initializer

@@ -1,0 +1,20 @@
+sources:
+  - name: Google News 台灣
+    url: https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    category: general
+    language: zh-TW
+
+  - name: Google News 科技
+    url: https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtcDBHZ0pVVkNnQVAB?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    category: technology
+    language: zh-TW
+
+  - name: Google News 財經
+    url: https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGt6YUdZU0FtcDBHZ0pVVkNnQVAB?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    category: finance
+    language: zh-TW
+
+  - name: Reuters Top News
+    url: https://feeds.reuters.com/reuters/topNews
+    category: general
+    language: en

@@ -1,0 +1,238 @@
+import os
+import re
+import yaml
+import logging
+from pathlib import Path
+from datetime import datetime, timedelta
+
+from news.intent_parser import NewsIntentParser
+from news.rss_fetcher import RSSFetcher
+from news.article_extractor import ArticleExtractor
+from news.summarizer import NewsSummarizer
+
+logger = logging.getLogger(__name__)
+
+
+class NewsManager:
+    def __init__(self, base_dir: Path, base_url: str, model: str):
+        self.base_dir = base_dir
+        self.config_path = base_dir / "config" / "news_sources.yml"
+        self.base_url = base_url
+        self.model = model
+
+        # Sub-modules
+        self.intent_parser = NewsIntentParser(base_url, model)
+        self.rss_fetcher = RSSFetcher()
+        self.extractor = ArticleExtractor()
+        self.summarizer = NewsSummarizer(base_url, model)
+
+        # Caching
+        # Format: { feed_url: (timestamp, list_of_articles) }
+        self.cache = {}
+        self.cache_ttl = timedelta(minutes=20)
+
+        # Session memory
+        self.last_fetched_articles = []
+
+    def load_sources(self) -> list[dict]:
+        """Loads news sources from config/news_sources.yml."""
+        if not self.config_path.exists():
+            logger.warning("News sources config not found at %s. Returning empty.", self.config_path)
+            return []
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+                return data.get("sources", [])
+        except Exception as e:
+            logger.error("Failed to load news sources config: %s", e)
+            return []
+
+    def handle_intent(self, user_input: str, parsed: dict) -> str:
+        """
+        Orchestrates flow based on parsed intent.
+        Returns the formatted response string.
+        """
+        intent = parsed.get("intent", "none")
+        
+        if intent == "list_sources":
+            sources = self.load_sources()
+            if not sources:
+                return "目前沒有設定任何新聞來源。"
+            
+            lines = ["目前支援的新聞來源如下：\n"]
+            for s in sources:
+                lang_str = f" ({s.get('language')})" if s.get("language") else ""
+                lines.append(f"- **{s.get('name')}** (類別: {s.get('category')}){lang_str}")
+            return "\n".join(lines)
+
+        elif intent in ("query_news", "filter_by_keyword"):
+            category = parsed.get("category")
+            source_pref = parsed.get("source")
+            keywords = parsed.get("keywords") or []
+
+            # 1. Source selection logic
+            all_sources = self.load_sources()
+            selected_sources = []
+            
+            if source_pref:
+                # Filter by name matching
+                source_pref_lower = source_pref.lower()
+                selected_sources = [s for s in all_sources if source_pref_lower in s.get("name", "").lower()]
+            
+            if not selected_sources and category:
+                # Filter by category
+                category_lower = category.lower()
+                selected_sources = [s for s in all_sources if s.get("category", "").lower() == category_lower]
+
+            if not selected_sources:
+                # Fallback to all sources
+                selected_sources = all_sources
+
+            if not selected_sources:
+                return "無法取得新聞，目前未設定任何新聞來源。"
+
+            # 2. Fetch and Cache
+            articles = []
+            now = datetime.now()
+            
+            for src in selected_sources:
+                url = src.get("url")
+                name = src.get("name")
+                if not url:
+                    continue
+
+                cached_data = self.cache.get(url)
+                if cached_data and (now - cached_data[0]) < self.cache_ttl:
+                    logger.info("Cache hit for feed: %s", url)
+                    feed_articles = cached_data[1]
+                else:
+                    logger.info("Cache miss for feed: %s. Fetching...", url)
+                    feed_articles = self.rss_fetcher.fetch_feed(url, name)
+                    self.cache[url] = (now, feed_articles)
+                
+                articles.extend(feed_articles)
+
+            if not articles:
+                return "抱歉，目前無法從選定的來源取得任何新聞報導。"
+
+            # 3. Deduplication (by title or link)
+            seen_titles = set()
+            seen_links = set()
+            deduped = []
+            for art in articles:
+                title = art["title"].lower().strip()
+                link = art["link"].lower().strip()
+                if title not in seen_titles and link not in seen_links:
+                    seen_titles.add(title)
+                    seen_links.add(link)
+                    deduped.append(art)
+
+            # Sort by published date descending (newest first)
+            # Standard published format: YYYY-MM-DD HH:MM
+            def get_pub_date(a):
+                try:
+                    return datetime.strptime(a["published"], "%Y-%m-%d %H:%M")
+                except Exception:
+                    return datetime.min
+
+            deduped.sort(key=get_pub_date, reverse=True)
+
+            # 4. Keyword Filtering
+            filtered = []
+            if keywords:
+                # Filter keywords case-insensitive
+                kw_lowers = [kw.lower() for kw in keywords if kw]
+                for art in deduped:
+                    title_lower = art["title"].lower()
+                    summary_lower = art["summary"].lower()
+                    if any(kw in title_lower or kw in summary_lower for kw in kw_lowers):
+                        filtered.append(art)
+            else:
+                filtered = deduped
+
+            if not filtered:
+                if keywords:
+                    return f"找不到與關鍵字「{', '.join(keywords)}」相關的新聞。您可以嘗試換個關鍵字或瀏覽其他類別。"
+                return "目前沒有合適的新聞報導。"
+
+            # Limit results to 10
+            final_articles = filtered[:10]
+            self.last_fetched_articles = final_articles
+
+            # 5. Format response
+            lines = [f"找到 {len(final_articles)} 則相關新聞：\n"]
+            for idx, art in enumerate(final_articles, 1):
+                lines.append(f"{idx}. [{art['title']}]({art['link']})")
+                lines.append(f"   來源：{art['source']}｜{art['published']}\n")
+            lines.append("想要我摘要某篇嗎？（例如：『摘要第一篇』或提供文章網址）")
+            
+            return "\n".join(lines)
+
+        elif intent == "summarize_article":
+            article_url = parsed.get("article_url")
+            keywords = parsed.get("keywords") or []
+            
+            # Match last fetched articles if URL is not direct
+            title = None
+            if not article_url:
+                article_url, title = self._match_article_from_history(user_input, keywords)
+
+            if not article_url:
+                return "請提供具體的新聞連結，或指定要摘要上一輪搜尋結果中的哪篇新聞（例如：『摘要第一篇』）。"
+
+            # Fetch full text
+            extracted = self.extractor.extract(article_url)
+            if not extracted["success"]:
+                return f"抱歉，我無法擷取該網頁的全文內容。您可以點擊原連結直接閱讀：\n{article_url}"
+
+            # Summarize
+            article_title = extracted["title"] or title or "未命名文章"
+            article_text = extracted["text"]
+            
+            try:
+                summary = self.summarizer.summarize(article_title, article_text)
+                response = (
+                    f"【{article_title}摘要】\n\n"
+                    f"{summary}\n\n"
+                    f"原文連結：{article_url}"
+                )
+                return response
+            except Exception as e:
+                return f"摘要生成失敗：{e}\n\n您可以點擊原連結直接閱讀：\n{article_url}"
+
+        return "未偵測到新聞意圖。"
+
+    def _match_article_from_history(self, user_input: str, keywords: list[str]) -> tuple[str | None, str | None]:
+        """Matches index or keyword against last fetched articles list."""
+        if not self.last_fetched_articles:
+            return None, None
+
+        # 1. Match index digit
+        match_index = re.search(r"(?:第)?(\d+)(?:篇|個)?", user_input)
+        if match_index:
+            idx = int(match_index.group(1))
+            if 1 <= idx <= len(self.last_fetched_articles):
+                art = self.last_fetched_articles[idx - 1]
+                return art["link"], art["title"]
+
+        # 2. Match Chinese word index
+        word_map = {
+            "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, 
+            "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
+            "首": 1, "最後": len(self.last_fetched_articles)
+        }
+        for w, idx in word_map.items():
+            if f"第{w}" in user_input or f"摘要{w}" in user_input or (w == "最後" and "最後一篇" in user_input):
+                if 1 <= idx <= len(self.last_fetched_articles):
+                    art = self.last_fetched_articles[idx - 1]
+                    return art["link"], art["title"]
+
+        # 3. Match by keyword in title
+        kw_lowers = [kw.lower() for kw in keywords if kw]
+        if kw_lowers:
+            for art in self.last_fetched_articles:
+                title_lower = art["title"].lower()
+                if any(kw in title_lower for kw in kw_lowers):
+                    return art["link"], art["title"]
+
+        return None, None

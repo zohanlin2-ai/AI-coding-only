@@ -105,6 +105,10 @@ Ann supports exporting and saving AI-generated code blocks and documentation dir
 
 For complete specs, see [file_generation_spec.md](./file_generation_spec.md).
 
+### 📰 News Module (新聞模組)
+Ann supports conversational news queries using local Ollama model to parse search intents, retrieve and parse RSS feeds (e.g. Google News, Reuters), filter articles by keywords/categories, and generate concise article summarizations (3–5 sentences) in Traditional Chinese upon request.
+For full specifications, caching policies, and architecture, see [news_module_spec.md](./news_module_spec.md).
+
 ### 🔄 Conversational System Commands (對話式系統指令)
 Ann supports executing system actions directly through natural conversation, featuring warm LLM response generation prior to execution:
 - **Exit Program (關閉程式)**: Commands like "再見", "關閉視窗", "exit", "close the app" trigger a warm goodbye, append `[EXIT]`, disable inputs, and shut down after a 1.5 seconds delay.
@@ -123,6 +127,8 @@ The recommended layout for deployment and development:
 ├── updater.py               # Update orchestrator (rarely updated, never overwritten)
 ├── moral_module_spec.md     # ⚖️ Moral & safety specification (DO NOT MODIFY)
 ├── config.yml               # User configuration (preserved across updates)
+├── config/                  # Configuration directory
+│   └── news_sources.yml     # RSS news sources definitions
 ├── version.txt              # Current version string (managed by updater)
 ├── logs/                    # System logs
 ├── current/                 # Active production version (auto-updated)
@@ -134,6 +140,7 @@ The recommended layout for deployment and development:
 │   ├── moral_evaluator.py   # Moral/safety risk classifier
 │   ├── version_check.py     # GitHub API version check helper
 │   ├── alarms/              # Alarm storage and scheduler
+│   ├── news/                # News parsing, fetching, extracting, and summarization
 │   ├── plugins/             # Plugin extension directory
 │   ├── requirements.txt     # Dependencies for this version
 │   └── tests/               # Unit tests (run in staging before each update)

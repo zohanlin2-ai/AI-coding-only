@@ -147,6 +147,12 @@ def main() -> None:
         base_url=config["llm"].get("base_url", "http://localhost:11434"),
         model=config["llm"]["model"]
     )
+    from news.news_manager import NewsManager
+    news_manager = NewsManager(
+        base_dir=BASE_DIR,
+        base_url=config["llm"].get("base_url", "http://localhost:11434"),
+        model=config["llm"]["model"]
+    )
 
     # --- Step 2: version check ---
     new_tag = check_for_update(config, BASE_DIR)
@@ -303,6 +309,14 @@ def main() -> None:
                     if file_reply is not None:
                         print(f"\nAnn: {file_reply}\n")
                         continue
+                # --- News Intent Handling ---
+                news_parsed = news_manager.intent_parser.parse_intent(user_input)
+                if news_parsed["intent"] != "none":
+                    news_reply = news_manager.handle_intent(user_input, news_parsed)
+                    print(f"\nAnn: {news_reply}\n")
+                    conversation.append({"role": "user", "content": user_input})
+                    conversation.append({"role": "assistant", "content": news_reply})
+                    continue
                 # Build the message for the LLM
                 if result.decision == Decision.COMPLY_WITH_SAFEGUARDS:
                     llm_message = (

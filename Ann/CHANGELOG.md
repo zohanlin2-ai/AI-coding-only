@@ -8,6 +8,11 @@ All notable changes to the **Ann** AI assistant project will be documented in th
 - Created design and implementation specification for the File Generation module ([file_generation_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/file_generation_spec.md)) to save AI-generated code blocks directly.
 - Expanded Drag and Drop (DND) receiver file formats in [drag_drop_spec.md](file:///c:/Users/zohanlin/Documents/zohan_ai_test/Ann/drag_drop_spec.md) to support HTML, XML, C, C++, Java, Shell, SQL, CSS, TS, TOML, and ENV formats.
 - Formulated an implementation plan for custom code block rendering and file-saving dialogs in PyQt6.
+- Implemented **Conversational File Generation & History Export (Option C)**: allows saving code blocks or exporting conversation history directly to the workspace via natural language dialogue.
+- Implemented **Conversational Program Exit (LLM-Driven)**: allows Ann to say a warm goodbye and automatically shut down the program when detecting user exit/close intent.
+- Implemented **Conversational Program Restart (LLM-Driven)**: enables Ann to say "see you in a moment" and reboot the application immediately (exit code `3` intercepted by launcher).
+- Implemented **Conversational Program Update (LLM-Driven)**: prompts Ann to warmly say goodbye when the user confirms an update, perform the self-update process, and restart.
+- Added comprehensive unit tests in `test_file_handler.py`, `test_conversational_exit.py`, and `test_conversational_update_flow.py` to cover these conversational flows.
 
 ## [0.1.6] - 2026-05-28
 

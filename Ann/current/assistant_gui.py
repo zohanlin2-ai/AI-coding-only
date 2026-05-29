@@ -71,6 +71,28 @@ class UpdateCheckWorker(QThread):
             self.finished.emit("", str(e))
 
 
+class NewsWorker(QThread):
+    """Worker thread to handle news parsing, fetching, and summarization asynchronously."""
+    finished = pyqtSignal(str, str)  # Emits (reply_text, error_message)
+
+    def __init__(self, news_manager, user_text: str):
+        super().__init__()
+        self.news_manager = news_manager
+        self.user_text = user_text
+
+    def run(self) -> None:
+        try:
+            parsed = self.news_manager.intent_parser.parse_intent(self.user_text)
+            if parsed["intent"] != "none":
+                reply = self.news_manager.handle_intent(self.user_text, parsed)
+                self.finished.emit(reply, "")
+            else:
+                self.finished.emit("", "not_news")
+        except Exception as e:
+            logging.error("NewsWorker error: %s", e)
+            self.finished.emit("", str(e))
+
+
 class DragDropOverlay(QWidget):
     """Semi-transparent overlay shown when files are dragged over the window."""
     def __init__(self, parent=None):
@@ -449,6 +471,14 @@ class ChatWindow(QWidget):
         # Initialize FileIntentParser
         from file_handler import FileIntentParser
         self.file_intent_parser = FileIntentParser(
+            base_url=llm_base_url,
+            model=self.config["llm"]["model"]
+        )
+
+        # Initialize NewsManager
+        from news.news_manager import NewsManager
+        self.news_manager = NewsManager(
+            base_dir=BASE_DIR,
             base_url=llm_base_url,
             model=self.config["llm"]["model"]
         )
@@ -871,6 +901,19 @@ class ChatWindow(QWidget):
         else:
             llm_message = user_text + attachment_text
 
+        # --- News Intent Handling ---
+        if self.news_manager.intent_parser.should_parse(user_text):
+            self.send_btn.setEnabled(False)
+            self.input_field.setEnabled(False)
+            self.title_label.setText("Ann is fetching news...")
+
+            self.news_worker = NewsWorker(self.news_manager, user_text)
+            self.news_worker.finished.connect(
+                lambda reply, err: self.handle_news_reply(reply, err, user_text, llm_message, target_model, images_to_send)
+            )
+            self.news_worker.start()
+            return
+
         self.conversation.append({"role": "user", "content": llm_message})
 
         # Prepend system prompt
@@ -889,6 +932,34 @@ class ChatWindow(QWidget):
         self.worker = OllamaWorker(llm_base_url, target_model, messages_with_system, images_to_send)
         self.worker.finished.connect(self.handle_reply)
         self.worker.start()
+
+    def handle_news_reply(self, reply: str, error: str, user_text: str, llm_message: str, target_model: str, images_to_send: list) -> None:
+        if error == "not_news":
+            # Fallback to standard Ollama flow
+            self.conversation.append({"role": "user", "content": llm_message})
+            messages_with_system = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                *self.conversation,
+            ]
+            llm_base_url = self.config["llm"].get("base_url", "http://localhost:11434")
+            
+            # Start normal Ollama worker
+            self.worker = OllamaWorker(llm_base_url, target_model, messages_with_system, images_to_send)
+            self.worker.finished.connect(self.handle_reply)
+            self.worker.start()
+        else:
+            # Re-enable inputs
+            self.send_btn.setEnabled(True)
+            self.input_field.setEnabled(True)
+            self.title_label.setText("Ann")
+
+            if error:
+                self.add_message(f"獲取新聞時發生錯誤：{error}", is_user=False, is_refusal=True)
+            else:
+                self.add_message(reply, is_user=False)
+                # Save to conversation memory (use clean user_text and reply)
+                self.conversation.append({"role": "user", "content": user_text})
+                self.conversation.append({"role": "assistant", "content": reply})
 
     def handle_reply(self, reply: str, error: str) -> None:
         self.send_btn.setEnabled(True)
