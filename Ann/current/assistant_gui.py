@@ -448,7 +448,6 @@ class NewsCardWidget(QFrame):
         display_title = elide_text(self.title, 76)
         title_lbl = QLabel(display_title)
         title_lbl.setWordWrap(True)
-        title_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         title_lbl.setStyleSheet(
             "QLabel { color: #FFFFFF; font-weight: bold; font-family: 'Segoe UI', Arial; "
             "font-size: 13px; background-color: transparent; border: none; padding: 0; }"
@@ -460,7 +459,6 @@ class NewsCardWidget(QFrame):
         meta_text = f"{self.source} • {self.published}"
         meta_lbl = QLabel(meta_text)
         meta_lbl.setWordWrap(True)
-        meta_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         meta_lbl.setStyleSheet(
             "QLabel { color: #CBD5E0; font-family: 'Segoe UI', Arial; "
             "font-size: 10px; background-color: transparent; border: none; padding: 0; }"
