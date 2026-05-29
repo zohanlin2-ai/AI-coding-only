@@ -132,19 +132,19 @@ sources:
     language: zh-TW
 
   - name: Google News 科技
-    url: https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtcDBHZ0pVVkNnQVAB?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    url: https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: technology
     language: zh-TW
 
   - name: Google News 財經
-    url: https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGt6YUdZU0FtcDBHZ0pVVkNnQVAB?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    url: https://news.google.com/news/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: finance
     language: zh-TW
 
-  - name: Reuters Top News
-    url: https://feeds.reuters.com/reuters/topNews
+  - name: Google News 國際
+    url: https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: general
-    language: en
+    language: zh-TW
 ```
 
 > Sources can be added or removed by editing `config/news_sources.yml` directly.
