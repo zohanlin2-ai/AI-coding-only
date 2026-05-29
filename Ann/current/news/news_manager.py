@@ -316,6 +316,17 @@ class NewsManager:
                 art["local_image_path"] = None
                 return
 
+            # If it's a Google News redirect URL, decode it to get the real destination URL
+            if url.startswith("https://news.google.com/rss/articles/") or url.startswith("https://news.google.com/articles/"):
+                try:
+                    from googlenewsdecoder import new_decoderv1
+                    res = new_decoderv1(url)
+                    if res.get("status") and res.get("decoded_url"):
+                        url = res["decoded_url"]
+                        art["link"] = url  # Update to the real URL for extraction and interaction
+                except Exception as e:
+                    logger.warning("Failed to decode Google News URL %s: %s", url, e)
+
             # Generate stable filename based on URL hash
             url_hash = hashlib.md5(url.encode("utf-8")).hexdigest()
             

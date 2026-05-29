@@ -102,6 +102,9 @@ class ArticleExtractor:
                     meta_tw = soup_full.find("meta", name="twitter:image")
                     if meta_tw and meta_tw.get("content"):
                         og_image = meta_tw.get("content")
+                if og_image and not (og_image.startswith("http://") or og_image.startswith("https://")):
+                    from urllib.parse import urljoin
+                    og_image = urljoin(url, og_image)
             except Exception as ex:
                 logger.debug("Failed to extract fallback image og:image: %s", ex)
 

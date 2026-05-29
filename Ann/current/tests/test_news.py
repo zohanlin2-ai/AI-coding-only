@@ -259,3 +259,51 @@ def test_news_image_scraping_and_downloading(tmp_path):
         assert local_path.exists()
         assert local_path.read_bytes() == b"fake-image-bytes"
 
+
+def test_google_news_url_decoding(tmp_path):
+    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model")
+    
+    # Mock extractor.extract to return top_image
+    mock_extractor = MagicMock()
+    mock_extractor.client_type = "mock"
+    mock_extractor.extract.return_value = {
+        "success": True,
+        "title": "Decoded Article",
+        "text": "Content...",
+        "publish_date": None,
+        "authors": [],
+        "source_url": "https://example.com/decoded",
+        "top_image": "https://example.com/img.jpg"
+    }
+    manager.extractor = mock_extractor
+
+    # Mock googlenewsdecoder.new_decoderv1
+    with patch("googlenewsdecoder.new_decoderv1") as mock_decoder:
+        mock_decoder.return_value = {"status": True, "decoded_url": "https://example.com/decoded"}
+
+        # Mock HTTP download to return fake bytes
+        with patch("requests.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.content = b"fake-image-bytes"
+            mock_get.return_value = mock_resp
+
+            articles = [
+                {
+                    "title": "Google News Article",
+                    "link": "https://news.google.com/rss/articles/CBMi...",
+                    "published": "2026-05-29 12:00",
+                    "source": "Google News"
+                }
+            ]
+            
+            manager.fetch_article_images(articles)
+            
+            # Verify new_decoderv1 was called
+            mock_decoder.assert_called_once_with("https://news.google.com/rss/articles/CBMi...")
+            # Verify article link was updated to decoded URL
+            assert articles[0]["link"] == "https://example.com/decoded"
+            # Verify top image is loaded from decoded URL extractor mock
+            assert articles[0]["top_image"] == "https://example.com/img.jpg"
+            assert articles[0]["local_image_path"] is not None
+
+
