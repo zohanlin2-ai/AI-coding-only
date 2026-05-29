@@ -284,11 +284,15 @@ class NewsManager:
         """
         Scrapes article web pages in parallel to extract top_image URLs and download them locally.
         Saves downloaded images to scratch/news_images/ and sets article['local_image_path'].
+
+        Uses wait() instead of as_completed() with a timeout so that slow or
+        unavailable articles are skipped gracefully rather than raising a
+        TimeoutError that aborts the entire batch.
         """
         import urllib.parse
         import hashlib
         import httpx
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 
         # Ensure directory exists
         img_dir = self.base_dir / "scratch" / "news_images"
@@ -329,8 +333,8 @@ class NewsManager:
 
             # Generate stable filename based on URL hash
             url_hash = hashlib.md5(url.encode("utf-8")).hexdigest()
-            
-            # Check if we already have it in a cache or if we extracted it before
+
+            # Extract page metadata to find the top image
             try:
                 extracted = self.extractor.extract(url)
                 top_image = extracted.get("top_image")
@@ -384,12 +388,29 @@ class NewsManager:
             except Exception as e:
                 logger.warning("Failed to download image %s: %s", top_image, e)
 
-        # Run process_article in parallel using ThreadPoolExecutor
+        # Run process_article in parallel.
+        # Use wait() with a generous per-batch timeout so that slow articles are
+        # skipped gracefully rather than raising TimeoutError for the whole batch.
+        # Each article may take up to ~15 s (decode + extract + download), so
+        # allow 60 s total for 10 articles running concurrently.
+        BATCH_TIMEOUT = 60.0
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(process_article, art) for art in articles]
-            # Wait for all to complete (limit wait to 12 seconds to prevent excessive blocking)
-            for fut in as_completed(futures, timeout=12.0):
+            futures = {executor.submit(process_article, art): art for art in articles}
+            done, pending = wait(futures, timeout=BATCH_TIMEOUT)
+
+            # Collect results from completed futures
+            for fut in done:
                 try:
                     fut.result()
                 except Exception as e:
                     logger.error("Error processing article image in thread: %s", e)
+
+            # Log any articles that did not finish in time (they keep running
+            # in the background but we won't block the UI waiting for them)
+            if pending:
+                logger.warning(
+                    "%d article image(s) did not finish within %.0f s and will be skipped.",
+                    len(pending), BATCH_TIMEOUT
+                )
+                for fut in pending:
+                    fut.cancel()
