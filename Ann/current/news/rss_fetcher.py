@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-import feedparser
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +38,7 @@ class RSSFetcher:
                 logger.warning("Empty response from RSS feed: %s", url)
                 return []
 
+            import feedparser  # lazy import — only needed at parse time
             parsed_feed = feedparser.parse(xml_data)
             
             articles = []

@@ -5,6 +5,13 @@ import yaml
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
 
+# Skip the entire module if news dependencies are not installed.
+# This prevents a collection-time ImportError from crashing the whole test suite
+# in environments that only have core dependencies installed (e.g., staging pytest
+# during an update validation run).
+pytest.importorskip("feedparser")
+pytest.importorskip("newspaper")
+
 # Add parent path to imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
