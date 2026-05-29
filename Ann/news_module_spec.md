@@ -312,7 +312,9 @@ project/
 | `beautifulsoup4` | HTML parsing support |
 | `httpx` | Async-capable HTTP requests |
 | `PyYAML` | Reading `news_sources.yml` |
-| `ollama` | Intent parsing, summarization, response generation |
+| `googlenewsdecoder` | Decoding Google News redirect URLs |
+
+> Ollama communication is handled internally via `OllamaClient` (HTTP), not the `ollama` Python SDK.
 
 ---
 
