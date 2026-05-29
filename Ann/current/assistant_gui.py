@@ -429,6 +429,7 @@ class NewsCardWidget(QFrame):
         # Title label: bold white text
         title_lbl = QLabel(self.title)
         title_lbl.setWordWrap(True)
+        title_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         title_lbl.setStyleSheet(
             "QLabel { color: #FFFFFF; font-weight: bold; font-family: 'Segoe UI', Arial; "
             "font-size: 13px; background-color: transparent; border: none; padding: 0; }"
@@ -439,6 +440,8 @@ class NewsCardWidget(QFrame):
         # Source & Time row
         meta_text = f"{self.source} • {self.published}"
         meta_lbl = QLabel(meta_text)
+        meta_lbl.setWordWrap(True)
+        meta_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         meta_lbl.setStyleSheet(
             "QLabel { color: #CBD5E0; font-family: 'Segoe UI', Arial; "
             "font-size: 10px; background-color: transparent; border: none; padding: 0; }"
@@ -675,6 +678,7 @@ class ChatWindow(QWidget):
         # --- Message Area (Scrollable) ---
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.scroll_area.setStyleSheet(
             "QScrollArea { border: none; background-color: transparent; }"
             "QScrollBar:vertical { border: none; background: #1A1D24; width: 8px; }"
