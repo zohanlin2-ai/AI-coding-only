@@ -38,6 +38,17 @@ class NewsManager:
         """Loads news sources from config/news_sources.yml."""
         if not self.config_path.exists():
             self._write_default_sources()
+        else:
+            # Self-repair: detect and overwrite outdated broken feeds URLs
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                if "feeds.reuters.com" in content or "CAAqJggKIiBDQkFTRWdvSUwyMHZNR" in content:
+                    logger.info("Outdated news sources config detected. Updating to modern feeds.")
+                    self._write_default_sources()
+            except Exception:
+                pass
+
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
@@ -55,19 +66,19 @@ class NewsManager:
     language: zh-TW
 
   - name: Google News 科技
-    url: https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtcDBHZ0pVVkNnQVAB?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    url: https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: technology
     language: zh-TW
 
   - name: Google News 財經
-    url: https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGt6YUdZU0FtcDBHZ0pVVkNnQVAB?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    url: https://news.google.com/news/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: finance
     language: zh-TW
 
-  - name: Reuters Top News
-    url: https://feeds.reuters.com/reuters/topNews
+  - name: Google News 國際
+    url: https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: general
-    language: en
+    language: zh-TW
 """
         try:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
