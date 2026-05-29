@@ -70,7 +70,7 @@ def test_news_intent_parser_key_normalization():
     assert parsed["category"] == "technology"
 
 
-@patch("news.rss_fetcher.feedparser.parse")
+@patch("feedparser.parse")
 def test_rss_fetcher_normalize(mock_parse):
     # Setup mock parsed feed
     mock_feed = MagicMock()
