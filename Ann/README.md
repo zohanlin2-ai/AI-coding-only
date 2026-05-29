@@ -70,7 +70,7 @@ Install the required packages from the dependency manifest:
 ```bash
 pip install -r current/requirements.txt
 ```
-This installs `PyQt6` (for GUI), `pygame` (for audio alarms), `ollama` (for API integration), and all news module dependencies (`feedparser`, `newspaper3k`, `readability-lxml`, `beautifulsoup4`, and `httpx`).
+This installs `PyQt6` (for GUI), `pygame` (for audio alarms), `ollama` (for API integration), `requests` (for HTTP APIs), `pyyaml` (for configuration parsing), `pytest` (for unit testing), and all news module dependencies (`feedparser`, `newspaper3k`, `readability-lxml`, `beautifulsoup4`, and `httpx`).
 
 ### 3. Running Ann (啟動方式)
 You can run Ann in two modes. The launcher automatically monitors and updates the core:
