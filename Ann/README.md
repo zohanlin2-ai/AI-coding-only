@@ -38,20 +38,27 @@ To solve the "cannot overwrite running code" local limitation, the project split
 
 ```mermaid
 graph TD
-    Launcher[launcher.py <br><i>Persistent monitor & version management</i>]
-    Assistant[current/assistant.py <br><i>Ann AI assistant core & user interaction</i>]
-    Staging[staging/ <br><i>New version testing & environment prep</i>]
-    Versions[versions/ <br><i>Historical version backups for rollback</i>]
-    GitHub[GitHub API <br><i>Online Release / Tag detection</i>]
+    Launcher["launcher.py\nPersistent monitor — never auto-updated"]
+    Updater["updater.py\nUpdate orchestrator — never auto-updated"]
+    Assistant["current/assistant.py\nAnn AI assistant core & user interaction"]
+    Staging["staging/\nNew version download & pytest validation"]
+    Versions["versions/\nHistorical backups for rollback"]
+    GitHub["GitHub API\nCommit & file delivery"]
 
     Launcher -->|Start & restart monitoring| Assistant
-    Assistant -->|Update detected, signal & exit| Launcher
-    Launcher -->|1. Fetch file list| GitHub
-    Launcher -->|2. Download files| Staging
-    Launcher -->|3. Run pytest validation| Staging
-    Staging -->|4. Tests pass: atomic swap| Assistant
-    Launcher -.->|Tests fail: rollback| Versions
+    Assistant -->|Update confirmed, exit 42| Launcher
+    Assistant -->|Restart requested, exit 3| Launcher
+    Launcher -->|Delegate update| Updater
+    Updater -->|1. Fetch latest commit| GitHub
+    Updater -->|2. Download files| Staging
+    Updater -->|3. Run pytest| Staging
+    Updater -->|4. Backup current| Versions
+    Updater -->|5. Atomic swap| Assistant
+    Updater -->|6. Post-swap self-test| Assistant
+    Updater -.->|Self-test fails: rollback| Versions
+    Launcher -.->|Startup crash after update: rollback| Versions
 ```
+
 ---
 
 ## ⚙️ Installation & Usage (安裝與使用)
