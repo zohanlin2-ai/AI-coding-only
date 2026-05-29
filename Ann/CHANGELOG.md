@@ -10,6 +10,7 @@ All notable changes to the **Ann** AI assistant project will be documented in th
 - Added OpenGraph and Twitter image metadata parser fallbacks inside `ArticleExtractor`.
 - Added local image caching under `scratch/news_images/` with automated cleanup.
 - Added comprehensive unit tests for image extraction and parallel downloading.
+- Optimizations: Filtered out redundant text list items in PyQt6 message bubbles, disabled horizontal scrollbars, and set layout size policies on card text to prevent horizontal overflow.
 
 ## [0.1.7] - 2026-05-28
 
