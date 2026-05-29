@@ -256,8 +256,8 @@ In GUI mode, Ann intercepts default news queries and presents them as a scrollab
 
 - **Background**: Article's parsed `top_image` (downloaded concurrently in the background and stored locally under `scratch/news_images/`) scaled smoothly with 12px rounded corners.
 - **Overlay**: Bottom-aligned black-to-transparent linear gradient for maximum text contrast.
-- **Text**: White bold title, small gray source + publish time. To prevent text from horizontally overflowing or forcing layout expansion, the labels use `QSizePolicy.Policy.Ignored` horizontally with word wrapping enabled.
-- **Interaction**: Pointer cursor on hover with a glowing blue border. Left-click anywhere on the card opens the article's link in the user's default web browser.
+- **Text**: White bold title, small gray source + publish time. To prevent text from horizontally overflowing or forcing layout expansion, the labels use `QSizePolicy.Policy.Ignored` horizontally with word wrapping enabled. Titles longer than 2 lines are elided (weighted length > 76) with trailing ellipsis `...`.
+- **Interaction**: Pointer cursor on hover with a glowing blue border. Left-click anywhere on the card opens the article's link in the user's default web browser. Hovering over a card displays the full news title in a custom styled tooltip (`QToolTip`).
 - **Scrollbar Safety**: The scroll viewport explicitly disables horizontal scrollbars (`ScrollBarAlwaysOff`) to maintain a clean aesthetic under all screen sizes.
 - **Fallback**: Solid dark linear gradient (Slate Gray to Slate Blue) if no article image is available.
 
