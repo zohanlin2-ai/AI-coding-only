@@ -16,13 +16,13 @@ NEWS_SYSTEM_PROMPT = (
     "Extract the user's news query intent from the message below.\n"
     "Respond ONLY with a valid JSON object. No explanation, no markdown.\n\n"
     "JSON schema:\n"
-    "{\n"
+    "{{\n"
     '  "intent": "query_news | summarize_article | filter_by_keyword | list_sources | none",\n'
     '  "keywords": ["string"] or [],\n'
     '  "category": "technology | finance | politics | sports | health | entertainment | general | null",\n'
     '  "source": "string or null",\n'
     '  "article_url": "string or null"\n'
-    "}\n\n"
+    "}}\n\n"
     "Rules:\n"
     "- keywords: extract relevant search terms from the user message.\n"
     "- category: infer the most relevant category (technology, finance, politics, sports, health, entertainment, general), or null if unclear.\n"
