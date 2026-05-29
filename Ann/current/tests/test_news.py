@@ -142,6 +142,17 @@ def test_news_summarizer_truncation(mock_chat):
     assert "[注意：文章內容過長，已截斷後半部]" in sent_prompt
 
 
+def test_news_manager_writes_default_sources_if_missing(tmp_path):
+    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model")
+    config_file = tmp_path / "config" / "news_sources.yml"
+    assert not config_file.exists()
+    
+    sources = manager.load_sources()
+    assert config_file.exists()
+    assert len(sources) == 4
+    assert sources[0]["name"] == "Google News 台灣"
+
+
 def test_news_manager_caching_and_filtering(tmp_path):
     # Setup directories
     config_dir = tmp_path / "config"

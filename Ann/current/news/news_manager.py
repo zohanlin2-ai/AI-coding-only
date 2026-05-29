@@ -37,8 +37,7 @@ class NewsManager:
     def load_sources(self) -> list[dict]:
         """Loads news sources from config/news_sources.yml."""
         if not self.config_path.exists():
-            logger.warning("News sources config not found at %s. Returning empty.", self.config_path)
-            return []
+            self._write_default_sources()
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
@@ -46,6 +45,36 @@ class NewsManager:
         except Exception as e:
             logger.error("Failed to load news sources config: %s", e)
             return []
+
+    def _write_default_sources(self) -> None:
+        """Writes default news sources configuration to config/news_sources.yml."""
+        default_yaml = """sources:
+  - name: Google News 台灣
+    url: https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    category: general
+    language: zh-TW
+
+  - name: Google News 科技
+    url: https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtcDBHZ0pVVkNnQVAB?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    category: technology
+    language: zh-TW
+
+  - name: Google News 財經
+    url: https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGt6YUdZU0FtcDBHZ0pVVkNnQVAB?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    category: finance
+    language: zh-TW
+
+  - name: Reuters Top News
+    url: https://feeds.reuters.com/reuters/topNews
+    category: general
+    language: en
+"""
+        try:
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            self.config_path.write_text(default_yaml, encoding="utf-8")
+            logger.info("Created default news sources config at %s", self.config_path)
+        except Exception as e:
+            logger.error("Failed to write default news sources config: %s", e)
 
     def handle_intent(self, user_input: str, parsed: dict) -> str:
         """
