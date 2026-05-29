@@ -233,7 +233,7 @@ Article content:
 
 ## 10. Response Format
 
-### Default Query Response (title + link)
+### 10.1 Default Query Response (title + link)
 
 ```
 找到 3 則相關新聞：
@@ -250,7 +250,17 @@ Article content:
 想要我摘要某篇嗎？
 ```
 
-### Summarization Response
+### 10.2 GUI Card Layout Response (PyQt6)
+
+In GUI mode, Ann intercepts default news queries and presents them as a scrollable vertical list of up to 10 custom overlay news card widgets (`NewsCardWidget`):
+
+- **Background**: Article's parsed `top_image` (downloaded concurrently in the background and stored locally under `scratch/news_images/`) scaled smoothly with 12px rounded corners.
+- **Overlay**: Bottom-aligned black-to-transparent linear gradient for maximum text contrast.
+- **Text**: White bold title, small gray source + publish time.
+- **Interaction**: Pointer cursor on hover with a glowing blue border. Left-click anywhere on the card opens the article's link in the user's default web browser.
+- **Fallback**: Solid dark linear gradient (Slate Gray to Slate Blue) if no article image is available.
+
+### 10.3 Summarization Response
 
 ```
 【標題一摘要】

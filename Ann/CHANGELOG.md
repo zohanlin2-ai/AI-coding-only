@@ -2,6 +2,15 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.1.8] - 2026-05-29
+
+### Added
+- Implemented PyQt6 news card widgets (`NewsCardWidget` and `MessageBubble` integration) featuring a sleek overlay layout to render up to 10 articles in the chat window.
+- Implemented background parallel image extraction and downloading using `ThreadPoolExecutor` inside `NewsWorker`/`NewsManager` to prevent GUI rendering latency.
+- Added OpenGraph and Twitter image metadata parser fallbacks inside `ArticleExtractor`.
+- Added local image caching under `scratch/news_images/` with automated cleanup.
+- Added comprehensive unit tests for image extraction and parallel downloading.
+
 ## [0.1.7] - 2026-05-28
 
 ### Added
