@@ -11,15 +11,15 @@ try:
         QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
         QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QDialog, QTextEdit, QFileDialog
     )
-    from PyQt6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, pyqtSignal, QObject, QThread, QTimer
-    from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush, QPixmap
+    from PyQt6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, pyqtSignal, QObject, QThread, QTimer, QRectF
+    from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush, QPixmap, QPainterPath
 except ImportError:
     from PySide6.QtWidgets import (
         QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
         QPushButton, QLabel, QScrollArea, QFrame, QSizePolicy, QDialog, QTextEdit, QFileDialog
     )
-    from PySide6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, Signal, QObject, QThread, QTimer
-    from PySide6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush, QPixmap
+    from PySide6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, Signal, QObject, QThread, QTimer, QRectF
+    from PySide6.QtGui import QPainter, QColor, QLinearGradient, QPen, QBrush, QPixmap, QPainterPath
     # Map PySide6 Signal to pyqtSignal name
     pyqtSignal = Signal
 
@@ -73,7 +73,7 @@ class UpdateCheckWorker(QThread):
 
 class NewsWorker(QThread):
     """Worker thread to handle news parsing, fetching, and summarization asynchronously."""
-    finished = pyqtSignal(str, str)  # Emits (reply_text, error_message)
+    finished = pyqtSignal(str, str, list)  # Emits (reply_text, error_message, articles)
 
     def __init__(self, news_manager, user_text: str):
         super().__init__()
@@ -85,12 +85,15 @@ class NewsWorker(QThread):
             parsed = self.news_manager.intent_parser.parse_intent(self.user_text)
             if parsed["intent"] != "none":
                 reply = self.news_manager.handle_intent(self.user_text, parsed)
-                self.finished.emit(reply, "")
+                articles = []
+                if parsed["intent"] in ("query_news", "filter_by_keyword"):
+                    articles = list(self.news_manager.last_fetched_articles)
+                self.finished.emit(reply, "", articles)
             else:
-                self.finished.emit("", "not_news")
+                self.finished.emit("", "not_news", [])
         except Exception as e:
             logging.error("NewsWorker error: %s", e)
-            self.finished.emit("", str(e))
+            self.finished.emit("", str(e), [])
 
 
 class DragDropOverlay(QWidget):
@@ -385,9 +388,132 @@ class CodeBlockWidget(QFrame):
                 logging.error("Failed to save code block: %s", e)
 
 
+import webbrowser
+
+class NewsCardWidget(QFrame):
+    """
+    Custom QFrame representing a single news article as an overlay card.
+    Displays a background image (or gradient fallback), a bottom semi-transparent
+    black gradient overlay, title, source, and publish time.
+    Clicking the widget opens the article link in a web browser.
+    """
+    def __init__(self, article: dict, parent=None):
+        super().__init__(parent)
+        self.article = article
+        self.link = article.get("link", "")
+        self.title = article.get("title", "")
+        self.source = article.get("source", "")
+        self.published = article.get("published", "")
+        self.local_image_path = article.get("local_image_path")
+
+        # Set widget height and size policy
+        self.setFixedHeight(120)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMouseTracking(True)
+        self.is_hovered = False
+
+        # Load pixmap if local image path exists
+        self.pixmap = None
+        if self.local_image_path and Path(self.local_image_path).exists():
+            self.pixmap = QPixmap(self.local_image_path)
+            if self.pixmap.isNull():
+                self.pixmap = None
+
+        # Custom inner layout to position the text at the bottom
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(2)
+        layout.addStretch()
+
+        # Title label: bold white text
+        title_lbl = QLabel(self.title)
+        title_lbl.setWordWrap(True)
+        title_lbl.setStyleSheet(
+            "QLabel { color: #FFFFFF; font-weight: bold; font-family: 'Segoe UI', Arial; "
+            "font-size: 13px; background-color: transparent; border: none; padding: 0; }"
+        )
+        title_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        layout.addWidget(title_lbl)
+
+        # Source & Time row
+        meta_text = f"{self.source} • {self.published}"
+        meta_lbl = QLabel(meta_text)
+        meta_lbl.setStyleSheet(
+            "QLabel { color: #CBD5E0; font-family: 'Segoe UI', Arial; "
+            "font-size: 10px; background-color: transparent; border: none; padding: 0; }"
+        )
+        meta_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        layout.addWidget(meta_lbl)
+
+    def enterEvent(self, event) -> None:
+        self.is_hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self.is_hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and self.link:
+            webbrowser.open(self.link)
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect()
+        radius = 12
+
+        # 1. Draw background image or gradient fallback
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(rect), radius, radius)
+        painter.setClipPath(path)
+
+        if self.pixmap:
+            # Scale pixmap to cover the rect aspect-ratio correctly
+            scaled_pixmap = self.pixmap.scaled(
+                rect.size(),
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            # Center the pixmap
+            x = (rect.width() - scaled_pixmap.width()) // 2
+            y = (rect.height() - scaled_pixmap.height()) // 2
+            painter.drawPixmap(x, y, scaled_pixmap)
+        else:
+            # Solid dark gradient fallback (deep blue/grey gradient)
+            grad = QLinearGradient(0, 0, 0, rect.height())
+            grad.setColorAt(0, QColor(45, 55, 72))  # Slate Gray
+            grad.setColorAt(1, QColor(26, 32, 44))
+            painter.fillPath(path, QBrush(grad))
+
+        # 2. Draw bottom semi-transparent overlay gradient for text readability
+        overlay_grad = QLinearGradient(0, 0, 0, rect.height())
+        overlay_grad.setColorAt(0, QColor(0, 0, 0, 0))          # transparent at top
+        overlay_grad.setColorAt(0.5, QColor(0, 0, 0, 100))      # fade to dark
+        overlay_grad.setColorAt(1, QColor(0, 0, 0, 220))        # almost solid black at bottom
+        painter.fillPath(path, QBrush(overlay_grad))
+
+        # 3. Draw hover outline / border
+        painter.setClipping(False) # Disable clipping so border renders fully
+        if self.is_hovered:
+            border_pen = QPen(QColor(66, 153, 225, 230), 2)  # Glowing blue border
+        else:
+            border_pen = QPen(QColor(74, 85, 104, 150), 1)   # Subtle gray border
+        painter.setPen(border_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(QRectF(rect).adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
+
+
 class MessageBubble(QFrame):
     """Custom styled chat message bubble."""
-    def __init__(self, text: str, is_user: bool, is_refusal: bool = False):
+    def __init__(self, text: str, is_user: bool, is_refusal: bool = False, articles: list = None):
         super().__init__()
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 5, 10, 5)
@@ -435,6 +561,18 @@ class MessageBubble(QFrame):
                 code_widget = CodeBlockWidget(block["language"], block["content"])
                 code_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
                 bubble_layout.addWidget(code_widget)
+
+        # Render news card widgets if present
+        if articles:
+            cards_container = QWidget()
+            cards_container.setStyleSheet("background-color: transparent; border: none;")
+            cards_layout = QVBoxLayout(cards_container)
+            cards_layout.setContentsMargins(0, 8, 0, 0)
+            cards_layout.setSpacing(8)
+            for art in articles:
+                card = NewsCardWidget(art)
+                cards_layout.addWidget(card)
+            bubble_layout.addWidget(cards_container)
 
         if is_user:
             layout.addStretch()
@@ -697,9 +835,9 @@ class ChatWindow(QWidget):
     def dismiss_alarm(self) -> None:
         self.bubble.dismiss_alarm()
 
-    def add_message(self, text: str, is_user: bool, is_refusal: bool = False) -> None:
+    def add_message(self, text: str, is_user: bool, is_refusal: bool = False, articles: list = None) -> None:
         """Add a bubble message to the chat view."""
-        bubble = MessageBubble(text, is_user, is_refusal)
+        bubble = MessageBubble(text, is_user, is_refusal, articles)
         self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, bubble)
         
         # Force layout update to compute correct scroll maximum synchronously
@@ -909,7 +1047,7 @@ class ChatWindow(QWidget):
 
             self.news_worker = NewsWorker(self.news_manager, user_text)
             self.news_worker.finished.connect(
-                lambda reply, err: self.handle_news_reply(reply, err, user_text, llm_message, target_model, images_to_send)
+                lambda reply, err, articles: self.handle_news_reply(reply, err, user_text, llm_message, target_model, images_to_send, articles)
             )
             self.news_worker.start()
             return
@@ -933,7 +1071,7 @@ class ChatWindow(QWidget):
         self.worker.finished.connect(self.handle_reply)
         self.worker.start()
 
-    def handle_news_reply(self, reply: str, error: str, user_text: str, llm_message: str, target_model: str, images_to_send: list) -> None:
+    def handle_news_reply(self, reply: str, error: str, user_text: str, llm_message: str, target_model: str, images_to_send: list, articles: list = None) -> None:
         if error == "not_news":
             # Fallback to standard Ollama flow
             self.conversation.append({"role": "user", "content": llm_message})
@@ -956,7 +1094,7 @@ class ChatWindow(QWidget):
             if error:
                 self.add_message(f"獲取新聞時發生錯誤：{error}", is_user=False, is_refusal=True)
             else:
-                self.add_message(reply, is_user=False)
+                self.add_message(reply, is_user=False, articles=articles)
                 # Save to conversation memory (use clean user_text and reply)
                 self.conversation.append({"role": "user", "content": user_text})
                 self.conversation.append({"role": "assistant", "content": reply})

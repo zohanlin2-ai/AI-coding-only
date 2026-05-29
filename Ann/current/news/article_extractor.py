@@ -21,7 +21,8 @@ class ArticleExtractor:
             "text": str or None,
             "publish_date": str or None,
             "authors": list of str or None,
-            "source_url": str
+            "source_url": str,
+            "top_image": str or None
         }
         """
         logger.info("Extracting article from URL: %s", url)
@@ -41,6 +42,8 @@ class ArticleExtractor:
             if article.publish_date:
                 publish_date_str = article.publish_date.strftime("%Y-%m-%d %H:%M")
                 
+            top_image = getattr(article, "top_image", None) or None
+
             if title and text and len(text.strip()) > 100:
                 logger.info("Successfully extracted article using newspaper3k: %s", title)
                 return {
@@ -49,7 +52,8 @@ class ArticleExtractor:
                     "text": text,
                     "publish_date": publish_date_str,
                     "authors": article.authors,
-                    "source_url": url
+                    "source_url": url,
+                    "top_image": top_image
                 }
         except Exception as e:
             logger.warning("newspaper3k extraction failed for %s: %s. Trying fallback...", url, e)
@@ -88,6 +92,19 @@ class ArticleExtractor:
             import re
             text = re.sub(r"\n\s*\n+", "\n\n", text)
 
+            og_image = None
+            try:
+                soup_full = BeautifulSoup(html_content, "html.parser")
+                meta_og = soup_full.find("meta", property="og:image")
+                if meta_og and meta_og.get("content"):
+                    og_image = meta_og.get("content")
+                else:
+                    meta_tw = soup_full.find("meta", name="twitter:image")
+                    if meta_tw and meta_tw.get("content"):
+                        og_image = meta_tw.get("content")
+            except Exception as ex:
+                logger.debug("Failed to extract fallback image og:image: %s", ex)
+
             if title and text and len(text.strip()) > 50:
                 logger.info("Successfully extracted article using readability-lxml: %s", title)
                 return {
@@ -96,7 +113,8 @@ class ArticleExtractor:
                     "text": text,
                     "publish_date": None,
                     "authors": [],
-                    "source_url": url
+                    "source_url": url,
+                    "top_image": og_image
                 }
             else:
                 raise ValueError("Extracted text too short or empty")
@@ -109,5 +127,6 @@ class ArticleExtractor:
                 "text": None,
                 "publish_date": None,
                 "authors": [],
-                "source_url": url
+                "source_url": url,
+                "top_image": None
             }

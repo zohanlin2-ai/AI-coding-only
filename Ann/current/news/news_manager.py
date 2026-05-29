@@ -199,6 +199,9 @@ class NewsManager:
             final_articles = filtered[:10]
             self.last_fetched_articles = final_articles
 
+            # Fetch article images in parallel
+            self.fetch_article_images(final_articles)
+
             # 5. Format response
             lines = [f"找到 {len(final_articles)} 則相關新聞：\n"]
             for idx, art in enumerate(final_articles, 1):
@@ -276,3 +279,106 @@ class NewsManager:
                     return art["link"], art["title"]
 
         return None, None
+
+    def fetch_article_images(self, articles: list[dict]) -> None:
+        """
+        Scrapes article web pages in parallel to extract top_image URLs and download them locally.
+        Saves downloaded images to scratch/news_images/ and sets article['local_image_path'].
+        """
+        import urllib.parse
+        import hashlib
+        import httpx
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # Ensure directory exists
+        img_dir = self.base_dir / "scratch" / "news_images"
+        try:
+            img_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.error("Failed to create news_images directory: %s", e)
+            return
+
+        # Simple cleanup of old files in scratch/news_images (older than 2 days)
+        try:
+            now = datetime.now()
+            for f in img_dir.iterdir():
+                if f.is_file():
+                    mtime = datetime.fromtimestamp(f.stat().st_mtime)
+                    if now - mtime > timedelta(days=2):
+                        f.unlink()
+        except Exception as e:
+            logger.debug("Failed to clean up old news images: %s", e)
+
+        def process_article(art: dict):
+            url = art.get("link")
+            if not url:
+                art["top_image"] = None
+                art["local_image_path"] = None
+                return
+
+            # Generate stable filename based on URL hash
+            url_hash = hashlib.md5(url.encode("utf-8")).hexdigest()
+            
+            # Check if we already have it in a cache or if we extracted it before
+            try:
+                extracted = self.extractor.extract(url)
+                top_image = extracted.get("top_image")
+            except Exception as e:
+                logger.warning("Failed to extract page for image %s: %s", url, e)
+                top_image = None
+
+            art["top_image"] = top_image
+            art["local_image_path"] = None
+
+            if not top_image:
+                return
+
+            # Determine extension
+            parsed_img_url = urllib.parse.urlparse(top_image)
+            path = parsed_img_url.path.lower()
+            ext = ".png"
+            if path.endswith(".jpg") or path.endswith(".jpeg"):
+                ext = ".jpg"
+            elif path.endswith(".webp"):
+                ext = ".webp"
+            elif path.endswith(".gif"):
+                ext = ".gif"
+            elif path.endswith(".bmp"):
+                ext = ".bmp"
+
+            local_path = img_dir / f"{url_hash}{ext}"
+            if local_path.exists():
+                art["local_image_path"] = str(local_path)
+                return
+
+            # Download the image
+            try:
+                if self.extractor.client_type == "httpx":
+                    with httpx.Client(timeout=10.0, follow_redirects=True) as client:
+                        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                        resp = client.get(top_image, headers=headers)
+                        resp.raise_for_status()
+                        img_data = resp.content
+                else:
+                    import requests
+                    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                    resp = requests.get(top_image, headers=headers, timeout=10.0, allow_redirects=True)
+                    resp.raise_for_status()
+                    img_data = resp.content
+
+                if img_data:
+                    local_path.write_bytes(img_data)
+                    art["local_image_path"] = str(local_path)
+                    logger.info("Successfully downloaded image for %s -> %s", url, local_path)
+            except Exception as e:
+                logger.warning("Failed to download image %s: %s", top_image, e)
+
+        # Run process_article in parallel using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(process_article, art) for art in articles]
+            # Wait for all to complete (limit wait to 12 seconds to prevent excessive blocking)
+            for fut in as_completed(futures, timeout=12.0):
+                try:
+                    fut.result()
+                except Exception as e:
+                    logger.error("Error processing article image in thread: %s", e)

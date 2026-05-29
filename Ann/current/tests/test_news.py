@@ -221,3 +221,41 @@ def test_news_manager_caching_and_filtering(tmp_path):
     url, title = manager._match_article_from_history("摘要第一篇", [])
     assert url == "https://general.com/peace"
     assert title == "World Peace"
+
+
+def test_news_image_scraping_and_downloading(tmp_path):
+    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model")
+    
+    # Mock extractor.extract to return top_image
+    mock_extractor = MagicMock()
+    mock_extractor.client_type = "mock"
+    mock_extractor.extract.return_value = {
+        "success": True,
+        "title": "Article with Image",
+        "text": "Article content...",
+        "publish_date": None,
+        "authors": [],
+        "source_url": "https://example.com/art1",
+        "top_image": "https://example.com/image.jpg"
+    }
+    manager.extractor = mock_extractor
+
+    # Mock requests.get/httpx.Client.get to return fake image content
+    with patch("requests.get") as mock_get:
+        mock_resp = MagicMock()
+        mock_resp.content = b"fake-image-bytes"
+        mock_get.return_value = mock_resp
+
+        articles = [
+            {"title": "Article with Image", "link": "https://example.com/art1", "published": "2026-05-29 12:00", "source": "Source"}
+        ]
+        
+        manager.fetch_article_images(articles)
+        
+        assert articles[0]["top_image"] == "https://example.com/image.jpg"
+        assert articles[0]["local_image_path"] is not None
+        
+        local_path = Path(articles[0]["local_image_path"])
+        assert local_path.exists()
+        assert local_path.read_bytes() == b"fake-image-bytes"
+
