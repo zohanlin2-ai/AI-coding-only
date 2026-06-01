@@ -27,7 +27,7 @@ BASE_DIR = CURRENT_DIR.parent
 
 sys.path.insert(0, str(CURRENT_DIR))
 
-from alarm_handler import detect_update_intent, handle_alarm_intent  # noqa: E402
+from alarm_handler import detect_update_intent, handle_alarm_intent, UPDATE_CHECK_WORDS  # noqa: E402
 from moral_evaluator import Decision, MoralEvaluator  # noqa: E402
 from version_check import check_for_update  # noqa: E402
 
@@ -261,7 +261,7 @@ def main() -> None:
                     continue
 
                 # Intercept update check requests
-                if any(w in user_input_lower for w in ["update", "更新", "檢查更新", "升級", "check update"]):
+                if any(w in user_input_lower for w in UPDATE_CHECK_WORDS):
                     print("\nAnn: 正在檢查更新，請稍候...")
                     new_version = check_for_update(config, BASE_DIR)
                     if new_version:

@@ -24,12 +24,21 @@ except ImportError:
     pyqtSignal = Signal
 
 # Import core elements from assistant.py and moral_evaluator.py
-from alarm_handler import detect_update_intent, handle_alarm_intent
+from alarm_handler import detect_update_intent, handle_alarm_intent, UPDATE_CHECK_WORDS
 from assistant import load_config, call_ollama, SYSTEM_PROMPT, BASE_DIR, EXIT_UPDATE, EXIT_RESTART
+from file_handler import parse_markdown_blocks
 from moral_evaluator import MoralEvaluator, Decision
 
 # Set up logging for GUI
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] (GUI) %(message)s")
+
+# Allowed file extensions for drag-and-drop (single source of truth for ChatWindow + FloatingBubble).
+ALLOWED_TEXT_EXTENSIONS = [
+    '.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css',
+    '.yaml', '.yml', '.ini', '.cfg', '.log', '.c', '.cpp', '.java',
+    '.sh', '.ts', '.sql', '.toml', '.env', '.xml',
+]
+ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
 
 
 class OllamaWorker(QThread):
@@ -262,13 +271,6 @@ class AttachmentItem(QFrame):
         remove_btn.clicked.connect(lambda: self.removed.emit(self.file_path))
         layout.addWidget(remove_btn)
 
-
-def parse_markdown_blocks(text: str) -> list[dict]:
-    """
-    Parses response text and splits it into a sequence of text and code blocks.
-    """
-    from file_handler import parse_markdown_blocks as parse
-    return parse(text)
 
 
 class CodeBlockWidget(QFrame):
@@ -806,9 +808,7 @@ class ChatWindow(QWidget):
                 file_path = Path(url.toLocalFile())
                 if file_path.is_file():
                     suffix = file_path.suffix.lower()
-                    allowed_text = ['.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.yaml', '.yml', '.ini', '.cfg', '.log', '.c', '.cpp', '.java', '.sh', '.ts', '.sql', '.toml', '.env', '.xml']
-                    allowed_img = ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
-                    if suffix in allowed_text or suffix in allowed_img:
+                    if suffix in ALLOWED_TEXT_EXTENSIONS or suffix in ALLOWED_IMAGE_EXTENSIONS:
                         self.add_attachment(file_path)
                     else:
                         logging.info("Dropped unsupported file format: %s", suffix)
@@ -937,7 +937,7 @@ class ChatWindow(QWidget):
 
         # Intercept update check requests
         user_input_lower = user_text.lower()
-        if any(w in user_input_lower for w in ["update", "更新", "檢查更新", "升級", "check update"]):
+        if any(w in user_input_lower for w in UPDATE_CHECK_WORDS):
             self.input_field.clear()
             self.add_message(user_text, is_user=True)
             self.add_message("正在檢查更新，請稍候...", is_user=False)
@@ -1371,9 +1371,7 @@ class FloatingBubble(QWidget):
                 file_path = Path(url.toLocalFile())
                 if file_path.is_file():
                     suffix = file_path.suffix.lower()
-                    allowed_text = ['.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.yaml', '.yml', '.ini', '.cfg', '.log', '.c', '.cpp', '.java', '.sh', '.ts', '.sql', '.toml', '.env', '.xml']
-                    allowed_img = ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
-                    if suffix in allowed_text or suffix in allowed_img:
+                    if suffix in ALLOWED_TEXT_EXTENSIONS or suffix in ALLOWED_IMAGE_EXTENSIONS:
                         self.chat_window.add_attachment(file_path)
                     else:
                         logging.info("Dropped unsupported file format in bubble: %s", suffix)

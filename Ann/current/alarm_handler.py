@@ -26,6 +26,9 @@ UPDATE_NO_WORDS = [
     "沒時間", "改天", "忽略",
 ]
 
+# Keywords that trigger an on-demand update check (single source of truth for CLI + GUI).
+UPDATE_CHECK_WORDS = ["update", "更新", "檢查更新", "升級", "check update"]
+
 
 def detect_update_intent(user_input_lower: str) -> str:
     """

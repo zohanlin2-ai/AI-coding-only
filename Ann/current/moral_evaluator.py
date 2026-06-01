@@ -28,8 +28,8 @@ class RiskLevel(Enum):
 class Decision(Enum):
     COMPLY = "comply"
     COMPLY_WITH_SAFEGUARDS = "comply_with_safeguards"
-    CLARIFY = "clarify"
-    PARTIAL_REFUSAL = "partial_refusal"
+    CLARIFY = "clarify"           # NOTE: dead code — not returned by evaluate(); reserved for future LLM-based classifier
+    PARTIAL_REFUSAL = "partial_refusal"  # NOTE: dead code — not returned by evaluate(); reserved for future LLM-based classifier
     REFUSE = "refuse"
     ESCALATE_OR_PAUSE = "escalate_or_pause"
 
