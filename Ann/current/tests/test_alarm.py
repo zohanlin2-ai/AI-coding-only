@@ -337,8 +337,8 @@ class TestIntentParser(unittest.TestCase):
         self.assertFalse(parser.should_parse("\u4f60\u597d\u55ce\uff1f\u8acb\u554f\u4ec0\u9ebc\u662f\u5fae\u7a4d\u5206\uff1f"))
         self.assertFalse(parser.should_parse("\u5beb\u4e00\u500b python \u8caa\u98df\u86c7\u904a\u6232"))
 
-    @patch("assistant.call_ollama")
-    def test_intent_parsing_success(self, mock_call):
+    @patch("ollama_client.OllamaClient.chat")
+    def test_intent_parsing_success(self, mock_chat):
         parser = IntentParser(base_url="http://mock", model="mock")
         
         # Mock JSON response from Ollama
@@ -348,7 +348,7 @@ class TestIntentParser(unittest.TestCase):
             "label": "\u5403\u85e5",
             "alarm_id": None
         }
-        mock_call.return_value = json.dumps(json_resp)
+        mock_chat.return_value = json.dumps(json_resp)
         
         res = parser.parse_intent("\u660e\u5929\u65e9\u4e0a\u516b\u9ede\u53eb\u6211\uff0c\u5099\u8a3b\u5403\u85e5")
         self.assertEqual(res["intent"], "set_alarm")
@@ -408,8 +408,8 @@ class TestIntentParser(unittest.TestCase):
             self.assertEqual(res["target_alarm"], "\u958b\u6703")
             self.assertIsNone(res["alarm_id"])
 
-    @patch("assistant.call_ollama")
-    def test_clean_val_null_dummy_values(self, mock_call):
+    @patch("ollama_client.OllamaClient.chat")
+    def test_clean_val_null_dummy_values(self, mock_chat):
         parser = IntentParser(base_url="http://mock", model="mock")
         
         # Mock JSON response with string "無", "None", "null"
@@ -419,7 +419,7 @@ class TestIntentParser(unittest.TestCase):
             "target_alarm": "null",
             "label": "None"
         }
-        mock_call.return_value = json.dumps(json_resp)
+        mock_chat.return_value = json.dumps(json_resp)
         
         res = parser.parse_intent("\u522a\u9664\u9b27\u9418")
         self.assertEqual(res["intent"], "delete_alarm")

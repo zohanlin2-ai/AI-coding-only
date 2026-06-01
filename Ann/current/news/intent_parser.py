@@ -1,7 +1,8 @@
 import re
-import json
 import logging
 from datetime import datetime
+
+from base_intent_parser import BaseIntentParser
 
 logger = logging.getLogger(__name__)
 
@@ -10,9 +11,9 @@ NEWS_KEYWORDS = [
     "詳細說明", "詳細", "summarize", "summary", "article", "feed", "rss", "找新聞", "看新聞"
 ]
 
-NEWS_SYSTEM_PROMPT = (
+_NEWS_SYSTEM_PROMPT_TEMPLATE = (
     "You are an intent parser for a news assistant.\n"
-    "The current datetime is: {current_datetime}.\n\n"
+    "The current datetime is: {now}.\n\n"
     "Extract the user's news query intent from the message below.\n"
     "Respond ONLY with a valid JSON object. No explanation, no markdown.\n\n"
     "JSON schema:\n"
@@ -30,139 +31,75 @@ NEWS_SYSTEM_PROMPT = (
     "- article_url: only populate for summarize_article intent. Extract any HTTP/HTTPS URL found in the message.\n"
 )
 
+_VALID_NEWS_INTENTS = {"query_news", "summarize_article", "filter_by_keyword", "list_sources", "none"}
+_VALID_CATEGORIES = {"technology", "finance", "politics", "sports", "health", "entertainment", "general"}
 
-class NewsIntentParser:
-    def __init__(self, base_url: str, model: str):
-        self.base_url = base_url
-        self.model = model
+
+class NewsIntentParser(BaseIntentParser):
+    KEYWORDS = NEWS_KEYWORDS
 
     def should_parse(self, text: str) -> bool:
-        """Fast pre-filter to check if the query might be news-related."""
-        text_lower = text.lower()
-        if any(w in text_lower for w in NEWS_KEYWORDS):
+        """News parser also triggers on HTTP/HTTPS URLs."""
+        if super().should_parse(text):
             return True
-        # Also match url
-        if re.search(r"https?://\S+", text):
-            return True
-        return False
+        return bool(re.search(r"https?://\S+", text))
 
-    def parse_intent(self, text: str) -> dict:
-        """
-        Sends the user text to Ollama for news intent parsing and parameter extraction.
-        Returns a dict conforming to the schema.
-        """
-        if not self.should_parse(text):
-            return {
-                "intent": "none",
-                "keywords": [],
-                "category": None,
-                "source": None,
-                "article_url": None
-            }
+    def _build_system_prompt(self) -> str:
+        return _NEWS_SYSTEM_PROMPT_TEMPLATE.format(now=datetime.now().isoformat())
 
-        current_datetime = datetime.now().isoformat()
-        system_prompt = NEWS_SYSTEM_PROMPT.format(current_datetime=current_datetime)
+    def _validate_and_normalize(self, result: dict) -> dict:
+        intent = result.get("intent", "none")
+        if intent not in _VALID_NEWS_INTENTS:
+            intent = "none"
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": text}
-        ]
+        keywords = result.get("keywords")
+        if not isinstance(keywords, list):
+            keywords = []
+        keywords = [str(k) for k in keywords]
 
-        try:
-            from ollama_client import OllamaClient
-            client = OllamaClient(self.base_url)
-            reply = client.chat(self.model, messages)
-            parsed = self._clean_and_parse_json(reply)
-            return parsed
-        except Exception as e:
-            logger.error("Failed to parse news intent using Ollama: %s", e)
-            return self._regex_fallback(text)
+        category = self._clean_val(result.get("category"))
+        if category not in _VALID_CATEGORIES:
+            category = None
 
-    def _clean_and_parse_json(self, reply: str) -> dict:
-        """Extracts JSON substring from the reply and parses it."""
-        try:
-            cleaned = reply.strip()
-            if cleaned.startswith("```"):
-                cleaned = re.sub(r"^```(?:json)?\n", "", cleaned)
-                cleaned = re.sub(r"\n```$", "", cleaned)
-            cleaned = cleaned.strip()
+        source = self._clean_val(result.get("source"))
 
-            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-            if match:
-                cleaned = match.group(0)
+        article_url = result.get("article_url")
+        if article_url:
+            article_url = str(article_url).strip()
+            if not (article_url.startswith("http://") or article_url.startswith("https://")):
+                article_url = None
 
-            result = json.loads(cleaned)
-            if isinstance(result, dict):
-                result = {k.strip().strip('"').strip("'").strip(): v for k, v in result.items()}
-            
-            # Normalize fields
-            intent = result.get("intent", "none")
-            if intent not in ["query_news", "summarize_article", "filter_by_keyword", "list_sources", "none"]:
-                intent = "none"
+        return {
+            "intent": intent,
+            "keywords": keywords,
+            "category": category,
+            "source": source,
+            "article_url": article_url,
+        }
 
-            keywords = result.get("keywords")
-            if not isinstance(keywords, list):
-                keywords = []
-            keywords = [str(k) for k in keywords]
-
-            def clean_val(v):
-                if isinstance(v, str):
-                    v_clean = v.strip().lower()
-                    if v_clean in ("null", "none", "無", "nil", ""):
-                         return None
-                return v
-
-            category = clean_val(result.get("category"))
-            if category not in ["technology", "finance", "politics", "sports", "health", "entertainment", "general"]:
-                category = None
-
-            source = clean_val(result.get("source"))
-            article_url = result.get("article_url")
-            if article_url:
-                article_url = str(article_url).strip()
-                if not (article_url.startswith("http://") or article_url.startswith("https://")):
-                    article_url = None
-
-            return {
-                "intent": intent,
-                "keywords": keywords,
-                "category": category,
-                "source": source,
-                "article_url": article_url
-            }
-        except Exception as e:
-            logger.warning("Could not parse JSON from Ollama news reply %r: %s", reply, e)
-            return {"intent": "none", "keywords": [], "category": None, "source": None, "article_url": None}
+    def _empty_result(self) -> dict:
+        return {
+            "intent": "none",
+            "keywords": [],
+            "category": None,
+            "source": None,
+            "article_url": None,
+        }
 
     def _regex_fallback(self, text: str) -> dict:
         """Simple rule-based regex fallback when Ollama is offline or fails."""
         text_lower = text.lower()
-        
-        # Check for URLs
+
         url_match = re.search(r"(https?://\S+)", text)
         url = url_match.group(1) if url_match else None
 
         if url and any(w in text_lower for w in ["摘要", "這篇", "說明", "summary", "summarize"]):
-            return {
-                "intent": "summarize_article",
-                "keywords": [],
-                "category": None,
-                "source": None,
-                "article_url": url
-            }
+            return {**self._empty_result(), "intent": "summarize_article", "article_url": url}
 
         if any(w in text_lower for w in ["來源", "媒體", "sources"]):
-            return {
-                "intent": "list_sources",
-                "keywords": [],
-                "category": None,
-                "source": None,
-                "article_url": None
-            }
+            return {**self._empty_result(), "intent": "list_sources"}
 
-        # Check for query_news
         if any(w in text_lower for w in ["新聞", "news", "報導", "消息"]):
-            # Extract basic category matching
             category = None
             for cat in ["technology", "finance", "politics", "sports", "health", "entertainment"]:
                 if cat in text_lower:
@@ -171,19 +108,6 @@ class NewsIntentParser:
                 category = "technology"
             elif "財經" in text_lower or "經濟" in text_lower or "理財" in text_lower:
                 category = "finance"
+            return {**self._empty_result(), "intent": "query_news", "category": category}
 
-            return {
-                "intent": "query_news",
-                "keywords": [],
-                "category": category,
-                "source": None,
-                "article_url": None
-            }
-            
-        return {
-            "intent": "none",
-            "keywords": [],
-            "category": None,
-            "source": None,
-            "article_url": None
-        }
+        return self._empty_result()
