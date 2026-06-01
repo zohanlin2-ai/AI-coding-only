@@ -27,7 +27,7 @@ BASE_DIR = CURRENT_DIR.parent
 
 sys.path.insert(0, str(CURRENT_DIR))
 
-from alarm_handler import detect_update_intent, handle_alarm_intent, UPDATE_CHECK_WORDS  # noqa: E402
+from alarm_handler import detect_update_intent, handle_alarm_intent, UPDATE_CHECK_WORDS, parse_reply_marker, build_update_confirm_llm_message, UPDATE_CONFIRM_NO_REPLY, UPDATE_CONFIRM_UNCLEAR_REPLY  # noqa: E402
 from moral_evaluator import Decision, MoralEvaluator  # noqa: E402
 from version_check import check_for_update  # noqa: E402
 
@@ -230,12 +230,7 @@ def main() -> None:
                     intent = detect_update_intent(user_input_lower)
 
                     if intent == "yes":
-                        llm_message = (
-                            f"[System Instruction: The user confirmed they want to install the available update (version {pending_version}). "
-                            f"Reply with a warm goodbye and state that you are starting the update. "
-                            f"You MUST append the marker '[UPDATE]' at the very end of your response so the system can run the updater.]\n\n"
-                            f"User: {user_input}"
-                        )
+                        llm_message = build_update_confirm_llm_message(pending_version, user_input)
                         conversation.append({"role": "user", "content": llm_message})
                         awaiting_update_confirm = False
                         pending_version = None
@@ -255,9 +250,9 @@ def main() -> None:
                     elif intent == "no":
                         awaiting_update_confirm = False
                         pending_version = None
-                        print("\nAnn: 好的，那我們先不更新。如果您想再次檢查，可以隨時對我說『更新』。\n")
+                        print(f"\nAnn: {UPDATE_CONFIRM_NO_REPLY}\n")
                     else:
-                        print("\nAnn: 我不太確定您的意思。請問您現在需要更新程式嗎？[y/n]\n")
+                        print(f"\nAnn: {UPDATE_CONFIRM_UNCLEAR_REPLY}\n")
                     continue
 
                 # Intercept update check requests
@@ -339,24 +334,15 @@ def main() -> None:
                     conversation.pop()  # don't store failed turn
                     continue
 
-                if "[EXIT]" in reply:
-                    clean_reply = reply.replace("[EXIT]", "").strip()
-                    conversation.append({"role": "assistant", "content": clean_reply})
-                    print(f"\nAnn: {clean_reply}\n")
+                clean_reply, marker = parse_reply_marker(reply)
+                conversation.append({"role": "assistant", "content": clean_reply})
+                print(f"\nAnn: {clean_reply}\n")
+                if marker == "[EXIT]":
                     sys.exit(0)
-                elif "[RESTART]" in reply:
-                    clean_reply = reply.replace("[RESTART]", "").strip()
-                    conversation.append({"role": "assistant", "content": clean_reply})
-                    print(f"\nAnn: {clean_reply}\n")
+                elif marker == "[RESTART]":
                     sys.exit(EXIT_RESTART)
-                elif "[UPDATE]" in reply:
-                    clean_reply = reply.replace("[UPDATE]", "").strip()
-                    conversation.append({"role": "assistant", "content": clean_reply})
-                    print(f"\nAnn: {clean_reply}\n")
+                elif marker == "[UPDATE]":
                     sys.exit(EXIT_UPDATE)
-                else:
-                    conversation.append({"role": "assistant", "content": reply})
-                    print(f"\nAnn: {reply}\n")
         finally:
             alarm_scheduler.stop_cli_scheduler()
             alarm_trigger.stop_trigger()

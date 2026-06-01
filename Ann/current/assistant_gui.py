@@ -24,7 +24,7 @@ except ImportError:
     pyqtSignal = Signal
 
 # Import core elements from assistant.py and moral_evaluator.py
-from alarm_handler import detect_update_intent, handle_alarm_intent, UPDATE_CHECK_WORDS
+from alarm_handler import detect_update_intent, handle_alarm_intent, UPDATE_CHECK_WORDS, parse_reply_marker, build_update_confirm_llm_message, UPDATE_CONFIRM_NO_REPLY, UPDATE_CONFIRM_UNCLEAR_REPLY
 from assistant import load_config, call_ollama, SYSTEM_PROMPT, BASE_DIR, EXIT_UPDATE, EXIT_RESTART
 from file_handler import parse_markdown_blocks
 from moral_evaluator import MoralEvaluator, Decision
@@ -900,12 +900,7 @@ class ChatWindow(QWidget):
             intent = detect_update_intent(user_input_lower)
 
             if intent == "yes":
-                llm_message = (
-                    f"[System Instruction: The user confirmed they want to install the available update (version {self.pending_version}). "
-                    f"Reply with a warm goodbye and state that you are starting the update. "
-                    f"You MUST append the marker '[UPDATE]' at the very end of your response so the system can run the updater.]\n\n"
-                    f"User: {user_text}"
-                )
+                llm_message = build_update_confirm_llm_message(self.pending_version, user_text)
                 self.conversation.append({"role": "user", "content": llm_message})
                 self.awaiting_update_confirm = False
                 self.pending_version = None
@@ -929,10 +924,10 @@ class ChatWindow(QWidget):
             elif intent == "no":
                 self.awaiting_update_confirm = False
                 self.pending_version = None
-                self.add_message("好的，那我們先不更新。如果您想再次檢查，可以隨時對我說『更新』。", is_user=False)
+                self.add_message(UPDATE_CONFIRM_NO_REPLY, is_user=False)
                 return
             else:
-                self.add_message("我不太確定您的意思。請問您現在需要更新程式嗎？（您可以回答「好/要」來更新，或回答「不用/先不要」跳過）", is_user=False)
+                self.add_message(UPDATE_CONFIRM_UNCLEAR_REPLY, is_user=False)
                 return
 
         # Intercept update check requests
@@ -1143,45 +1138,29 @@ class ChatWindow(QWidget):
                 self.conversation.pop()
             return
 
-        if "[EXIT]" in reply:
-            clean_reply = reply.replace("[EXIT]", "").strip()
-            self.conversation.append({"role": "assistant", "content": clean_reply})
+        clean_reply, marker = parse_reply_marker(reply)
+        self.conversation.append({"role": "assistant", "content": clean_reply})
+
+        if marker == "[EXIT]":
             self.add_message(clean_reply, is_user=False)
-            
-            # Disable GUI controls
             self.send_btn.setEnabled(False)
             self.input_field.setEnabled(False)
             self.title_label.setText("Goodbye...")
-            
-            # Exit program after 1.5 seconds delay so user can read goodbye
             QTimer.singleShot(1500, QApplication.quit)
-        elif "[RESTART]" in reply:
-            clean_reply = reply.replace("[RESTART]", "").strip()
-            self.conversation.append({"role": "assistant", "content": clean_reply})
+        elif marker == "[RESTART]":
             self.add_message(clean_reply, is_user=False)
-            
-            # Disable GUI controls
             self.send_btn.setEnabled(False)
             self.input_field.setEnabled(False)
             self.title_label.setText("Restarting...")
-            
-            # Exit program with code 3 after 1.5 seconds delay
             QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_RESTART))
-        elif "[UPDATE]" in reply:
-            clean_reply = reply.replace("[UPDATE]", "").strip()
-            self.conversation.append({"role": "assistant", "content": clean_reply})
+        elif marker == "[UPDATE]":
             self.add_message(clean_reply, is_user=False)
-            
-            # Disable GUI controls
             self.send_btn.setEnabled(False)
             self.input_field.setEnabled(False)
             self.title_label.setText("Updating...")
-            
-            # Exit program with code 42 after 1.5 seconds delay
             QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_UPDATE))
         else:
-            self.conversation.append({"role": "assistant", "content": reply})
-            self.add_message(reply, is_user=False)
+            self.add_message(clean_reply, is_user=False)
             self.input_field.setFocus()
 
     def handle_update_check_finished(self, new_version: str, error: str) -> None:

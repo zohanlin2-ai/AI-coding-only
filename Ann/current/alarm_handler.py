@@ -45,6 +45,48 @@ def detect_update_intent(user_input_lower: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Reply marker parsing (single source of truth for CLI + GUI)
+# ---------------------------------------------------------------------------
+
+_MARKERS = ("[EXIT]", "[RESTART]", "[UPDATE]")
+
+
+def parse_reply_marker(reply: str) -> tuple[str, str | None]:
+    """
+    Detects and strips a control marker from the LLM reply.
+
+    Returns (clean_reply, marker) where marker is one of '[EXIT]', '[RESTART]',
+    '[UPDATE]', or None if no marker was found.
+
+    Example:
+        clean, marker = parse_reply_marker("Goodbye! [EXIT]")
+        # clean == "Goodbye!", marker == "[EXIT]"
+    """
+    for marker in _MARKERS:
+        if marker in reply:
+            return reply.replace(marker, "").strip(), marker
+    return reply, None
+
+
+# ---------------------------------------------------------------------------
+# Update-confirmation shared messages (single source of truth for CLI + GUI)
+# ---------------------------------------------------------------------------
+
+def build_update_confirm_llm_message(version: str, user_text: str) -> str:
+    """Returns the system-instruction LLM message used when user confirms an update."""
+    return (
+        f"[System Instruction: The user confirmed they want to install the available update (version {version}). "
+        f"Reply with a warm goodbye and state that you are starting the update. "
+        f"You MUST append the marker '[UPDATE]' at the very end of your response so the system can run the updater.]\n\n"
+        f"User: {user_text}"
+    )
+
+
+UPDATE_CONFIRM_NO_REPLY = "好的，那我們先不更新。如果您想再次檢查，可以隨時對我說『更新』。"
+UPDATE_CONFIRM_UNCLEAR_REPLY = "我不太確定您的意思。請問您現在需要更新程式嗎？（您可以回答「好/要」來更新，或回答「不用/先不要」跳過）"
+
+
+# ---------------------------------------------------------------------------
 # Alarm intent dispatcher
 # ---------------------------------------------------------------------------
 
