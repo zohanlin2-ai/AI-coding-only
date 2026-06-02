@@ -314,3 +314,57 @@ def test_google_news_url_decoding(tmp_path):
             assert articles[0]["local_image_path"] is not None
 
 
+@patch("ollama_client.OllamaClient.chat")
+def test_news_manager_batch_ai_filtering(mock_chat, tmp_path):
+    # Setup mock sources file
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    sources_file = config_dir / "news_sources.yml"
+    sources_data = {
+        "sources": [
+            {"name": "Sports News", "url": "https://sports.com/rss", "category": "sports", "language": "zh-TW"}
+        ]
+    }
+    with open(sources_file, "w", encoding="utf-8") as f:
+        yaml.dump(sources_data, f)
+
+    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model")
+    
+    # Mock RSSFetcher to return 3 sports articles
+    manager.rss_fetcher = MagicMock()
+    sports_articles = [
+        {"title": "世足賠率公布", "link": "https://sports.com/worldcup", "published": "2026-05-29 11:00", "summary": "法國熱門", "source": "Sports News"},
+        {"title": "大谷翔平再開轟", "link": "https://sports.com/ohtani", "published": "2026-05-29 10:00", "summary": "道奇贏球", "source": "Sports News"},
+        {"title": "梅西飛抵美國", "link": "https://sports.com/messi", "published": "2026-05-29 09:00", "summary": "出征世足", "source": "Sports News"}
+    ]
+    manager.rss_fetcher.fetch_feed.return_value = sports_articles
+
+    # Mock Ollama response to return JSON index list: [1, 3] (index 1 is '世足賠率公布', index 3 is '梅西飛抵美國')
+    mock_chat.return_value = "```json\n[1, 3]\n```"
+
+    parsed = {
+        "intent": "query_news",
+        "category": "sports",
+        "source": None,
+        "keywords": ["足球"]
+    }
+    
+    # Execute handle_intent
+    res = manager.handle_intent("幫我查足球新聞", parsed)
+    
+    # Verify mock_chat was called with correct model & instructions
+    mock_chat.assert_called_once()
+    assert "test-model" in mock_chat.call_args[0][0]
+    prompt_sent = mock_chat.call_args[0][1][0]["content"]
+    assert "You are a news filtering assistant." in prompt_sent
+    assert "世足賠率公布" in prompt_sent
+    
+    # Verify the filtered articles are mapped correctly
+    assert len(manager.last_fetched_articles) == 2
+    assert manager.last_fetched_articles[0]["title"] == "世足賠率公布"
+    assert manager.last_fetched_articles[1]["title"] == "梅西飛抵美國"
+    assert "大谷翔平" not in res
+    assert "世足賠率" in res
+
+
+

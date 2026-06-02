@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import yaml
 import logging
 from pathlib import Path
@@ -229,23 +230,73 @@ class NewsManager:
             # 4. Keyword Filtering
             filtered = []
             if cleaned_keywords:
-                # Build list of words to look for, including expansions
-                search_terms = []
-                for kw in cleaned_keywords:
-                    kw_lower = kw.lower().strip()
-                    search_terms.append(kw_lower)
-                    # Add synonyms if available
-                    if kw_lower in SYNONYM_EXPANSIONS:
-                        search_terms.extend(SYNONYM_EXPANSIONS[kw_lower])
+                # Try Batch AI Filtering first if Ollama is available
+                ai_filtered_indices = None
+                try:
+                    from ollama_client import OllamaClient
+                    client = OllamaClient(self.base_url)
+                    
+                    # Prepare list for AI (limit to top 20 latest articles to ensure speed)
+                    ai_input_articles = deduped[:20]
+                    articles_text = ""
+                    for idx, art in enumerate(ai_input_articles, 1):
+                        summary_clean = art["summary"][:150]
+                        articles_text += f"{idx}. {art['title']}\n   Summary: {summary_clean}\n\n"
+                    
+                    # Search text is the user input query to provide maximum context
+                    prompt = (
+                        "You are a news filtering assistant.\n"
+                        f"Identify which of the news articles listed below are semantically related to the user's query.\n"
+                        f"Query: {user_input}\n\n"
+                        "Articles:\n"
+                        f"{articles_text}\n"
+                        "Respond ONLY with a valid JSON array of indices (1-indexed) representing the matching articles.\n"
+                        "Example response: [1, 3, 5]\n"
+                        "If no articles match, respond with: []\n"
+                        "Respond ONLY with the JSON array, no explanation, no markdown."
+                    )
+                    
+                    messages = [{"role": "user", "content": prompt}]
+                    logger.info("Sending batch news filtering request to Ollama...")
+                    reply = client.chat(self.model, messages)
+                    
+                    # Clean markdown code blocks from reply if any
+                    reply_clean = reply.strip()
+                    if reply_clean.startswith("```"):
+                        lines = reply_clean.split("\n")
+                        if lines[0].startswith("```"):
+                            lines = lines[1:]
+                        if lines and lines[-1].strip() == "```":
+                            lines = lines[:-1]
+                        reply_clean = "\n".join(lines).strip()
+                    
+                    indices = json.loads(reply_clean)
+                    if isinstance(indices, list):
+                        ai_filtered_indices = {int(i) for i in indices if str(i).isdigit()}
+                        logger.info("Batch AI filtering succeeded. Matching indices: %s", ai_filtered_indices)
+                except Exception as e:
+                    logger.warning("Batch AI filtering failed or Ollama offline: %s. Falling back to keyword rules.", e)
                 
-                # Deduplicate search terms
-                search_terms = list(set(search_terms))
-
-                for art in deduped:
-                    title_lower = art["title"].lower()
-                    summary_lower = art["summary"].lower()
-                    if any(term in title_lower or term in summary_lower for term in search_terms):
-                        filtered.append(art)
+                if ai_filtered_indices is not None:
+                    # Map indices back to articles
+                    for idx, art in enumerate(ai_input_articles, 1):
+                        if idx in ai_filtered_indices:
+                            filtered.append(art)
+                else:
+                    # Fallback to synonym-based keyword filtering
+                    search_terms = []
+                    for kw in cleaned_keywords:
+                        kw_lower = kw.lower().strip()
+                        search_terms.append(kw_lower)
+                        if kw_lower in SYNONYM_EXPANSIONS:
+                            search_terms.extend(SYNONYM_EXPANSIONS[kw_lower])
+                    
+                    search_terms = list(set(search_terms))
+                    for art in deduped:
+                        title_lower = art["title"].lower()
+                        summary_lower = art["summary"].lower()
+                        if any(term in title_lower or term in summary_lower for term in search_terms):
+                            filtered.append(art)
             else:
                 filtered = deduped
 
