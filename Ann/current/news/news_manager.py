@@ -34,10 +34,35 @@ GENERIC_KEYWORDS = {
 
 # Synonym expansion map to help find relevant articles when specific terms are used
 SYNONYM_EXPANSIONS = {
-    "足球": ["足球", "世足", "世界盃", "歐冠", "英超", "西甲", "義甲", "德甲", "法甲", "皇馬", "巴薩", "曼聯", "曼城", "利物浦", "梅西", "c羅", "姆巴佩", "足協", "國足", "足總", "十一碼", "角球", "足球員", "女足", "男足"],
-    "fifa": ["fifa", "世足", "世界盃", "國際足總", "足協", "足總"],
-    "籃球": ["籃球", "nba", "t1", "p+", "pleague", "tpbl", "籃協", "詹姆斯", "柯瑞", "杜蘭特", "約基奇", "東契奇", "總冠軍賽", "季後賽", "湖人", "勇士", "塞爾提克", "尼克", "國王", "夢想家"],
-    "棒球": ["棒球", "mlb", "中職", "cpbl", "大谷翔平", "大谷", "山本由伸", "佐佐木朗希", "今井達也", "徐若熙", "平野", "彭政閔", "兄弟", "悍將", "樂天桃猿", "味全龍", "台鋼雄鷹", "統一獅", "洋基", "道奇", "紅襪", "響尾蛇"]
+    # 足球 / Football / Soccer
+    "足球": ["足球", "世足", "世界盃", "歐冠", "英超", "西甲", "義甲", "德甲", "法甲", "皇馬", "巴薩", "曼聯", "曼城", "利物浦", "梅西", "c羅", "姆巴佩", "足協", "國足", "足總", "十一碼", "角球", "足球員", "女足", "男足", "football", "soccer", "fifa", "world cup", "premier league", "champions league"],
+    "football": ["football", "soccer", "足球", "世足", "世界盃", "歐冠", "英超", "fifa", "world cup", "premier league", "champions league"],
+    "soccer": ["football", "soccer", "足球", "世足", "世界盃", "歐冠", "英超", "fifa", "world cup", "premier league", "champions league"],
+    "fifa": ["fifa", "世足", "世界盃", "國際足總", "足協", "足總", "football", "soccer", "足球"],
+    
+    # 籃球 / Basketball / NBA
+    "籃球": ["籃球", "nba", "t1", "p+", "pleague", "tpbl", "籃協", "詹姆斯", "柯瑞", "杜蘭特", "約基奇", "東契奇", "總冠軍賽", "季後賽", "湖人", "勇士", "塞爾提克", "尼克", "國王", "夢想家", "basketball"],
+    "basketball": ["basketball", "nba", "籃球", "湖人", "勇士", "詹姆斯", "柯瑞"],
+    "nba": ["nba", "basketball", "籃球", "詹姆斯", "柯瑞", "湖人", "勇士", "總冠軍賽"],
+
+    # 棒球 / Baseball / MLB
+    "棒球": ["棒球", "mlb", "中職", "cpbl", "大谷翔平", "大谷", "山本由伸", "佐佐木朗希", "今井達也", "徐若熙", "平野", "彭政閔", "兄弟", "悍將", "樂天桃猿", "味全龍", "台鋼雄鷹", "統一獅", "洋基", "道奇", "紅襪", "響尾蛇", "baseball"],
+    "baseball": ["baseball", "mlb", "棒球", "大谷", "大谷翔平", "道奇", "中職"],
+    "mlb": ["mlb", "baseball", "棒球", "大谷翔平", "道奇", "洋基"],
+
+    # 美式足球 / NFL
+    "nfl": ["nfl", "american football", "美式足球", "橄欖球", "super bowl", "superbowl"],
+    "american football": ["nfl", "american football", "美式足球", "橄欖球", "super bowl", "superbowl"],
+    "美式足球": ["nfl", "american football", "美式足球", "橄欖球", "super bowl", "superbowl"],
+    "橄欖球": ["nfl", "american football", "美式足球", "橄欖球", "super bowl", "superbowl"],
+
+    # 科技 / Tech / AI
+    "科技": ["科技", "technology", "tech", "ai", "人工智慧", "輝達", "nvidia", "computex", "semiconductor", "半導體", "晶片", "chips"],
+    "technology": ["technology", "tech", "科技", "ai", "artificial intelligence", "computex", "semiconductor", "半導體", "晶片", "chips"],
+    "tech": ["technology", "tech", "科技", "ai", "artificial intelligence", "computex", "semiconductor", "半導體", "晶片", "chips"],
+    "ai": ["ai", "artificial intelligence", "人工智慧", "輝達", "nvidia", "openai", "chatgpt", "llm", "large language model", "deep learning", "machine learning", "computex"],
+    "artificial intelligence": ["ai", "artificial intelligence", "人工智慧", "輝達", "nvidia", "openai", "chatgpt", "llm"],
+    "人工智慧": ["ai", "artificial intelligence", "人工智慧", "輝達", "nvidia", "openai", "chatgpt", "llm"]
 }
 
 
@@ -321,13 +346,15 @@ class NewsManager:
                 except Exception as e:
                     logger.warning("Batch AI filtering failed or Ollama offline: %s. Falling back to keyword rules.", e)
                 
-                if ai_filtered_indices is not None:
+                if ai_filtered_indices:
                     # Map indices back to articles
                     for idx, art in enumerate(ai_input_articles, 1):
                         if idx in ai_filtered_indices:
                             filtered.append(art)
-                else:
-                    # Fallback to synonym-based keyword filtering
+                
+                # If AI filtering yielded no results, or was offline/unreachable, fallback to keyword rules
+                if not filtered:
+                    import re
                     search_terms = []
                     for kw in cleaned_keywords:
                         kw_lower = kw.lower().strip()
@@ -339,7 +366,25 @@ class NewsManager:
                     for art in deduped:
                         title_lower = art["title"].lower()
                         summary_lower = art["summary"].lower()
-                        if any(term in title_lower or term in summary_lower for term in search_terms):
+                        
+                        # Match logic: match English/ASCII alphanumeric keywords as whole words
+                        # and Chinese/non-ASCII words as substrings
+                        matched = False
+                        for term in search_terms:
+                            if not term:
+                                continue
+                            if term.isalnum() and term.isascii():
+                                # ASCII alphanumeric terms (e.g. ai, nba, nfl, tech) matched as whole words
+                                pattern = r"\b" + re.escape(term) + r"\b"
+                                if re.search(pattern, title_lower) or re.search(pattern, summary_lower):
+                                    matched = True
+                                    break
+                            else:
+                                # Substring match for non-ASCII/Chinese terms
+                                if term in title_lower or term in summary_lower:
+                                    matched = True
+                                    break
+                        if matched:
                             filtered.append(art)
             else:
                 filtered = deduped

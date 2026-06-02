@@ -105,21 +105,26 @@ class NewsIntentParser(BaseIntentParser):
             for cat in ["technology", "finance", "politics", "sports", "health", "entertainment"]:
                 if cat in text_lower:
                     category = cat
-            # Chinese term mapping
+            
+            # Chinese and English mappings to general categories
             cn_mappings = {
-                "科技": "technology",
-                "財經": "finance",
-                "經濟": "finance",
-                "理財": "finance",
-                "商業": "finance",
-                "政治": "politics",
-                "體育": "sports",
-                "運動": "sports",
-                "健康": "health",
-                "醫療": "health",
-                "娛樂": "entertainment",
-                "八卦": "entertainment",
-                "明星": "entertainment"
+                # Technology
+                "科技": "technology", "tech": "technology", "technology": "technology",
+                "ai": "technology", "人工智慧": "technology",
+                # Finance
+                "財經": "finance", "經濟": "finance", "理財": "finance", "商業": "finance", "finance": "finance", "business": "finance",
+                # Politics
+                "政治": "politics", "politics": "politics",
+                # Sports
+                "體育": "sports", "運動": "sports", "sports": "sports",
+                "足球": "sports", "football": "sports", "soccer": "sports",
+                "籃球": "sports", "basketball": "sports", "nba": "sports",
+                "棒球": "sports", "baseball": "sports", "mlb": "sports",
+                "nfl": "sports", "橄欖球": "sports",
+                # Health
+                "健康": "health", "醫療": "health", "health": "health",
+                # Entertainment
+                "娛樂": "entertainment", "八卦": "entertainment", "明星": "entertainment", "entertainment": "entertainment"
             }
             for term, cat in cn_mappings.items():
                 if term in text_lower:
@@ -127,13 +132,19 @@ class NewsIntentParser(BaseIntentParser):
                     break
 
             # Simple keyword extraction
-            # Strip common words and category names
+            # Strip common words and general category names (do NOT strip subcategories like 'ai' or 'football')
             stop_words = [
                 "新聞", "news", "報導", "消息", "的", "有關", "關於", 
                 "想看", "幫我找", "給我", "最近", "最新", "今天", "今日", 
-                "每日", "看", "找", "搜", "查", "要", "請", "我想看"
+                "每日", "看", "找", "搜", "查", "要", "請", "我想看",
+                # general categories to strip
+                "科技", "tech", "technology",
+                "財經", "經濟", "理財", "商業", "finance", "business",
+                "政治", "politics",
+                "體育", "運動", "sports",
+                "健康", "醫療", "health",
+                "娛樂", "八卦", "明星", "entertainment"
             ]
-            stop_words.extend(cn_mappings.keys())
             
             kw_text = text
             for w in stop_words:
