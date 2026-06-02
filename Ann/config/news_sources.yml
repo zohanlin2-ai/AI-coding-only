@@ -58,3 +58,9 @@ sources:
     category: technology
     region: foreign
     language: en-US
+
+  - name: BBC Sport Football
+    url: https://feeds.bbci.co.uk/sport/football/rss.xml
+    category: sports
+    region: foreign
+    language: en-GB

@@ -147,6 +147,12 @@ class NewsManager:
     category: technology
     region: foreign
     language: en-US
+
+  - name: BBC Sport Football
+    url: https://feeds.bbci.co.uk/sport/football/rss.xml
+    category: sports
+    region: foreign
+    language: en-GB
 """
         try:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -268,8 +274,11 @@ class NewsManager:
                     from ollama_client import OllamaClient
                     client = OllamaClient(self.base_url)
                     
-                    # Prepare list for AI (limit to top 20 latest articles to ensure speed)
-                    ai_input_articles = deduped[:20]
+                    # Build a region-balanced pool for AI filtering (10 taiwan + 10 foreign)
+                    # This prevents taiwan sources (more articles, faster updates) from crowding out foreign content
+                    taiwan_pool = [a for a in deduped if a.get("region") == "taiwan"]
+                    foreign_pool = [a for a in deduped if a.get("region") == "foreign"]
+                    ai_input_articles = taiwan_pool[:10] + foreign_pool[:10]
                     articles_text = ""
                     for idx, art in enumerate(ai_input_articles, 1):
                         summary_clean = art["summary"][:150]

@@ -156,7 +156,7 @@ def test_news_manager_writes_default_sources_if_missing(tmp_path):
     
     sources = manager.load_sources()
     assert config_file.exists()
-    assert len(sources) == 10
+    assert len(sources) == 11
     assert sources[0]["name"] == "Google News 台灣"
 
 
