@@ -128,7 +128,11 @@ class NewsIntentParser(BaseIntentParser):
 
             # Simple keyword extraction
             # Strip common words and category names
-            stop_words = ["新聞", "news", "報導", "消息", "的", "有關", "關於", "想看", "幫我找", "看"]
+            stop_words = [
+                "新聞", "news", "報導", "消息", "的", "有關", "關於", 
+                "想看", "幫我找", "給我", "最近", "最新", "今天", "今日", 
+                "每日", "看", "找", "搜", "查", "要", "請", "我想看"
+            ]
             stop_words.extend(cn_mappings.keys())
             
             kw_text = text

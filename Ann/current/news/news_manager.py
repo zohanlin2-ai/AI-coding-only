@@ -16,13 +16,20 @@ logger = logging.getLogger(__name__)
 
 # Generic words to strip from keyword filters to prevent broad false-positive matching
 GENERIC_KEYWORDS = {
+    # Categories
     "體育", "運動", "sports", "sport",
     "科技", "technology", "tech",
     "財經", "經濟", "理財", "finance", "business", "商業",
     "政治", "politics", "politic",
     "健康", "醫療", "health", "medical",
     "娛樂", "明星", "entertainment", "showbiz",
-    "新聞", "news", "報導", "消息", "feed", "rss"
+    "新聞", "news", "報導", "消息", "feed", "rss",
+    # Common helper words (pronouns, verbs, adverbs, particles, prepositions)
+    "我", "你", "他", "想", "看", "聽", "找", "搜", "查", "要", "給我", "最近", "最新",
+    "今天", "今日", "每日", "一下", "看看", "幫我", "請", "有沒有", "相關", "關於",
+    "的", "了", "呢", "吧", "啊", "有", "無", "個", "些", "條", "篇", "次",
+    "和", "與", "或", "同", "及", "跟", "在", "從", "自", "向", "往", "到",
+    "是", "為", "這", "那", "哪", "誰", "什麼", "怎", "怎麼", "如何", "多少"
 }
 
 # Synonym expansion map to help find relevant articles when specific terms are used
@@ -84,42 +91,62 @@ class NewsManager:
   - name: Google News 台灣
     url: https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: general
+    region: taiwan
     language: zh-TW
 
   - name: Google News 科技
     url: https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: technology
+    region: taiwan
     language: zh-TW
 
   - name: Google News 財經
     url: https://news.google.com/news/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: finance
+    region: taiwan
     language: zh-TW
 
   - name: Google News 國際
     url: https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: general
+    region: foreign
     language: zh-TW
 
   - name: Google News 政治
     url: https://news.google.com/news/rss/headlines/section/topic/POLITICS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: politics
+    region: taiwan
     language: zh-TW
 
   - name: Google News 體育
     url: https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: sports
+    region: taiwan
     language: zh-TW
 
   - name: Google News 健康
     url: https://news.google.com/news/rss/headlines/section/topic/HEALTH?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: health
+    region: taiwan
     language: zh-TW
 
   - name: Google News 娛樂
     url: https://news.google.com/news/rss/headlines/section/topic/ENTERTAINMENT?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: entertainment
+    region: taiwan
     language: zh-TW
+
+  - name: Google News 國際體育
+    url: https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en
+    category: sports
+    region: foreign
+    language: en-US
+
+  - name: Google News 國際科技
+    url: https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en
+    category: technology
+    region: foreign
+    language: en-US
 """
         try:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -188,6 +215,7 @@ class NewsManager:
             for src in selected_sources:
                 url = src.get("url")
                 name = src.get("name")
+                region = src.get("region", "taiwan")
                 if not url:
                     continue
 
@@ -199,6 +227,10 @@ class NewsManager:
                     logger.info("Cache miss for feed: %s. Fetching...", url)
                     feed_articles = self.rss_fetcher.fetch_feed(url, name)
                     self.cache[url] = (now, feed_articles)
+                
+                # Tag articles with region from source config
+                for art in feed_articles:
+                    art["region"] = region
                 
                 articles.extend(feed_articles)
 
@@ -243,11 +275,14 @@ class NewsManager:
                         summary_clean = art["summary"][:150]
                         articles_text += f"{idx}. {art['title']}\n   Summary: {summary_clean}\n\n"
                     
-                    # Search text is the user input query to provide maximum context
+                    # Build a clean query string from extracted keywords to avoid AI confusion with noise words (e.g. "最近")
+                    query_str = ", ".join(cleaned_keywords)
+                    
+                    # Search text is the cleaned query keywords to provide precise context
                     prompt = (
                         "You are a news filtering assistant.\n"
                         f"Identify which of the news articles listed below are semantically related to the user's query.\n"
-                        f"Query: {user_input}\n\n"
+                        f"Query: {query_str}\n\n"
                         "Articles:\n"
                         f"{articles_text}\n"
                         "Respond ONLY with a valid JSON array of indices (1-indexed) representing the matching articles.\n"
@@ -305,8 +340,11 @@ class NewsManager:
                     return f"找不到與關鍵字「{', '.join(keywords)}」相關的新聞。您可以嘗試換個關鍵字或瀏覽其他類別。"
                 return "目前沒有合適的新聞報導。"
 
-            # Limit results to 10
-            final_articles = filtered[:10]
+            # Redesign: Taiwan news max 5, Foreign news max 5. Combined total max 10.
+            taiwan_articles = [art for art in filtered if art.get("region") == "taiwan"]
+            foreign_articles = [art for art in filtered if art.get("region") == "foreign"]
+            
+            final_articles = taiwan_articles[:5] + foreign_articles[:5]
             self.last_fetched_articles = final_articles
 
             # Fetch article images in parallel

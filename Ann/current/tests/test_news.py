@@ -156,7 +156,7 @@ def test_news_manager_writes_default_sources_if_missing(tmp_path):
     
     sources = manager.load_sources()
     assert config_file.exists()
-    assert len(sources) == 8
+    assert len(sources) == 10
     assert sources[0]["name"] == "Google News 台灣"
 
 
@@ -365,6 +365,65 @@ def test_news_manager_batch_ai_filtering(mock_chat, tmp_path):
     assert manager.last_fetched_articles[1]["title"] == "梅西飛抵美國"
     assert "大谷翔平" not in res
     assert "世足賠率" in res
+
+
+def test_news_manager_regional_group_limit(tmp_path):
+    # Setup mock sources file with region settings
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    sources_file = config_dir / "news_sources.yml"
+    sources_data = {
+        "sources": [
+            {"name": "Local Tech", "url": "https://tech.tw/rss", "category": "technology", "region": "taiwan", "language": "zh-TW"},
+            {"name": "Global Tech", "url": "https://tech.com/rss", "category": "technology", "region": "foreign", "language": "en-US"}
+        ]
+    }
+    with open(sources_file, "w", encoding="utf-8") as f:
+        yaml.dump(sources_data, f)
+
+    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model")
+    
+    # Mock RSSFetcher to return 8 local and 8 foreign articles
+    manager.rss_fetcher = MagicMock()
+    
+    local_articles = [
+        {"title": f"台灣科技 {i}", "link": f"https://tech.tw/{i}", "published": "2026-05-29 11:00", "summary": "TW Summary", "source": "Local Tech"}
+        for i in range(1, 9)
+    ]
+    foreign_articles = [
+        {"title": f"Global Tech {i}", "link": f"https://tech.com/{i}", "published": "2026-05-29 10:00", "summary": "Global Summary", "source": "Global Tech"}
+        for i in range(1, 9)
+    ]
+    
+    def side_effect(url, name):
+        if "tw" in url:
+            return local_articles
+        return foreign_articles
+    
+    manager.rss_fetcher.fetch_feed.side_effect = side_effect
+
+    # Query general technology news (no keywords, so all are selected)
+    parsed = {
+        "intent": "query_news",
+        "category": "technology",
+        "source": None,
+        "keywords": []
+    }
+    
+    res = manager.handle_intent("最新科技新聞", parsed)
+    
+    # Verify that we got exactly 10 articles: 5 local + 5 foreign
+    assert len(manager.last_fetched_articles) == 10
+    
+    # Check that the first 5 are local (Taiwan)
+    for i in range(5):
+        assert manager.last_fetched_articles[i]["region"] == "taiwan"
+        assert "台灣科技" in manager.last_fetched_articles[i]["title"]
+        
+    # Check that the next 5 are foreign
+    for i in range(5, 10):
+        assert manager.last_fetched_articles[i]["region"] == "foreign"
+        assert "Global Tech" in manager.last_fetched_articles[i]["title"]
 
 
 
