@@ -13,6 +13,26 @@ from news.summarizer import NewsSummarizer
 logger = logging.getLogger(__name__)
 
 
+# Generic words to strip from keyword filters to prevent broad false-positive matching
+GENERIC_KEYWORDS = {
+    "體育", "運動", "sports", "sport",
+    "科技", "technology", "tech",
+    "財經", "經濟", "理財", "finance", "business", "商業",
+    "政治", "politics", "politic",
+    "健康", "醫療", "health", "medical",
+    "娛樂", "明星", "entertainment", "showbiz",
+    "新聞", "news", "報導", "消息", "feed", "rss"
+}
+
+# Synonym expansion map to help find relevant articles when specific terms are used
+SYNONYM_EXPANSIONS = {
+    "足球": ["足球", "世足", "世界盃", "歐冠", "英超", "西甲", "義甲", "德甲", "法甲", "皇馬", "巴薩", "曼聯", "曼城", "利物浦", "梅西", "c羅", "姆巴佩", "足協", "國足", "足總", "十一碼", "角球", "足球員", "女足", "男足"],
+    "fifa": ["fifa", "世足", "世界盃", "國際足總", "足協", "足總"],
+    "籃球": ["籃球", "nba", "t1", "p+", "pleague", "tpbl", "籃協", "詹姆斯", "柯瑞", "杜蘭特", "約基奇", "東契奇", "總冠軍賽", "季後賽", "湖人", "勇士", "塞爾提克", "尼克", "國王", "夢想家"],
+    "棒球": ["棒球", "mlb", "中職", "cpbl", "大谷翔平", "大谷", "山本由伸", "佐佐木朗希", "今井達也", "徐若熙", "平野", "彭政閔", "兄弟", "悍將", "樂天桃猿", "味全龍", "台鋼雄鷹", "統一獅", "洋基", "道奇", "紅襪", "響尾蛇"]
+}
+
+
 class NewsManager:
     def __init__(self, base_dir: Path, base_url: str, model: str):
         self.base_dir = base_dir
@@ -130,6 +150,15 @@ class NewsManager:
             source_pref = parsed.get("source")
             keywords = parsed.get("keywords") or []
 
+            # Clean keywords by removing generic words and category names
+            cleaned_keywords = []
+            for kw in keywords:
+                if not kw:
+                    continue
+                kw_lower = kw.strip().lower()
+                if kw_lower not in GENERIC_KEYWORDS:
+                    cleaned_keywords.append(kw)
+
             # 1. Source selection logic
             all_sources = self.load_sources()
             selected_sources = []
@@ -199,13 +228,23 @@ class NewsManager:
 
             # 4. Keyword Filtering
             filtered = []
-            if keywords:
-                # Filter keywords case-insensitive
-                kw_lowers = [kw.lower() for kw in keywords if kw]
+            if cleaned_keywords:
+                # Build list of words to look for, including expansions
+                search_terms = []
+                for kw in cleaned_keywords:
+                    kw_lower = kw.lower().strip()
+                    search_terms.append(kw_lower)
+                    # Add synonyms if available
+                    if kw_lower in SYNONYM_EXPANSIONS:
+                        search_terms.extend(SYNONYM_EXPANSIONS[kw_lower])
+                
+                # Deduplicate search terms
+                search_terms = list(set(search_terms))
+
                 for art in deduped:
                     title_lower = art["title"].lower()
                     summary_lower = art["summary"].lower()
-                    if any(kw in title_lower or kw in summary_lower for kw in kw_lowers):
+                    if any(term in title_lower or term in summary_lower for term in search_terms):
                         filtered.append(art)
             else:
                 filtered = deduped

@@ -101,13 +101,44 @@ class NewsIntentParser(BaseIntentParser):
 
         if any(w in text_lower for w in ["新聞", "news", "報導", "消息"]):
             category = None
+            # Standard English mapping
             for cat in ["technology", "finance", "politics", "sports", "health", "entertainment"]:
                 if cat in text_lower:
                     category = cat
-            if "科技" in text_lower:
-                category = "technology"
-            elif "財經" in text_lower or "經濟" in text_lower or "理財" in text_lower:
-                category = "finance"
-            return {**self._empty_result(), "intent": "query_news", "category": category}
+            # Chinese term mapping
+            cn_mappings = {
+                "科技": "technology",
+                "財經": "finance",
+                "經濟": "finance",
+                "理財": "finance",
+                "商業": "finance",
+                "政治": "politics",
+                "體育": "sports",
+                "運動": "sports",
+                "健康": "health",
+                "醫療": "health",
+                "娛樂": "entertainment",
+                "八卦": "entertainment",
+                "明星": "entertainment"
+            }
+            for term, cat in cn_mappings.items():
+                if term in text_lower:
+                    category = cat
+                    break
+
+            # Simple keyword extraction
+            # Strip common words and category names
+            stop_words = ["新聞", "news", "報導", "消息", "的", "有關", "關於", "想看", "幫我找", "看"]
+            stop_words.extend(cn_mappings.keys())
+            
+            kw_text = text
+            for w in stop_words:
+                kw_text = re.sub(re.escape(w), "", kw_text, flags=re.IGNORECASE)
+            
+            # Strip remaining punctuation and whitespace
+            kw_text = re.sub(r"[^\w\s]", "", kw_text).strip()
+            
+            keywords = [kw_text] if kw_text else []
+            return {**self._empty_result(), "intent": "query_news", "category": category, "keywords": keywords}
 
         return self._empty_result()
