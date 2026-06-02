@@ -129,42 +129,62 @@ sources:
   - name: Google News 台灣
     url: https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: general
+    region: taiwan
     language: zh-TW
 
   - name: Google News 科技
     url: https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: technology
+    region: taiwan
     language: zh-TW
 
   - name: Google News 財經
     url: https://news.google.com/news/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: finance
+    region: taiwan
     language: zh-TW
 
   - name: Google News 國際
     url: https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: general
+    region: foreign
     language: zh-TW
 
   - name: Google News 政治
     url: https://news.google.com/news/rss/headlines/section/topic/POLITICS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: politics
+    region: taiwan
     language: zh-TW
 
   - name: Google News 體育
     url: https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: sports
+    region: taiwan
     language: zh-TW
 
   - name: Google News 健康
     url: https://news.google.com/news/rss/headlines/section/topic/HEALTH?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: health
+    region: taiwan
     language: zh-TW
 
   - name: Google News 娛樂
     url: https://news.google.com/news/rss/headlines/section/topic/ENTERTAINMENT?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: entertainment
+    region: taiwan
     language: zh-TW
+
+  - name: Google News 國際體育
+    url: https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en
+    category: sports
+    region: foreign
+    language: en-US
+
+  - name: Google News 國際科技
+    url: https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en
+    category: technology
+    region: foreign
+    language: en-US
 ```
 
 > Sources can be added or removed by editing `config/news_sources.yml` directly.
@@ -217,10 +237,10 @@ Full article extraction is performed **only when the user explicitly requests a 
 
 After fetching, apply filters in this order:
 
-1. **Keyword filter:** Check title and RSS summary for any of the extracted keywords (case-insensitive). Discard articles with no keyword match if keywords were specified.
+1. **Keyword filter:** Clean user keywords to strip common noise words/particles (e.g. "的", "了", "給我", "最近"). Check title and RSS summary for any of the extracted keywords (case-insensitive). Discard articles with no keyword match if keywords were specified.
 2. **Category filter:** Applied via source selection (Section 5.2), not post-fetch.
 3. **Deduplication:** Remove articles with identical titles or URLs.
-4. **Result limit:** Return up to **10 articles** to the user per query.
+4. **Result limit:** Return up to **10 articles** to the user per query, composed of **up to 5 Taiwan articles** and **up to 5 foreign articles** (`taiwan_articles[:5] + foreign_articles[:5]`).
 
 Categorization is handled at the source level (defined in `news_sources.yml`). No additional ML-based categorization is performed in this version.
 
