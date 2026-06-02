@@ -79,6 +79,26 @@ class NewsManager:
     url: https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: general
     language: zh-TW
+
+  - name: Google News 政治
+    url: https://news.google.com/news/rss/headlines/section/topic/POLITICS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    category: politics
+    language: zh-TW
+
+  - name: Google News 體育
+    url: https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    category: sports
+    language: zh-TW
+
+  - name: Google News 健康
+    url: https://news.google.com/news/rss/headlines/section/topic/HEALTH?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    category: health
+    language: zh-TW
+
+  - name: Google News 娛樂
+    url: https://news.google.com/news/rss/headlines/section/topic/ENTERTAINMENT?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
+    category: entertainment
+    language: zh-TW
 """
         try:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
