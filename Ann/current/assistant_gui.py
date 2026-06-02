@@ -635,6 +635,12 @@ class ChatWindow(QWidget):
         self.pending_version = None
         self.update_worker = None
 
+        # 閒置自動縮回計時器（3 分鐘）
+        self.inactivity_timer = QTimer(self)
+        self.inactivity_timer.setSingleShot(True)
+        self.inactivity_timer.setInterval(3 * 60 * 1000)  # 180,000 ms
+        self.inactivity_timer.timeout.connect(self._on_inactivity_timeout)
+
         # Initialize OllamaClient
         from ollama_client import OllamaClient
         llm_base_url = self.config["llm"].get("base_url", "http://localhost:11434")
@@ -855,8 +861,29 @@ class ChatWindow(QWidget):
         dialog = AttachmentViewerDialog(file_path, self)
         dialog.exec()
 
+    def start_inactivity_timer(self) -> None:
+        """啟動（或重置）3 分鐘閒置倒數計時器。"""
+        self.inactivity_timer.start()
+
+    def stop_inactivity_timer(self) -> None:
+        """停止閒置計時器。"""
+        self.inactivity_timer.stop()
+
+    def _on_inactivity_timeout(self) -> None:
+        """閒置計時器到期，自動切回 bubble 模式。"""
+        logging.info("Inactivity timeout: auto-collapsing to bubble.")
+        self.shrink_back()
+
+    def extend_inactivity_if_alarm(self) -> None:
+        """鬧鐘觸發時，若計時器剩餘時間不足 10 秒，補到 10 秒。"""
+        if self.inactivity_timer.isActive():
+            remaining = self.inactivity_timer.remainingTime()
+            if remaining < 10_000:
+                self.inactivity_timer.start(10_000)
+
     def shrink_back(self) -> None:
         """Collapse the chat window back into the floating bubble."""
+        self.stop_inactivity_timer()
         # If alarm is active, transfer visual target back to bubble
         if self.bubble.active_triggered_alarms:
             self.alarm_trigger.stop_visual_effects()
@@ -867,6 +894,7 @@ class ChatWindow(QWidget):
 
     def dismiss_alarm(self) -> None:
         self.bubble.dismiss_alarm()
+        self.start_inactivity_timer()
 
     def add_message(self, text: str, is_user: bool, is_refusal: bool = False, articles: list = None) -> None:
         """Add a bubble message to the chat view."""
@@ -887,6 +915,8 @@ class ChatWindow(QWidget):
         user_text = self.input_field.text().strip()
         if not user_text:
             return
+
+        self.start_inactivity_timer()  # 對話更新，重置 3 分鐘倒數
 
         if user_text.lower() == "exit":
             QApplication.quit()
@@ -1127,6 +1157,13 @@ class ChatWindow(QWidget):
                 self.conversation.append({"role": "user", "content": user_text})
                 self.conversation.append({"role": "assistant", "content": reply})
 
+            # Inactivity timer / pink pulsing light logic
+            if self.isVisible():
+                self.start_inactivity_timer()
+            else:
+                if not self.bubble.active_triggered_alarms:
+                    self.bubble.set_new_reply_pending(True)
+
     def handle_reply(self, reply: str, error: str) -> None:
         self.send_btn.setEnabled(True)
         self.input_field.setEnabled(True)
@@ -1136,6 +1173,11 @@ class ChatWindow(QWidget):
             self.add_message(f"(LLM error — is Ollama running? {error})", is_user=False, is_refusal=True)
             if self.conversation:
                 self.conversation.pop()
+            if self.isVisible():
+                self.start_inactivity_timer()
+            else:
+                if not self.bubble.active_triggered_alarms:
+                    self.bubble.set_new_reply_pending(True)
             return
 
         clean_reply, marker = parse_reply_marker(reply)
@@ -1161,7 +1203,12 @@ class ChatWindow(QWidget):
             QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_UPDATE))
         else:
             self.add_message(clean_reply, is_user=False)
-            self.input_field.setFocus()
+            if self.isVisible():
+                self.input_field.setFocus()
+                self.start_inactivity_timer()
+            else:
+                if not self.bubble.active_triggered_alarms:
+                    self.bubble.set_new_reply_pending(True)
 
     def handle_update_check_finished(self, new_version: str, error: str) -> None:
         self.send_btn.setEnabled(True)
@@ -1170,15 +1217,20 @@ class ChatWindow(QWidget):
 
         if error:
             self.add_message(f"(檢查更新時發生錯誤：{error})", is_user=False, is_refusal=True)
-            return
-
-        if new_version:
-            self.awaiting_update_confirm = True
-            self.pending_version = new_version
-            self.add_message(f"偵測到新版本 {new_version}。請問您現在要更新嗎？[y/n]", is_user=False)
         else:
-            self.add_message("您目前已是最新版本，不需要更新。", is_user=False)
-        self.input_field.setFocus()
+            if new_version:
+                self.awaiting_update_confirm = True
+                self.pending_version = new_version
+                self.add_message(f"偵測到新版本 {new_version}。請問您現在要更新嗎？[y/n]", is_user=False)
+            else:
+                self.add_message("您目前已是最新版本，不需要更新。", is_user=False)
+
+        if self.isVisible():
+            self.start_inactivity_timer()
+            self.input_field.setFocus()
+        else:
+            if not self.bubble.active_triggered_alarms:
+                self.bubble.set_new_reply_pending(True)
 
 
 class FloatingBubble(QWidget):
@@ -1196,6 +1248,15 @@ class FloatingBubble(QWidget):
         self.click_start_pos = QPoint()
         self.drag_active = False
         self.setAcceptDrops(True)
+
+        # 粉紅燈狀態（有未讀 Ann 回覆）
+        self.new_reply_pending = False
+        self._pulse_alpha = 80          # 當前透明度（80~230 之間震盪）
+        self._pulse_direction = 1       # 1=加深, -1=變淡
+
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.setInterval(30)          # ~33fps
+        self._pulse_timer.timeout.connect(self._update_pulse)
 
         # Frameless, stays on top, tool window (no taskbar icon)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
@@ -1236,6 +1297,9 @@ class FloatingBubble(QWidget):
         elif self.drag_active:
             grad.setColorAt(0, QColor(34, 84, 61))  # Dark green
             grad.setColorAt(1, QColor(20, 50, 35))
+        elif self.new_reply_pending:
+            grad.setColorAt(0, QColor(90, 30, 60))  # Dark pink
+            grad.setColorAt(1, QColor(50, 15, 35))
         else:
             grad.setColorAt(0, QColor(45, 55, 72))  # Slate Gray
             grad.setColorAt(1, QColor(26, 32, 44))
@@ -1249,6 +1313,8 @@ class FloatingBubble(QWidget):
             pen = QPen(QColor(246, 224, 94, 230), 3)  # Flashing yellow border
         elif self.drag_active:
             pen = QPen(QColor(72, 187, 120, 230), 3)  # Glowing green border for drop target
+        elif self.new_reply_pending:
+            pen = QPen(QColor(236, 72, 153, self._pulse_alpha), 3)  # Pulsing pink border
         else:
             pen = QPen(QColor(49, 130, 206, 200), 2)  # Blue glow border
         painter.setPen(pen)
@@ -1278,8 +1344,31 @@ class FloatingBubble(QWidget):
                     self.expand_to_chat()
             event.accept()
 
+    def set_new_reply_pending(self, state: bool) -> None:
+        """設定粉紅燈狀態，並啟動/停止脈衝動畫。"""
+        self.new_reply_pending = state
+        if state:
+            self._pulse_alpha = 80
+            self._pulse_direction = 1
+            self._pulse_timer.start()
+        else:
+            self._pulse_timer.stop()
+        self.update()
+
+    def _update_pulse(self) -> None:
+        """更新粉紅燈的脈衝透明度。"""
+        self._pulse_alpha += self._pulse_direction * 6
+        if self._pulse_alpha >= 230:
+            self._pulse_alpha = 230
+            self._pulse_direction = -1
+        elif self._pulse_alpha <= 80:
+            self._pulse_alpha = 80
+            self._pulse_direction = 1
+        self.update()
+
     def expand_to_chat(self) -> None:
         """Morph/Expand from bubble to chat window."""
+        self.set_new_reply_pending(False)
         if self.active_triggered_alarms:
             self.alarm_trigger.stop_visual_effects()
             self.alarm_trigger.start_visual_effects(self.chat_window)
@@ -1300,6 +1389,7 @@ class FloatingBubble(QWidget):
         self.hide()
         self.chat_window.show()
         self.chat_window.input_field.setFocus()
+        self.chat_window.start_inactivity_timer()
 
     def collapse_from_chat(self, chat_center: QPoint) -> None:
         """Morph/Collapse from chat window back to bubble."""
@@ -1317,6 +1407,7 @@ class FloatingBubble(QWidget):
     def on_alarm_triggered(self, alarm) -> None:
         logging.info("Alarm triggered in GUI: %s", alarm.label)
         self.active_triggered_alarms.append(alarm)
+        self.chat_window.extend_inactivity_if_alarm()
         
         target = self.chat_window if self.chat_window.isVisible() else self
         self.alarm_trigger.start_trigger(target)

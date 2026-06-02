@@ -2,6 +2,15 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.1.9] - 2026-06-02
+
+### Added
+- Implemented automatic inactivity timer in the chat window (`ChatWindow`) that collapses the chat interface back into the floating bubble mode after 3 minutes of user inactivity.
+- Implemented a pink pulsing reply notification light (`new_reply_pending` with smooth `QTimer` animation loop) in the floating bubble (`FloatingBubble`) when Ann receives replies or update check results while in bubble mode.
+- Optimized focus handling by preventing focus calls on hidden line edit widgets.
+- Addressed boundary conditions: ensured alarm triggers reset/extend inactivity appropriately, and user clicks to expand or dismiss alarms correctly clear pulsing notification states.
+- Created unit tests (`tests/test_gui_inactivity.py`) covering inactivity timer reset, timeout triggers, alarm interaction, and pulsing bubble states.
+
 ## [0.1.8] - 2026-05-29
 
 ### Added
