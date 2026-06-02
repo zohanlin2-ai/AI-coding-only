@@ -1297,9 +1297,6 @@ class FloatingBubble(QWidget):
         elif self.drag_active:
             grad.setColorAt(0, QColor(34, 84, 61))  # Dark green
             grad.setColorAt(1, QColor(20, 50, 35))
-        elif self.new_reply_pending:
-            grad.setColorAt(0, QColor(90, 30, 60))  # Dark pink
-            grad.setColorAt(1, QColor(50, 15, 35))
         else:
             grad.setColorAt(0, QColor(45, 55, 72))  # Slate Gray
             grad.setColorAt(1, QColor(26, 32, 44))
