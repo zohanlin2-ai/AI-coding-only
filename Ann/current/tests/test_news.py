@@ -314,8 +314,7 @@ def test_google_news_url_decoding(tmp_path):
             assert articles[0]["local_image_path"] is not None
 
 
-@patch("ollama_client.OllamaClient.chat")
-def test_news_manager_batch_ai_filtering(mock_chat, tmp_path):
+def test_news_manager_keyword_filtering(tmp_path):
     # Setup mock sources file
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -339,9 +338,6 @@ def test_news_manager_batch_ai_filtering(mock_chat, tmp_path):
     ]
     manager.rss_fetcher.fetch_feed.return_value = sports_articles
 
-    # Mock Ollama response to return JSON index list: [1, 3] (index 1 is '世足賠率公布', index 3 is '梅西飛抵美國')
-    mock_chat.return_value = "```json\n[1, 3]\n```"
-
     parsed = {
         "intent": "query_news",
         "category": "sports",
@@ -352,14 +348,7 @@ def test_news_manager_batch_ai_filtering(mock_chat, tmp_path):
     # Execute handle_intent
     res = manager.handle_intent("幫我查足球新聞", parsed)
     
-    # Verify mock_chat was called with correct model & instructions
-    mock_chat.assert_called_once()
-    assert "test-model" in mock_chat.call_args[0][0]
-    prompt_sent = mock_chat.call_args[0][1][0]["content"]
-    assert "You are a news filtering assistant." in prompt_sent
-    assert "世足賠率公布" in prompt_sent
-    
-    # Verify the filtered articles are mapped correctly
+    # Verify the filtered articles are mapped correctly (using static synonym fallback since it contains "足球")
     assert len(manager.last_fetched_articles) == 2
     assert manager.last_fetched_articles[0]["title"] == "世足賠率公布"
     assert manager.last_fetched_articles[1]["title"] == "梅西飛抵美國"

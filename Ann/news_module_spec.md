@@ -98,7 +98,7 @@ JSON schema:
 }
 
 Rules:
-- keywords: extract relevant search terms from the user message.
+- keywords: Extract relevant search terms from the user message and dynamically expand them to include synonyms, abbreviations, related terms, leagues, or translations in both Chinese and English (limit to top 6 terms).
 - category: infer the most relevant category, or null if unclear.
 - source: only populate if the user explicitly names a specific source.
 - article_url: only populate for summarize_article intent.
@@ -237,7 +237,7 @@ Full article extraction is performed **only when the user explicitly requests a 
 
 After fetching, apply filters in this order:
 
-1. **Keyword filter:** Clean user keywords to strip common noise words/particles (e.g. "的", "了", "給我", "最近"). Check title and RSS summary for any of the extracted keywords (case-insensitive). Discard articles with no keyword match if keywords were specified.
+1. **Keyword filter:** Check the title and RSS summary for the extracted keywords. Alphanumeric/ASCII terms (e.g. "ai", "nba", "tech") match using word boundaries (`\b`) to prevent false substring matches, while Chinese/non-ASCII terms match as substrings. If the LLM is offline or keywords are unexpanded, the system falls back to static synonym expansions (`SYNONYM_EXPANSIONS`).
 2. **Category filter:** Applied via source selection (Section 5.2), not post-fetch.
 3. **Deduplication:** Remove articles with identical titles or URLs.
 4. **Result limit:** Return up to **10 articles** to the user per query, composed of **up to 5 Taiwan articles** and **up to 5 foreign articles** (`taiwan_articles[:5] + foreign_articles[:5]`).

@@ -293,99 +293,39 @@ class NewsManager:
             # 4. Keyword Filtering
             filtered = []
             if cleaned_keywords:
-                # Try Batch AI Filtering first if Ollama is available
-                ai_filtered_indices = None
-                try:
-                    from ollama_client import OllamaClient
-                    client = OllamaClient(self.base_url)
-                    
-                    # Build a region-balanced pool for AI filtering (10 taiwan + 10 foreign)
-                    # This prevents taiwan sources (more articles, faster updates) from crowding out foreign content
-                    taiwan_pool = [a for a in deduped if a.get("region") == "taiwan"]
-                    foreign_pool = [a for a in deduped if a.get("region") == "foreign"]
-                    ai_input_articles = taiwan_pool[:10] + foreign_pool[:10]
-                    articles_text = ""
-                    for idx, art in enumerate(ai_input_articles, 1):
-                        summary_clean = art["summary"][:150]
-                        articles_text += f"{idx}. {art['title']}\n   Summary: {summary_clean}\n\n"
-                    
-                    # Build a clean query string from extracted keywords to avoid AI confusion with noise words (e.g. "最近")
-                    query_str = ", ".join(cleaned_keywords)
-                    
-                    # Search text is the cleaned query keywords to provide precise context
-                    prompt = (
-                        "You are a news filtering assistant.\n"
-                        f"Identify which of the news articles listed below are semantically related to the user's query.\n"
-                        f"Query: {query_str}\n\n"
-                        "Articles:\n"
-                        f"{articles_text}\n"
-                        "Respond ONLY with a valid JSON array of indices (1-indexed) representing the matching articles.\n"
-                        "Example response: [1, 3, 5]\n"
-                        "If no articles match, respond with: []\n"
-                        "Respond ONLY with the JSON array, no explanation, no markdown."
-                    )
-                    
-                    messages = [{"role": "user", "content": prompt}]
-                    logger.info("Sending batch news filtering request to Ollama...")
-                    reply = client.chat(self.model, messages)
-                    
-                    # Clean markdown code blocks from reply if any
-                    reply_clean = reply.strip()
-                    if reply_clean.startswith("```"):
-                        lines = reply_clean.split("\n")
-                        if lines[0].startswith("```"):
-                            lines = lines[1:]
-                        if lines and lines[-1].strip() == "```":
-                            lines = lines[:-1]
-                        reply_clean = "\n".join(lines).strip()
-                    
-                    indices = json.loads(reply_clean)
-                    if isinstance(indices, list):
-                        ai_filtered_indices = {int(i) for i in indices if str(i).isdigit()}
-                        logger.info("Batch AI filtering succeeded. Matching indices: %s", ai_filtered_indices)
-                except Exception as e:
-                    logger.warning("Batch AI filtering failed or Ollama offline: %s. Falling back to keyword rules.", e)
+                # LLM already performed keyword expansion during intent parsing.
+                # We do a fast regex/substring match on all fetched articles using the expanded keywords list.
+                # If LLM was offline, cleaned_keywords might only contain the single query term,
+                # so we still apply the static expansions as a fallback.
+                search_terms = []
+                for kw in cleaned_keywords:
+                    kw_lower = kw.lower().strip()
+                    search_terms.append(kw_lower)
+                    if kw_lower in SYNONYM_EXPANSIONS:
+                        search_terms.extend(SYNONYM_EXPANSIONS[kw_lower])
                 
-                if ai_filtered_indices:
-                    # Map indices back to articles
-                    for idx, art in enumerate(ai_input_articles, 1):
-                        if idx in ai_filtered_indices:
-                            filtered.append(art)
-                
-                # If AI filtering yielded no results, or was offline/unreachable, fallback to keyword rules
-                if not filtered:
-                    import re
-                    search_terms = []
-                    for kw in cleaned_keywords:
-                        kw_lower = kw.lower().strip()
-                        search_terms.append(kw_lower)
-                        if kw_lower in SYNONYM_EXPANSIONS:
-                            search_terms.extend(SYNONYM_EXPANSIONS[kw_lower])
+                search_terms = list(set(search_terms))
+                for art in deduped:
+                    title_lower = art["title"].lower()
+                    summary_lower = art["summary"].lower()
                     
-                    search_terms = list(set(search_terms))
-                    for art in deduped:
-                        title_lower = art["title"].lower()
-                        summary_lower = art["summary"].lower()
-                        
-                        # Match logic: match English/ASCII alphanumeric keywords as whole words
-                        # and Chinese/non-ASCII words as substrings
-                        matched = False
-                        for term in search_terms:
-                            if not term:
-                                continue
-                            if term.isalnum() and term.isascii():
-                                # ASCII alphanumeric terms (e.g. ai, nba, nfl, tech) matched as whole words
-                                pattern = r"\b" + re.escape(term) + r"\b"
-                                if re.search(pattern, title_lower) or re.search(pattern, summary_lower):
-                                    matched = True
-                                    break
-                            else:
-                                # Substring match for non-ASCII/Chinese terms
-                                if term in title_lower or term in summary_lower:
-                                    matched = True
-                                    break
-                        if matched:
-                            filtered.append(art)
+                    matched = False
+                    for term in search_terms:
+                        if not term:
+                            continue
+                        if term.isalnum() and term.isascii():
+                            # ASCII alphanumeric terms (e.g. ai, nba, nfl, tech) matched as whole words
+                            pattern = r"\b" + re.escape(term) + r"\b"
+                            if re.search(pattern, title_lower) or re.search(pattern, summary_lower):
+                                matched = True
+                                break
+                        else:
+                            # Substring match for non-ASCII/Chinese terms
+                            if term in title_lower or term in summary_lower:
+                                matched = True
+                                break
+                    if matched:
+                        filtered.append(art)
             else:
                 filtered = deduped
 

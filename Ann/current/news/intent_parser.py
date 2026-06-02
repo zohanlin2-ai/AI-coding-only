@@ -25,7 +25,7 @@ _NEWS_SYSTEM_PROMPT_TEMPLATE = (
     '  "article_url": "string or null"\n'
     "}}\n\n"
     "Rules:\n"
-    "- keywords: extract relevant search terms from the user message.\n"
+    "- keywords: Extract relevant search terms from the user message and dynamically expand them to include synonyms, abbreviations, related terms, leagues, or translations in both Chinese and English (e.g. if query is '足球新聞', output ['足球', '世足', 'football', 'soccer', 'world cup']; if query is 'AI news', output ['AI', 'artificial intelligence', '人工智慧', 'openai', 'llm', 'nvidia']). Limit to top 6 most relevant terms.\n"
     "- category: infer the most relevant category (technology, finance, politics, sports, health, entertainment, general), or null if unclear.\n"
     "- source: only populate if the user explicitly names a specific source (e.g. 'reuters', 'google news').\n"
     "- article_url: only populate for summarize_article intent. Extract any HTTP/HTTPS URL found in the message.\n"
