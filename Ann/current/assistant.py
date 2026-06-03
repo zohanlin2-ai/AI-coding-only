@@ -255,6 +255,18 @@ def main() -> None:
                         print(f"\nAnn: {UPDATE_CONFIRM_UNCLEAR_REPLY}\n")
                     continue
 
+                # Intercept exit/close requests locally
+                exit_cmds = {"exit", "close", "terminate", "close the window", "shut down", "再見", "關閉程式", "關閉"}
+                if user_input_lower in exit_cmds:
+                    print("\nAnn: 再見！有需要隨時找我。\n")
+                    sys.exit(0)
+
+                # Intercept restart/reboot requests locally
+                restart_cmds = {"restart", "reboot", "重啟", "重新啟動"}
+                if user_input_lower in restart_cmds:
+                    print("\nAnn: 好的，我現在重新啟動，稍後見！\n")
+                    sys.exit(EXIT_RESTART)
+
                 # Intercept update check requests
                 if any(w in user_input_lower for w in UPDATE_CHECK_WORDS):
                     print("\nAnn: 正在檢查更新，請稍候...")

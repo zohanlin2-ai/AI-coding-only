@@ -918,8 +918,27 @@ class ChatWindow(QWidget):
 
         self.start_inactivity_timer()  # 對話更新，重置 3 分鐘倒數
 
-        if user_text.lower() == "exit":
-            QApplication.quit()
+        user_input_lower = user_text.lower()
+        exit_cmds = {"exit", "close", "terminate", "close the window", "shut down", "再見", "關閉程式", "關閉"}
+        if user_input_lower in exit_cmds:
+            self.input_field.clear()
+            self.add_message(user_text, is_user=True)
+            self.send_btn.setEnabled(False)
+            self.input_field.setEnabled(False)
+            self.title_label.setText("Goodbye...")
+            self.add_message("再見！有需要隨時找我。", is_user=False)
+            QTimer.singleShot(1500, QApplication.quit)
+            return
+
+        restart_cmds = {"restart", "reboot", "重啟", "重新啟動"}
+        if user_input_lower in restart_cmds:
+            self.input_field.clear()
+            self.add_message(user_text, is_user=True)
+            self.send_btn.setEnabled(False)
+            self.input_field.setEnabled(False)
+            self.title_label.setText("Restarting...")
+            self.add_message("好的，我現在重新啟動，稍後見！", is_user=False)
+            QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_RESTART))
             return
 
         # Intercept update confirmation replies
