@@ -92,11 +92,13 @@ class NewsManager:
         if not self.config_path.exists():
             self._write_default_sources()
         else:
-            # Self-repair: detect and overwrite outdated broken feeds URLs
+            # Self-repair: detect and overwrite outdated configs or incomplete feeds lists
             try:
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                if "feeds.reuters.com" in content or "CAAqJggKIiBDQkFTRWdvSUwyMHZNR" in content:
+                # Check for outdated default configs (has default TW news but missing sports or newer feeds)
+                is_outdated_default = "Google News 台灣" in content and "Google News 體育" not in content
+                if is_outdated_default or "feeds.reuters.com" in content or "CAAqJggKIiBDQkFTRWdvSUwyMHZNR" in content:
                     logger.info("Outdated news sources config detected. Updating to modern feeds.")
                     self._write_default_sources()
             except Exception:
