@@ -92,21 +92,23 @@ class NewsManager:
         if not self.config_path.exists():
             self._write_default_sources()
         else:
-            # Self-repair: detect and overwrite outdated configs or incomplete feeds lists
+            # Self-repair: detect and upgrade outdated config versions
             try:
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     content = f.read()
-                # Check for outdated default configs (has default TW news but missing sports or newer feeds)
-                is_outdated_default = "Google News 台灣" in content and "Google News 體育" not in content
-                if is_outdated_default or "feeds.reuters.com" in content or "CAAqJggKIiBDQkFTRWdvSUwyMHZNR" in content:
-                    logger.info("Outdated news sources config detected. Updating to modern feeds.")
+                data = yaml.safe_load(content) or {}
+                version = data.get("version", 1)
+                
+                # Upgrade if version is older than latest (v2), or if legacy broken urls are found
+                if version < 2 or "feeds.reuters.com" in content or "CAAqJggKIiBDQkFTRWdvSUwyMHZNR" in content:
+                    logger.info("Outdated config version %s detected. Upgrading to modern version 2 feeds.", version)
                     self._write_default_sources()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to check config version for self-repair: %s", e)
 
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
+                data = yaml.safe_load(f) or {}
                 return data.get("sources", [])
         except Exception as e:
             logger.error("Failed to load news sources config: %s", e)
@@ -114,7 +116,8 @@ class NewsManager:
 
     def _write_default_sources(self) -> None:
         """Writes default news sources configuration to config/news_sources.yml."""
-        default_yaml = """sources:
+        default_yaml = """version: 2
+sources:
   - name: Google News 台灣
     url: https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
     category: general

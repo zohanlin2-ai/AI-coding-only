@@ -125,6 +125,7 @@ Rules:
 Stored in `config/news_sources.yml`. The following sources are included by default:
 
 ```yaml
+version: 2
 sources:
   - name: Google News 台灣
     url: https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
@@ -185,6 +186,12 @@ sources:
     category: technology
     region: foreign
     language: en-US
+
+  - name: BBC Sport Football
+    url: https://feeds.bbci.co.uk/sport/football/rss.xml
+    category: sports
+    region: foreign
+    language: en-GB
 ```
 
 > Sources can be added or removed by editing `config/news_sources.yml` directly.

@@ -167,6 +167,7 @@ def test_news_manager_caching_and_filtering(tmp_path):
     sources_file = config_dir / "news_sources.yml"
     
     sources_data = {
+        "version": 2,
         "sources": [
             {"name": "Tech News", "url": "https://tech.com/rss", "category": "technology", "language": "zh-TW"},
             {"name": "General News", "url": "https://general.com/rss", "category": "general", "language": "zh-TW"}
@@ -320,6 +321,7 @@ def test_news_manager_keyword_filtering(tmp_path):
     config_dir.mkdir()
     sources_file = config_dir / "news_sources.yml"
     sources_data = {
+        "version": 2,
         "sources": [
             {"name": "Sports News", "url": "https://sports.com/rss", "category": "sports", "language": "zh-TW"}
         ]
@@ -362,6 +364,7 @@ def test_news_manager_regional_group_limit(tmp_path):
     config_dir.mkdir()
     sources_file = config_dir / "news_sources.yml"
     sources_data = {
+        "version": 2,
         "sources": [
             {"name": "Local Tech", "url": "https://tech.tw/rss", "category": "technology", "region": "taiwan", "language": "zh-TW"},
             {"name": "Global Tech", "url": "https://tech.com/rss", "category": "technology", "region": "foreign", "language": "en-US"}
