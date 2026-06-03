@@ -218,6 +218,17 @@ class NewsManager:
                 if kw_lower not in GENERIC_KEYWORDS:
                     cleaned_keywords.append(kw)
 
+            # Debug log to file
+            try:
+                debug_file = self.base_dir / "news_debug.txt"
+                with open(debug_file, "a", encoding="utf-8") as f:
+                    f.write(f"\n--- Debug Session: {datetime.now()} ---\n")
+                    f.write(f"User Input: {user_input}\n")
+                    f.write(f"Parsed Dict: {parsed}\n")
+                    f.write(f"Cleaned Keywords: {cleaned_keywords}\n")
+            except Exception as e:
+                logger.error("Failed to write initial debug log: %s", e)
+
             # 1. Source selection logic
             all_sources = self.load_sources()
             selected_sources = []
@@ -264,6 +275,15 @@ class NewsManager:
                     art["region"] = region
                 
                 articles.extend(feed_articles)
+
+            # Debug log to file
+            try:
+                debug_file = self.base_dir / "news_debug.txt"
+                with open(debug_file, "a", encoding="utf-8") as f:
+                    f.write(f"Selected Sources: {[s.get('name') for s in selected_sources]}\n")
+                    f.write(f"Fetched Articles Count: {len(articles)}\n")
+            except Exception as e:
+                logger.error("Failed to write fetch debug log: %s", e)
 
             if not articles:
                 return "抱歉，目前無法從選定的來源取得任何新聞報導。"
@@ -328,6 +348,16 @@ class NewsManager:
                         filtered.append(art)
             else:
                 filtered = deduped
+
+            # Debug log to file
+            try:
+                debug_file = self.base_dir / "news_debug.txt"
+                with open(debug_file, "a", encoding="utf-8") as f:
+                    f.write(f"Filtered Articles Count: {len(filtered)}\n")
+                    if filtered:
+                        f.write(f"Matched Titles Example: {[a['title'] for a in filtered[:5]]}\n")
+            except Exception as e:
+                logger.error("Failed to write filter debug log: %s", e)
 
             if not filtered:
                 if keywords:
