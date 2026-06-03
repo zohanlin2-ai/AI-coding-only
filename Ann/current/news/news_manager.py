@@ -295,6 +295,12 @@ sources: []
                 # Filter by category
                 category_lower = category.lower()
                 selected_sources = [s for s in all_sources if s.get("category", "").lower() == category_lower]
+                # If category is politics, also include international general news to cover international politics/geopolitics
+                if category_lower == "politics":
+                    selected_sources.extend([
+                        s for s in all_sources
+                        if s.get("category", "").lower() == "general" and s.get("region") == "foreign"
+                    ])
 
             if not selected_sources:
                 # Fallback to all sources
