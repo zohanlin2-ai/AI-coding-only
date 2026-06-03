@@ -176,7 +176,7 @@ def test_news_manager_caching_and_filtering(tmp_path):
     with open(sources_file, "w", encoding="utf-8") as f:
         yaml.dump(sources_data, f)
 
-    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model")
+    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model", load_defaults=False)
     
     # Mock RSSFetcher
     manager.rss_fetcher = MagicMock()
@@ -329,7 +329,7 @@ def test_news_manager_keyword_filtering(tmp_path):
     with open(sources_file, "w", encoding="utf-8") as f:
         yaml.dump(sources_data, f)
 
-    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model")
+    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model", load_defaults=False)
     
     # Mock RSSFetcher to return 3 sports articles
     manager.rss_fetcher = MagicMock()
@@ -373,7 +373,7 @@ def test_news_manager_regional_group_limit(tmp_path):
     with open(sources_file, "w", encoding="utf-8") as f:
         yaml.dump(sources_data, f)
 
-    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model")
+    manager = NewsManager(tmp_path, "http://localhost:11434", "test-model", load_defaults=False)
     
     # Mock RSSFetcher to return 8 local and 8 foreign articles
     manager.rss_fetcher = MagicMock()

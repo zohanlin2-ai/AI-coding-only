@@ -67,11 +67,92 @@ SYNONYM_EXPANSIONS = {
 
 
 class NewsManager:
-    def __init__(self, base_dir: Path, base_url: str, model: str):
+    DEFAULT_SOURCES = [
+        {
+            "name": "Google News 台灣",
+            "url": "https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant",
+            "category": "general",
+            "region": "taiwan",
+            "language": "zh-TW"
+        },
+        {
+            "name": "Google News 科技",
+            "url": "https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=zh-TW&gl=TW&ceid=TW:zh-Hant",
+            "category": "technology",
+            "region": "taiwan",
+            "language": "zh-TW"
+        },
+        {
+            "name": "Google News 財經",
+            "url": "https://news.google.com/news/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant",
+            "category": "finance",
+            "region": "taiwan",
+            "language": "zh-TW"
+        },
+        {
+            "name": "Google News 國際",
+            "url": "https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant",
+            "category": "general",
+            "region": "foreign",
+            "language": "zh-TW"
+        },
+        {
+            "name": "Google News 政治",
+            "url": "https://news.google.com/news/rss/headlines/section/topic/POLITICS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant",
+            "category": "politics",
+            "region": "taiwan",
+            "language": "zh-TW"
+        },
+        {
+            "name": "Google News 體育",
+            "url": "https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant",
+            "category": "sports",
+            "region": "taiwan",
+            "language": "zh-TW"
+        },
+        {
+            "name": "Google News 健康",
+            "url": "https://news.google.com/news/rss/headlines/section/topic/HEALTH?hl=zh-TW&gl=TW&ceid=TW:zh-Hant",
+            "category": "health",
+            "region": "taiwan",
+            "language": "zh-TW"
+        },
+        {
+            "name": "Google News 娛樂",
+            "url": "https://news.google.com/news/rss/headlines/section/topic/ENTERTAINMENT?hl=zh-TW&gl=TW&ceid=TW:zh-Hant",
+            "category": "entertainment",
+            "region": "taiwan",
+            "language": "zh-TW"
+        },
+        {
+            "name": "Google News 國際體育",
+            "url": "https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en",
+            "category": "sports",
+            "region": "foreign",
+            "language": "en-US"
+        },
+        {
+            "name": "Google News 國際科技",
+            "url": "https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en",
+            "category": "technology",
+            "region": "foreign",
+            "language": "en-US"
+        },
+        {
+            "name": "BBC Sport Football",
+            "url": "https://feeds.bbci.co.uk/sport/football/rss.xml",
+            "category": "sports",
+            "region": "foreign",
+            "language": "en-GB"
+        }
+    ]
+
+    def __init__(self, base_dir: Path, base_url: str, model: str, load_defaults: bool = True):
         self.base_dir = base_dir
         self.config_path = base_dir / "config" / "news_sources.yml"
         self.base_url = base_url
         self.model = model
+        self.load_defaults = load_defaults
 
         # Sub-modules
         self.intent_parser = NewsIntentParser(base_url, model)
@@ -88,108 +169,75 @@ class NewsManager:
         self.last_fetched_articles = []
 
     def load_sources(self) -> list[dict]:
-        """Loads news sources from config/news_sources.yml."""
+        """Loads news sources from config/news_sources.yml and merges them with default sources."""
         if not self.config_path.exists():
             self._write_default_sources()
-        else:
-            # Self-repair: detect and upgrade outdated config versions
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                data = yaml.safe_load(content) or {}
-                version = data.get("version", 1)
-                
-                # Upgrade if version is older than latest (v2), or if legacy broken urls are found
-                if version < 2 or "feeds.reuters.com" in content or "CAAqJggKIiBDQkFTRWdvSUwyMHZNR" in content:
-                    logger.info("Outdated config version %s detected. Upgrading to modern version 2 feeds.", version)
-                    self._write_default_sources()
-            except Exception as e:
-                logger.warning("Failed to check config version for self-repair: %s", e)
 
+        defaults = []
+        if self.load_defaults:
+            defaults = [src.copy() for src in self.DEFAULT_SOURCES]
+
+        customs = []
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
-                return data.get("sources", [])
+                customs = data.get("sources", []) or []
         except Exception as e:
             logger.error("Failed to load news sources config: %s", e)
-            return []
+
+        # Merge logic:
+        # 1. Process default sources, applying user overrides if specified
+        merged_sources = []
+        custom_dict = {c.get("name"): c for c in customs if c.get("name")}
+
+        for d in defaults:
+            name = d["name"]
+            if name in custom_dict:
+                user_override = custom_dict[name]
+                # If explicitly disabled, skip it
+                if user_override.get("enabled") is False:
+                    continue
+                # Merge user overrides (url, category, region, language)
+                merged_src = d.copy()
+                for key in ["url", "category", "region", "language"]:
+                    if key in user_override:
+                        merged_src[key] = user_override[key]
+                merged_sources.append(merged_src)
+            else:
+                merged_sources.append(d.copy())
+
+        # 2. Add custom sources that are not in defaults
+        default_names = {d["name"] for d in defaults}
+        for c in customs:
+            name = c.get("name")
+            if name and name not in default_names:
+                if c.get("enabled", True) is not False:
+                    merged_sources.append(c.copy())
+
+        return merged_sources
 
     def _write_default_sources(self) -> None:
-        """Writes default news sources configuration to config/news_sources.yml."""
-        default_yaml = """version: 2
-sources:
-  - name: Google News 台灣
-    url: https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: general
-    region: taiwan
-    language: zh-TW
+        """Writes an empty custom news sources configuration template to config/news_sources.yml."""
+        default_yaml = """# Add your custom news RSS sources here.
+# To override or disable a default source, use the same name.
+# Example:
+# - name: BBC Sport Football
+#   enabled: false
+#
+# - name: Custom Tech News
+#   url: https://example.com/tech/rss
+#   category: technology
+#   region: foreign
+#   language: en-US
 
-  - name: Google News 科技
-    url: https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: technology
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 財經
-    url: https://news.google.com/news/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: finance
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 國際
-    url: https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: general
-    region: foreign
-    language: zh-TW
-
-  - name: Google News 政治
-    url: https://news.google.com/news/rss/headlines/section/topic/POLITICS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: politics
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 體育
-    url: https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: sports
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 健康
-    url: https://news.google.com/news/rss/headlines/section/topic/HEALTH?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: health
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 娛樂
-    url: https://news.google.com/news/rss/headlines/section/topic/ENTERTAINMENT?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: entertainment
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 國際體育
-    url: https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en
-    category: sports
-    region: foreign
-    language: en-US
-
-  - name: Google News 國際科技
-    url: https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en
-    category: technology
-    region: foreign
-    language: en-US
-
-  - name: BBC Sport Football
-    url: https://feeds.bbci.co.uk/sport/football/rss.xml
-    category: sports
-    region: foreign
-    language: en-GB
+sources: []
 """
         try:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
             self.config_path.write_text(default_yaml, encoding="utf-8")
-            logger.info("Created default news sources config at %s", self.config_path)
+            logger.info("Created empty news sources config template at %s", self.config_path)
         except Exception as e:
-            logger.error("Failed to write default news sources config: %s", e)
+            logger.error("Failed to write empty news sources config template: %s", e)
 
     def handle_intent(self, user_input: str, parsed: dict) -> str:
         """

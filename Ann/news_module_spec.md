@@ -120,82 +120,51 @@ Rules:
 
 ## 5. News Sources
 
-### 5.1 Default RSS Sources
+The system uses a **Dual-track News Sources** mechanism that separates system default sources from user custom feeds:
 
-Stored in `config/news_sources.yml`. The following sources are included by default:
+1. **System Default Sources**: Managed directly in the application code (`NewsManager.DEFAULT_SOURCES`). These are automatically updated when the software updates, requiring no manual intervention.
+2. **User Custom Sources**: Configured in `config/news_sources.yml`. This file is reserved for user customizations and is never overwritten by system updates.
 
+### 5.1 System Default Sources
+
+The following sources are active by default:
+
+* **Google News 台灣** (general, taiwan, zh-TW)
+* **Google News 科技** (technology, taiwan, zh-TW)
+* **Google News 財經** (finance, taiwan, zh-TW)
+* **Google News 國際** (general, foreign, zh-TW)
+* **Google News 政治** (politics, taiwan, zh-TW)
+* **Google News 體育** (sports, taiwan, zh-TW)
+* **Google News 健康** (health, taiwan, zh-TW)
+* **Google News 娛樂** (entertainment, taiwan, zh-TW)
+* **Google News 國際體育** (sports, foreign, en-US)
+* **Google News 國際科技** (technology, foreign, en-US)
+* **BBC Sport Football** (sports, foreign, en-GB)
+
+### 5.2 User Custom Sources (`config/news_sources.yml`)
+
+The user configuration file allows adding custom feeds, disabling default feeds, or overriding default settings by matching the source `name`:
+
+* **Add custom feed**: Specify the `name`, `url`, `category`, `region`, and `language`.
+* **Disable default feed**: Provide the matching default `name` and set `enabled: false`.
+* **Override default feed**: Provide the matching default `name` and specify the fields to override (e.g. `url`).
+
+Example configuration:
 ```yaml
-version: 2
+# config/news_sources.yml
 sources:
-  - name: Google News 台灣
-    url: https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: general
-    region: taiwan
-    language: zh-TW
+  - name: BBC Sport Football
+    enabled: false  # Disables the default BBC Sports Football feed
 
   - name: Google News 科技
-    url: https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: technology
-    region: taiwan
-    language: zh-TW
+    url: https://custom-url.com/tech/rss  # Overrides the URL of default Tech feed
 
-  - name: Google News 財經
-    url: https://news.google.com/news/rss/headlines/section/topic/BUSINESS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: finance
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 國際
-    url: https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: general
-    region: foreign
-    language: zh-TW
-
-  - name: Google News 政治
-    url: https://news.google.com/news/rss/headlines/section/topic/POLITICS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: politics
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 體育
-    url: https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: sports
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 健康
-    url: https://news.google.com/news/rss/headlines/section/topic/HEALTH?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: health
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 娛樂
-    url: https://news.google.com/news/rss/headlines/section/topic/ENTERTAINMENT?hl=zh-TW&gl=TW&ceid=TW:zh-Hant
-    category: entertainment
-    region: taiwan
-    language: zh-TW
-
-  - name: Google News 國際體育
-    url: https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en
-    category: sports
-    region: foreign
-    language: en-US
-
-  - name: Google News 國際科技
-    url: https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en
+  - name: My Custom Tech Blog
+    url: https://myblog.com/feed
     category: technology
     region: foreign
     language: en-US
-
-  - name: BBC Sport Football
-    url: https://feeds.bbci.co.uk/sport/football/rss.xml
-    category: sports
-    region: foreign
-    language: en-GB
 ```
-
-> Sources can be added or removed by editing `config/news_sources.yml` directly.
-> Future planned feature: allow users to manage sources through natural conversation.
 
 ### 5.2 Source Selection Logic
 
