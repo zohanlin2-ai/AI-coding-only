@@ -19,8 +19,24 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ModuleResult:
+    """
+    Standardized result returned by a module's execute() method.
+
+    Attributes:
+        reply:    The text response to display to the user.
+        articles: Optional list of news article dicts (for news card rendering in GUI).
+        marker:   Optional control marker such as '[EXIT]', '[RESTART]', '[UPDATE]'.
+    """
+    reply: str
+    articles: list = field(default_factory=list)
+    marker: str | None = None
 
 
 class BaseIntentParser:
@@ -124,4 +140,20 @@ class BaseIntentParser:
         raise NotImplementedError
 
     def _regex_fallback(self, text: str) -> dict:  # pragma: no cover
+        raise NotImplementedError
+
+    def execute(self, parsed: dict, context: dict) -> ModuleResult:  # pragma: no cover
+        """
+        Execute the module's action given a successfully parsed intent dict and a
+        shared context dict provided by CoreController.  Subclasses must override
+        this method to implement their domain-specific business logic.
+
+        Args:
+            parsed:  Output of parse_intent() with intent != 'none'.
+            context: Shared runtime context containing config, conversation,
+                     base_dir, user_text, call_llm, alarm_manager, news_manager.
+
+        Returns:
+            A ModuleResult with at least a reply string.
+        """
         raise NotImplementedError

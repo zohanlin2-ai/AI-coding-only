@@ -6,7 +6,7 @@ import json
 import logging
 from pathlib import Path
 
-from base_intent_parser import BaseIntentParser
+from base_intent_parser import BaseIntentParser, ModuleResult
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +92,15 @@ class FileIntentParser(BaseIntentParser):
 
     def _empty_result(self) -> dict:
         return {"intent": "none", "filename": None, "target": None}
+
+    def execute(self, parsed: dict, context: dict) -> ModuleResult:
+        """Run the file save/export operation and return a ModuleResult."""
+        reply = handle_file_intent(
+            parsed,
+            context["conversation"],
+            context["base_dir"],
+        )
+        return ModuleResult(reply=reply or "")
 
     def _regex_fallback(self, text: str) -> dict:
         """Simple rule-based regex fallback when Ollama is offline or fails."""

@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 
-from base_intent_parser import BaseIntentParser
+from base_intent_parser import BaseIntentParser, ModuleResult
 
 logger = logging.getLogger(__name__)
 
@@ -133,3 +133,14 @@ class IntentParser(BaseIntentParser):
             }
 
         return self._empty_result()
+
+    def execute(self, parsed: dict, context: dict) -> ModuleResult:
+        """Dispatch the parsed alarm intent and return the LLM reply as a ModuleResult."""
+        from alarm_handler import handle_alarm_intent
+        reply = handle_alarm_intent(
+            parsed,
+            context["alarm_manager"],
+            context["call_llm"],
+        )
+        return ModuleResult(reply=reply or "")
+

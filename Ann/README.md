@@ -34,7 +34,11 @@ This project adopts a **Launcher + Core (separated processes)** architecture to 
 To solve the "cannot overwrite running code" local limitation, the project splits program logic into two components:
 
 - **`launcher.py`** (Launcher): Always running, rarely updated. Responsible for starting and monitoring the `assistant.py` core, and executing test-and-swap for new versions.
-- **`assistant.py`** (Ann Assistant Core): Handles all AI conversation and feature logic. Can be updated and restarted at any time.
+- **`assistant.py`** (Ann Assistant Core): Thin CLI entry point. Handles startup, system commands (exit/restart/update), and delegates conversation to `CoreController`.
+- **`core_controller.py`** (CoreController): Unified business logic layer shared by CLI and GUI. Runs the full conversation pipeline: moral evaluation → memory → intent routing → Ollama fallback.
+- **`intent_router.py`** (IntentRouter): Plugin registry. Registers `BaseIntentParser` modules (alarm, file, news, …) and routes each user message to the first matching module via `should_parse() → parse_intent() → execute()`.
+- **`assistant_gui.py`** (Ann GUI): Thin PyQt6 presentation layer. Uses `ControllerWorker(QThread)` to run `CoreController.post_message()` in the background, keeping the UI fully responsive.
+
 
 ```mermaid
 graph TD
@@ -116,6 +120,18 @@ For complete specs, see [file_generation_spec.md](./file_generation_spec.md).
 Ann supports conversational news queries using local Ollama model to parse search intents, retrieve and parse RSS feeds (e.g. Google News, Reuters), filter articles by keywords/categories, and generate concise article summarizations (3–5 sentences) in Traditional Chinese upon request.
 For full specifications, caching policies, and architecture, see [news_module_spec.md](./news_module_spec.md).
 
+### 🧠 Memory Module (記憶模組)
+Ann integrates a local conversational memory system designed in [AI_Memory_System_Design_v2.md](./AI_Memory_System_Design_v2.md) to persist user context across CLI and GUI sessions:
+- **Two-Phase Background Extraction**: Facts stated by the user are extracted on input (Phase 1), and commitments/conclusions are extracted after response generation (Phase 2) using separate background threads.
+- **Concurrent Safe Persistence**: Stored under `memory/` directory via daily JSON file slices and managed registry index with strict `filelock` synchronization.
+- **On-Demand Context Injection**: Prompts are dynamically augmented by retrieving and ranking the top 5 most relevant active memories based on keyword overlap and date recency weights.
+- **Commands Control**: Full user override control using `/memory` slash commands:
+  - `/memory list` — Lists all currently remembered active context.
+  - `/memory add <content>` — Manually registers a new context fact.
+  - `/memory edit <id> <new_content>` — Modifies a specific memory by its ID.
+  - `/memory delete <id>` — Discards a specific context memory.
+  - `/memory off` / `/memory on` — Globally pauses/resumes the memory layer.
+
 ### 🔄 Conversational System Commands (對話式系統指令)
 Ann supports executing system actions directly through natural conversation, featuring warm LLM response generation prior to execution:
 - **Exit Program (關閉程式)**: Commands like "再見", "關閉視窗", "exit", "close the app" trigger a warm goodbye, append `[EXIT]`, disable inputs, and shut down after a 1.5 seconds delay.
@@ -138,10 +154,14 @@ The recommended layout for deployment and development:
 │   └── news_sources.yml     # RSS news sources definitions
 ├── version.txt              # Current version string (managed by updater)
 ├── logs/                    # System logs
+├── memory/                  # AI memory persistence directory (preserved across updates)
+│   ├── index.json           # Memory registry index tracking metadata
+│   └── memories/            # Date-sliced daily memory files YYYY-MM-DD_memory.json
 ├── current/                 # Active production version (auto-updated)
 │   ├── assistant.py         # Ann AI assistant — CLI entry point
 │   ├── assistant_gui.py     # Ann AI assistant — GUI (PyQt6/PySide6)
 │   ├── alarm_handler.py     # Shared alarm intent dispatch (CLI + GUI)
+│   ├── memory_manager.py    # AI Memory System core logic and thread manager
 │   ├── ollama_client.py     # Unified Ollama API client with vision routing
 │   ├── file_handler.py      # File generation & export intent handler
 │   ├── moral_evaluator.py   # Moral/safety risk classifier
@@ -151,6 +171,7 @@ The recommended layout for deployment and development:
 │   ├── plugins/             # Plugin extension directory
 │   ├── requirements.txt     # Dependencies for this version
 │   └── tests/               # Unit tests (run in staging before each update)
+│       └── test_memory.py   # AI Memory System unit tests
 ├── staging/                 # Update buffer (download, test, then swap here)
 └── versions/                # Historical version backups (for rollback)
     ├── v20260101-abc1234/

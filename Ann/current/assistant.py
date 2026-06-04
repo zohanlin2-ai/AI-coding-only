@@ -6,11 +6,12 @@ Startup sequence:
   1. Load config.yml
   2. Check GitHub for a newer release (if check_on_startup: true)
   3. If update available, ask user; exit(42) if they agree
-  4. Enter conversation loop backed by Ollama (gemma4:e4b by default)
-  5. Every user message is evaluated by MoralEvaluator before reaching the LLM
+  4. Build CoreController (handles moral eval, memory, intent routing, Ollama)
+  5. Enter conversation loop
 
 Exit codes:
   0  — clean exit (launcher will restart)
+  3  — restart requested by user (launcher will restart immediately)
   42 — update requested by user (launcher will run updater)
 """
 import logging
@@ -27,43 +28,30 @@ BASE_DIR = CURRENT_DIR.parent
 
 sys.path.insert(0, str(CURRENT_DIR))
 
-from alarm_handler import detect_update_intent, handle_alarm_intent, UPDATE_CHECK_WORDS, parse_reply_marker, build_update_confirm_llm_message, UPDATE_CONFIRM_NO_REPLY, UPDATE_CONFIRM_UNCLEAR_REPLY  # noqa: E402
-from moral_evaluator import Decision, MoralEvaluator  # noqa: E402
+from alarm_handler import (  # noqa: E402
+    UPDATE_CHECK_WORDS,
+    UPDATE_CONFIRM_NO_REPLY,
+    UPDATE_CONFIRM_UNCLEAR_REPLY,
+    build_update_confirm_llm_message,
+    detect_update_intent,
+)
+from core_controller import CoreController, ControllerResult, handle_memory_command, SYSTEM_PROMPT  # noqa: E402
 from version_check import check_for_update  # noqa: E402
 
 EXIT_UPDATE = 42
 EXIT_RESTART = 3
 
-# ---------------------------------------------------------------------------
-# System prompt — establishes Ann's identity for every conversation.
-# The underlying model (e.g. gemma4:e4b) must never reveal its own name;
-# it always presents itself as Ann.
-# ---------------------------------------------------------------------------
-SYSTEM_PROMPT = (
-    "You are Ann, a helpful, honest, and safety-conscious AI assistant. "
-    "You were created by the Ann project and run locally on the user's machine. "
-    "Never refer to yourself as Gemma, a language model, or any other product name. "
-    "Your name is Ann and you should always introduce yourself as Ann. "
-    "Respond in the same language the user writes in.\n"
-    "When the user indicates they want to exit, close, or terminate the assistant program (e.g., 'close the window', 'shut down', 'exit', '再見', '關閉程式'), respond with a warm goodbye and append the marker '[EXIT]' at the very end of your response so the system can shut down.\n"
-    "When the user indicates they want to restart the assistant program (e.g., 'restart', 'reboot', '重啟', '重新啟動'), respond with a warm response (e.g., 'I will restart now, see you in a moment!') and append the marker '[RESTART]' at the very end of your response so the system can restart."
-)
+_EXIT_CMDS = {"exit", "close", "terminate", "close the window", "shut down", "再見", "關閉程式", "關閉"}
+_RESTART_CMDS = {"restart", "reboot", "重啟", "重新啟動"}
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-
 def load_config() -> dict:
     with open(BASE_DIR / "config.yml", encoding="utf-8") as f:
         return yaml.safe_load(f)
-
-
-def call_ollama(base_url: str, model: str, messages: list[dict]) -> str:
-    """Send a chat request to the local Ollama server and return the reply."""
-    from ollama_client import OllamaClient
-    client = OllamaClient(base_url)
-    return client.chat(model, messages)
 
 
 def setup_logging(config: dict) -> None:
@@ -71,7 +59,6 @@ def setup_logging(config: dict) -> None:
     logs_dir = BASE_DIR / "logs"
     logs_dir.mkdir(exist_ok=True)
     from datetime import datetime
-
     log_file = logs_dir / f"assistant_{datetime.now():%Y%m%d}.log"
     logging.basicConfig(
         level=getattr(logging, level, logging.INFO),
@@ -86,13 +73,13 @@ def setup_logging(config: dict) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
-
 def main() -> None:
+    # ------------------------------------------------------------------
+    # Self-test mode (used by updater.py post-swap validation)
+    # ------------------------------------------------------------------
     if "--self-test" in sys.argv:
         try:
-            # 1. Load config
             load_config()
-            # 2. Check UI framework import if GUI mode
             use_cli = "--cli" in sys.argv
             if not use_cli:
                 try:
@@ -104,9 +91,12 @@ def main() -> None:
                         has_qt = True
                     except ImportError:
                         has_qt = False
-                
+
                 if has_qt:
                     import assistant_gui  # noqa: F401
+            # Verify new core modules can be imported
+            from core_controller import CoreController  # noqa: F401
+            from intent_router import IntentRouter  # noqa: F401
             print("Self-test passed.")
             sys.exit(0)
         except Exception as e:
@@ -117,9 +107,8 @@ def main() -> None:
     setup_logging(config)
 
     version = (BASE_DIR / "version.txt").read_text(encoding="utf-8").strip()
-    evaluator = MoralEvaluator(BASE_DIR / "moral_module_spec.md")
 
-    # Check for pygame availability on startup
+    # Check for pygame availability
     try:
         import pygame  # noqa: F401
     except ImportError:
@@ -130,7 +119,7 @@ def main() -> None:
     from alarms.alarm_manager import AlarmManager
     from alarms.alarm_trigger import AlarmTrigger
     from alarms.alarm_scheduler import AlarmScheduler
-    from alarms.intent_parser import IntentParser
+    from alarms.intent_parser import IntentParser as AlarmIntentParser
 
     alarm_config = config.get("alarm", {})
     sound_filename = alarm_config.get("sound_path", "428157__setuniman__charade-1q62b.wav")
@@ -138,23 +127,17 @@ def main() -> None:
     alarm_manager = AlarmManager()
     alarm_trigger = AlarmTrigger(sound_path=str(sound_path), volume=alarm_config.get("volume", 0.8))
     alarm_scheduler = AlarmScheduler(alarm_manager, alarm_trigger)
-    intent_parser = IntentParser(
+    alarm_intent_parser = AlarmIntentParser(
         base_url=config["llm"].get("base_url", "http://localhost:11434"),
-        model=config["llm"]["model"]
-    )
-    from file_handler import FileIntentParser
-    file_intent_parser = FileIntentParser(
-        base_url=config["llm"].get("base_url", "http://localhost:11434"),
-        model=config["llm"]["model"]
-    )
-    from news.news_manager import NewsManager
-    news_manager = NewsManager(
-        base_dir=BASE_DIR,
-        base_url=config["llm"].get("base_url", "http://localhost:11434"),
-        model=config["llm"]["model"]
+        model=config["llm"]["model"],
     )
 
-    # --- Step 2: version check ---
+    # Build controller
+    controller = CoreController(config, BASE_DIR)
+    controller.setup_alarm_components(alarm_manager, alarm_trigger, alarm_scheduler, alarm_intent_parser)
+    controller.setup_modules()
+
+    # Version check
     new_tag = check_for_update(config, BASE_DIR)
 
     # Mode determination
@@ -171,10 +154,8 @@ def main() -> None:
             except ImportError:
                 has_qt = False
 
-    # Startup blocking updates removed in favor of conversational updates.
-
     if not has_qt:
-        # Run CLI loop
+        # ---- CLI mode ------------------------------------------------
         if not use_cli:
             print("\n[Notice] PyQt6 or PySide6 is not installed on this system.")
             print("         To enable the floating GUI interface, please run: pip install PyQt6")
@@ -184,25 +165,25 @@ def main() -> None:
         print(f"{'='*50}")
         print("  Commands: 'exit' to quit | 'update' to update\n")
 
-        llm_model = config["llm"]["model"]
-        llm_base_url = config["llm"].get("base_url", "http://localhost:11434")
-
-        # --- CLI Conversation loop ---
-        conversation: list[dict] = []
         awaiting_update_confirm = False
-        pending_version = None
+        pending_version: str | None = None
+
         if new_tag:
             awaiting_update_confirm = True
             pending_version = new_tag
             print(f"\nAnn: 偵測到新版本 {new_tag}。請問您現在需要更新嗎？[y/n]\n")
-        
+
         def cli_alarm_callback(alarm):
             alarm_scheduler.active_triggered_alarms.append(alarm)
             alarm_trigger.play_sound()
-            alarm_scheduler.start_cli_alerts(alarm.label or "無備註", alarm.datetime.strftime("%Y-%m-%d %H:%M"))
+            alarm_scheduler.start_cli_alerts(
+                alarm.label or "無備註",
+                alarm.datetime.strftime("%Y-%m-%d %H:%M"),
+            )
 
         try:
             alarm_scheduler.start_cli_scheduler(cli_alarm_callback)
+
             while True:
                 try:
                     user_input = input("You: ").strip()
@@ -210,8 +191,8 @@ def main() -> None:
                     print("\nAnn: Goodbye!")
                     sys.exit(0)
 
+                # Dismiss triggered alarm
                 if alarm_scheduler.active_triggered_alarms:
-                    # Dismiss triggered alarms
                     alarm_trigger.stop_trigger()
                     alarm_scheduler.stop_cli_alerts()
                     alarm_scheduler.active_triggered_alarms.clear()
@@ -221,30 +202,41 @@ def main() -> None:
                 if not user_input:
                     continue
 
-                if user_input.lower() == "exit":
-                    print("Ann: Goodbye!")
+                user_lower = user_input.lower().strip()
+
+                # ---- /memory slash commands (fast, no LLM) --------------
+                if user_lower.startswith("/memory"):
+                    reply = handle_memory_command(user_input, controller.memory_manager)
+                    print(f"\nAnn: {reply}\n")
+                    continue
+
+                # ---- System commands ------------------------------------
+                if user_lower in _EXIT_CMDS:
+                    print("\nAnn: 再見！有需要隨時找我。\n")
                     sys.exit(0)
 
-                user_input_lower = user_input.lower().strip()
-                if awaiting_update_confirm:
-                    intent = detect_update_intent(user_input_lower)
+                if user_lower in _RESTART_CMDS:
+                    print("\nAnn: 好的，我現在重新啟動，稍後見！\n")
+                    sys.exit(EXIT_RESTART)
 
+                # ---- Update confirmation flow ----------------------------
+                if awaiting_update_confirm:
+                    intent = detect_update_intent(user_lower)
                     if intent == "yes":
-                        llm_message = build_update_confirm_llm_message(pending_version, user_input)
-                        conversation.append({"role": "user", "content": llm_message})
                         awaiting_update_confirm = False
+                        llm_msg = build_update_confirm_llm_message(pending_version, user_input)
+                        controller.conversation.append({"role": "user", "content": llm_msg})
                         pending_version = None
-                        
                         try:
-                            messages_with_system = [
+                            messages = [
                                 {"role": "system", "content": SYSTEM_PROMPT},
-                                *conversation,
+                                *controller.conversation,
                             ]
-                            reply = call_ollama(llm_base_url, llm_model, messages_with_system)
-                            clean_reply = reply.replace("[UPDATE]", "").strip()
-                            conversation.append({"role": "assistant", "content": clean_reply})
-                            print(f"\nAnn: {clean_reply}\n")
-                        except Exception as e:
+                            reply = controller.ollama_client.chat(controller.llm_model, messages)
+                            clean = reply.replace("[UPDATE]", "").strip()
+                            controller.conversation.append({"role": "assistant", "content": clean})
+                            print(f"\nAnn: {clean}\n")
+                        except Exception:
                             print("\nAnn: 好的，即將進行更新並重新啟動應用程式...\n")
                         sys.exit(EXIT_UPDATE)
                     elif intent == "no":
@@ -255,20 +247,8 @@ def main() -> None:
                         print(f"\nAnn: {UPDATE_CONFIRM_UNCLEAR_REPLY}\n")
                     continue
 
-                # Intercept exit/close requests locally
-                exit_cmds = {"exit", "close", "terminate", "close the window", "shut down", "再見", "關閉程式", "關閉"}
-                if user_input_lower in exit_cmds:
-                    print("\nAnn: 再見！有需要隨時找我。\n")
-                    sys.exit(0)
-
-                # Intercept restart/reboot requests locally
-                restart_cmds = {"restart", "reboot", "重啟", "重新啟動"}
-                if user_input_lower in restart_cmds:
-                    print("\nAnn: 好的，我現在重新啟動，稍後見！\n")
-                    sys.exit(EXIT_RESTART)
-
-                # Intercept update check requests
-                if any(w in user_input_lower for w in UPDATE_CHECK_WORDS):
+                # ---- On-demand update check -----------------------------
+                if any(w in user_lower for w in UPDATE_CHECK_WORDS):
                     print("\nAnn: 正在檢查更新，請稍候...")
                     new_version = check_for_update(config, BASE_DIR)
                     if new_version:
@@ -279,89 +259,37 @@ def main() -> None:
                         print("\nAnn: 您目前已是最新版本，不需要更新。\n")
                     continue
 
-                # --- Moral evaluation (every message, no exceptions) ---
-                result = evaluator.evaluate(user_input)
-                logging.info(
-                    "Moral eval | risk=%s decision=%s confidence=%.2f | %r",
-                    result.risk_level.value,
-                    result.decision.value,
-                    result.confidence,
-                    user_input[:80],
-                )
+                # ---- Normal message → CoreController --------------------
+                result: ControllerResult = controller.post_message(user_input)
 
-                if result.decision == Decision.REFUSE:
-                    print(f"\nAnn: I'm unable to help with that.\n     ({result.rationale})\n")
+                if result.error:
+                    print(f"\nAnn: (LLM error — is Ollama running? {result.error})\n")
                     continue
 
-                if result.decision == Decision.ESCALATE_OR_PAUSE:
-                    print(f"\nAnn: ⚠️  {result.rationale}\n")
-                    continue
+                print(f"\nAnn: {result.reply}\n")
 
-                # --- Alarm Intent Handling ---
-                parsed = intent_parser.parse_intent(user_input)
-                def _cli_call_llm(prompt: str) -> str:
-                    return call_ollama(llm_base_url, llm_model, [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ])
-                reply = handle_alarm_intent(parsed, alarm_manager, _cli_call_llm)
-                if reply is not None:
-                    print(f"\nAnn: {reply}\n")
-                    continue
-                # --- File Intent Handling ---
-                file_parsed = file_intent_parser.parse_intent(user_input)
-                if file_parsed["intent"] != "none":
-                    from file_handler import handle_file_intent
-                    file_reply = handle_file_intent(file_parsed, conversation, BASE_DIR)
-                    if file_reply is not None:
-                        print(f"\nAnn: {file_reply}\n")
-                        continue
-                # --- News Intent Handling ---
-                news_parsed = news_manager.intent_parser.parse_intent(user_input)
-                if news_parsed["intent"] != "none":
-                    news_reply = news_manager.handle_intent(user_input, news_parsed)
-                    print(f"\nAnn: {news_reply}\n")
-                    conversation.append({"role": "user", "content": user_input})
-                    conversation.append({"role": "assistant", "content": news_reply})
-                    continue
-                # Build the message for the LLM
-                if result.decision == Decision.COMPLY_WITH_SAFEGUARDS:
-                    llm_message = (
-                        f"[Important: {result.rationale} Respond carefully and include "
-                        f"appropriate disclaimers.]\n\nUser: {user_input}"
-                    )
-                else:
-                    llm_message = user_input
-
-                conversation.append({"role": "user", "content": llm_message})
-
-                try:
-                    messages_with_system = [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        *conversation,
-                    ]
-                    reply = call_ollama(llm_base_url, llm_model, messages_with_system)
-                except Exception as e:
-                    print(f"\nAnn: (LLM error — is Ollama running? {e})\n")
-                    conversation.pop()  # don't store failed turn
-                    continue
-
-                clean_reply, marker = parse_reply_marker(reply)
-                conversation.append({"role": "assistant", "content": clean_reply})
-                print(f"\nAnn: {clean_reply}\n")
-                if marker == "[EXIT]":
+                if result.marker == "[EXIT]":
                     sys.exit(0)
-                elif marker == "[RESTART]":
+                elif result.marker == "[RESTART]":
                     sys.exit(EXIT_RESTART)
-                elif marker == "[UPDATE]":
+                elif result.marker == "[UPDATE]":
                     sys.exit(EXIT_UPDATE)
+
         finally:
             alarm_scheduler.stop_cli_scheduler()
             alarm_trigger.stop_trigger()
+
     else:
-        # Run GUI loop
+        # ---- GUI mode -----------------------------------------------
         import assistant_gui
-        assistant_gui.start_gui(config, evaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag)
+        assistant_gui.start_gui(
+            config,
+            controller,
+            alarm_manager,
+            alarm_trigger,
+            alarm_scheduler,
+            new_tag,
+        )
 
 
 if __name__ == "__main__":

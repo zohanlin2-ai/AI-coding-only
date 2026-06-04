@@ -2,7 +2,7 @@ import re
 import logging
 from datetime import datetime
 
-from base_intent_parser import BaseIntentParser
+from base_intent_parser import BaseIntentParser, ModuleResult
 
 logger = logging.getLogger(__name__)
 
@@ -157,3 +157,12 @@ class NewsIntentParser(BaseIntentParser):
             return {**self._empty_result(), "intent": "query_news", "category": category, "keywords": keywords}
 
         return self._empty_result()
+
+    def execute(self, parsed: dict, context: dict) -> ModuleResult:
+        """Fetch and format news using NewsManager, return result with article list."""
+        news_manager = context["news_manager"]
+        user_text = context["user_text"]
+        reply = news_manager.handle_intent(user_text, parsed)
+        articles = list(news_manager.last_fetched_articles)
+        return ModuleResult(reply=reply, articles=articles)
+

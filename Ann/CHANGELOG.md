@@ -2,6 +2,35 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.2.1] - 2026-06-04
+
+### Changed (Architecture Refactoring — Extensibility & Responsiveness)
+- **Extracted `CoreController`** (`current/core_controller.py`): unified business logic controller shared by both CLI and GUI. Encapsulates moral evaluation, memory retrieval, intent routing, vision routing, and Ollama fallback in a single `post_message()` method.
+- **Introduced `IntentRouter`** (`current/intent_router.py`): ordered plugin registry that dispatches user messages to the first matching feature module via `should_parse() → parse_intent() → execute()`.
+- **Added `ModuleResult` dataclass** to `base_intent_parser.py` as the standardised return type (`reply`, `articles`, `marker`) for all module plugins.
+- **Added `execute()` abstract method** to `BaseIntentParser` — all feature parsers now implement the full plugin interface (`AlarmIntentParser`, `FileIntentParser`, `NewsIntentParser`).
+- **Replaced `OllamaWorker` + `NewsWorker`** in `assistant_gui.py` with a single `ControllerWorker(QThread)` that runs `CoreController.post_message()` in the background. Emits `status_update` signal (`'typing'` | `'fetching_news'`) for context-aware GUI title labels.
+- **Extracted `handle_memory_command()`** and `SYSTEM_PROMPT` from `assistant.py` to `core_controller.py` so CLI and GUI share a single source of truth.
+- **Simplified `send_message()`** in `assistant_gui.py` from ~350 lines to ~120 lines: only system commands (exit / restart / update / /memory) run in the main thread; all other messages are delegated to `ControllerWorker`.
+- **Simplified CLI loop** in `assistant.py`: system commands handled locally; normal messages call `controller.post_message()` directly.
+- Alarm module's `_capture_llm` hack removed — alarm handler now calls `context["call_llm"]` synchronously inside the worker thread.
+
+### Added
+- `current/core_controller.py` — new unified controller module.
+- `current/intent_router.py` — new plugin registry and dispatcher.
+- `current/tests/test_router.py` — 8 unit tests covering `ModuleResult`, router registration ordering, match/no-match routing, and intent-fallthrough logic.
+
+## [0.2.0] - 2026-06-03
+
+### Added
+- Implemented Phase 1 MVP of the AI Memory System (`current/memory_manager.py`) according to `AI_Memory_System_Design_v2.md` specifications.
+- Implemented secure memory persistence under `memory/` using daily file slices (`YYYY-MM-DD_memory.json`), an `index.json` registry, and `filelock` for safe concurrent thread/process writes.
+- Implemented robust JSON schema validation for all stored memory units (validating fields, category, confidence, and timestamps).
+- Implemented keyword-based memory retrieval and scoring (incorporating recency and confidence weights) to inject top 5 context-relevant memories into Ollama prompts.
+- Implemented dual-phase asynchronous background memory extraction (Phase 1: extracting facts on user input; Phase 2: extracting commitments/conclusions after assistant reply) in separate background threads.
+- Added `/memory` conversational CLI & GUI commands (`list`, `add`, `edit`, `delete`, `on`, `off`) to allow full user control over stored memories.
+- Created comprehensive unit test suite (`current/tests/test_memory.py`) verifying schema validation, retrieval scoring, concurrency locking, and extraction flows.
+
 ## [0.1.9] - 2026-06-02
 
 ### Added

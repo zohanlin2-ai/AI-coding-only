@@ -23,11 +23,14 @@ except ImportError:
     # Map PySide6 Signal to pyqtSignal name
     pyqtSignal = Signal
 
-# Import core elements from assistant.py and moral_evaluator.py
-from alarm_handler import detect_update_intent, handle_alarm_intent, UPDATE_CHECK_WORDS, parse_reply_marker, build_update_confirm_llm_message, UPDATE_CONFIRM_NO_REPLY, UPDATE_CONFIRM_UNCLEAR_REPLY
-from assistant import load_config, call_ollama, SYSTEM_PROMPT, BASE_DIR, EXIT_UPDATE, EXIT_RESTART
+# Imports from core modules
+from alarm_handler import (
+    detect_update_intent, UPDATE_CHECK_WORDS, parse_reply_marker,
+    build_update_confirm_llm_message, UPDATE_CONFIRM_NO_REPLY, UPDATE_CONFIRM_UNCLEAR_REPLY,
+)
+from assistant import load_config, BASE_DIR, EXIT_UPDATE, EXIT_RESTART
+from core_controller import CoreController, ControllerResult, handle_memory_command, SYSTEM_PROMPT
 from file_handler import parse_markdown_blocks
-from moral_evaluator import MoralEvaluator, Decision
 
 # Set up logging for GUI
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] (GUI) %(message)s")
@@ -41,25 +44,45 @@ ALLOWED_TEXT_EXTENSIONS = [
 ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
 
 
-class OllamaWorker(QThread):
-    """Worker thread to handle blocking Ollama requests without freezing the GUI."""
-    finished = pyqtSignal(str, str)  # Emits (reply_text, error_message)
+class ControllerWorker(QThread):
+    """
+    Worker thread that runs CoreController.post_message() without blocking the GUI.
 
-    def __init__(self, base_url: str, model: str, messages: list[dict], images: list = None):
+    Emits:
+        status_update(str) — fired before the blocking call starts so the GUI
+            can show a context-specific status label (e.g. 'Ann is fetching news...').
+        finished(ControllerResult) — fired when post_message() returns.
+    """
+    status_update = pyqtSignal(str)   # status key: 'typing' | 'fetching_news'
+    finished = pyqtSignal(object)     # ControllerResult
+
+    def __init__(
+        self,
+        controller: CoreController,
+        user_text: str,
+        attachment_text: str = "",
+        images: list | None = None,
+    ):
         super().__init__()
-        self.base_url = base_url
-        self.model = model
-        self.messages = messages
-        self.images = images
+        self.controller = controller
+        self.user_text = user_text
+        self.attachment_text = attachment_text
+        self.images = images or []
 
     def run(self) -> None:
-        try:
-            from ollama_client import OllamaClient
-            client = OllamaClient(self.base_url)
-            reply = client.chat(self.model, self.messages, self.images)
-            self.finished.emit(reply, "")
-        except Exception as e:
-            self.finished.emit("", str(e))
+        # Emit fine-grained status before blocking on Ollama
+        if (
+            self.controller.news_manager
+            and self.controller.news_manager.intent_parser.should_parse(self.user_text)
+        ):
+            self.status_update.emit("fetching_news")
+        else:
+            self.status_update.emit("typing")
+
+        result = self.controller.post_message(
+            self.user_text, self.attachment_text, self.images
+        )
+        self.finished.emit(result)
 
 
 class UpdateCheckWorker(QThread):
@@ -78,31 +101,6 @@ class UpdateCheckWorker(QThread):
             self.finished.emit(new_tag or "", "")
         except Exception as e:
             self.finished.emit("", str(e))
-
-
-class NewsWorker(QThread):
-    """Worker thread to handle news parsing, fetching, and summarization asynchronously."""
-    finished = pyqtSignal(str, str, list)  # Emits (reply_text, error_message, articles)
-
-    def __init__(self, news_manager, user_text: str):
-        super().__init__()
-        self.news_manager = news_manager
-        self.user_text = user_text
-
-    def run(self) -> None:
-        try:
-            parsed = self.news_manager.intent_parser.parse_intent(self.user_text)
-            if parsed["intent"] != "none":
-                reply = self.news_manager.handle_intent(self.user_text, parsed)
-                articles = []
-                if parsed["intent"] in ("query_news", "filter_by_keyword"):
-                    articles = list(self.news_manager.last_fetched_articles)
-                self.finished.emit(reply, "", articles)
-            else:
-                self.finished.emit("", "not_news", [])
-        except Exception as e:
-            logging.error("NewsWorker error: %s", e)
-            self.finished.emit("", str(e), [])
 
 
 class DragDropOverlay(QWidget):
@@ -620,16 +618,14 @@ class ChatWindow(QWidget):
     """Main Chat Window (State 2 of Scheme B)."""
     closed_to_bubble = pyqtSignal(QPoint)
 
-    def __init__(self, config: dict, evaluator: MoralEvaluator, bubble, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag: str = None):
+    def __init__(self, config: dict, controller, bubble, alarm_manager, alarm_trigger, alarm_scheduler, new_tag: str = None):
         super().__init__()
         self.config = config
-        self.evaluator = evaluator
+        self.controller = controller
         self.bubble = bubble
         self.alarm_manager = alarm_manager
         self.alarm_trigger = alarm_trigger
         self.alarm_scheduler = alarm_scheduler
-        self.intent_parser = intent_parser
-        self.conversation: list[dict] = []
         self.drag_position = QPoint()
         self.awaiting_update_confirm = False
         self.pending_version = None
@@ -640,26 +636,6 @@ class ChatWindow(QWidget):
         self.inactivity_timer.setSingleShot(True)
         self.inactivity_timer.setInterval(3 * 60 * 1000)  # 180,000 ms
         self.inactivity_timer.timeout.connect(self._on_inactivity_timeout)
-
-        # Initialize OllamaClient
-        from ollama_client import OllamaClient
-        llm_base_url = self.config["llm"].get("base_url", "http://localhost:11434")
-        self.ollama_client = OllamaClient(llm_base_url)
-
-        # Initialize FileIntentParser
-        from file_handler import FileIntentParser
-        self.file_intent_parser = FileIntentParser(
-            base_url=llm_base_url,
-            model=self.config["llm"]["model"]
-        )
-
-        # Initialize NewsManager
-        from news.news_manager import NewsManager
-        self.news_manager = NewsManager(
-            base_dir=BASE_DIR,
-            base_url=llm_base_url,
-            model=self.config["llm"]["model"]
-        )
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -918,7 +894,17 @@ class ChatWindow(QWidget):
 
         self.start_inactivity_timer()  # 對話更新，重置 3 分鐘倒數
 
-        user_input_lower = user_text.lower()
+        user_input_lower = user_text.lower().strip()
+
+        # ---- /memory slash commands (fast, synchronous) -----------------
+        if user_input_lower.startswith("/memory"):
+            self.input_field.clear()
+            self.add_message(user_text, is_user=True)
+            reply = handle_memory_command(user_text, self.controller.memory_manager)
+            self.add_message(reply, is_user=False)
+            return
+
+        # ---- System commands (fast, synchronous) ------------------------
         exit_cmds = {"exit", "close", "terminate", "close the window", "shut down", "再見", "關閉程式", "關閉"}
         if user_input_lower in exit_cmds:
             self.input_field.clear()
@@ -941,101 +927,71 @@ class ChatWindow(QWidget):
             QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_RESTART))
             return
 
-        # Intercept update confirmation replies
+        # ---- Update confirmation flow ------------------------------------
         if self.awaiting_update_confirm:
             self.input_field.clear()
             self.add_message(user_text, is_user=True)
-            user_input_lower = user_text.lower()
             intent = detect_update_intent(user_input_lower)
-
             if intent == "yes":
                 llm_message = build_update_confirm_llm_message(self.pending_version, user_text)
-                self.conversation.append({"role": "user", "content": llm_message})
+                self.controller.conversation.append({"role": "user", "content": llm_message})
                 self.awaiting_update_confirm = False
                 self.pending_version = None
-                
-                # Prepend system prompt
                 messages_with_system = [
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    *self.conversation,
+                    *self.controller.conversation,
                 ]
-                
-                # Call Ollama asynchronously via worker thread
-                llm_base_url = self.config["llm"].get("base_url", "http://localhost:11434")
                 self.send_btn.setEnabled(False)
                 self.input_field.setEnabled(False)
                 self.title_label.setText("Ann is typing...")
-                
-                self.worker = OllamaWorker(llm_base_url, self.config["llm"]["model"], messages_with_system, None)
-                self.worker.finished.connect(self.handle_reply)
-                self.worker.start()
+                # Use ControllerWorker but intercept via a quick direct LLM call
+                # (no routing needed for this confirmation message)
+                try:
+                    reply = self.controller.ollama_client.chat(
+                        self.controller.llm_model, messages_with_system
+                    )
+                    clean = parse_reply_marker(reply)[0]
+                    self.controller.conversation.append({"role": "assistant", "content": clean})
+                    self.send_btn.setEnabled(True)
+                    self.input_field.setEnabled(True)
+                    self.title_label.setText("Ann")
+                    self.add_message(clean, is_user=False)
+                except Exception:
+                    self.send_btn.setEnabled(True)
+                    self.input_field.setEnabled(True)
+                    self.title_label.setText("Ann")
+                    self.add_message("好的，即將進行更新並重新啟動應用程式...", is_user=False)
+                QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_UPDATE))
                 return
             elif intent == "no":
                 self.awaiting_update_confirm = False
                 self.pending_version = None
                 self.add_message(UPDATE_CONFIRM_NO_REPLY, is_user=False)
-                return
             else:
                 self.add_message(UPDATE_CONFIRM_UNCLEAR_REPLY, is_user=False)
-                return
+            return
 
-        # Intercept update check requests
-        user_input_lower = user_text.lower()
+        # ---- On-demand update check -------------------------------------
         if any(w in user_input_lower for w in UPDATE_CHECK_WORDS):
             self.input_field.clear()
             self.add_message(user_text, is_user=True)
             self.add_message("正在檢查更新，請稍候...", is_user=False)
-
             self.send_btn.setEnabled(False)
             self.input_field.setEnabled(False)
             self.title_label.setText("Checking for updates...")
-
             self.update_worker = UpdateCheckWorker(self.config, BASE_DIR)
             self.update_worker.finished.connect(self.handle_update_check_finished)
             self.update_worker.start()
             return
 
-        # Intercept file generation/export intents
-        file_parsed = self.file_intent_parser.parse_intent(user_text)
-        if file_parsed["intent"] != "none":
-            self.input_field.clear()
-            self.add_message(user_text, is_user=True)
-            
-            from file_handler import handle_file_intent
-            file_reply = handle_file_intent(file_parsed, self.conversation, BASE_DIR)
-            if file_reply:
-                self.add_message(file_reply, is_user=False)
-            return
-
-        # Identify images in attachments first to check vision capability
-        attached_images = []
-        for file_path in self.attachments:
-            suffix = file_path.suffix.lower()
-            if suffix in ['.png', '.jpg', '.jpeg', '.webp', '.bmp']:
-                attached_images.append(file_path)
-
-        target_model = self.config["llm"]["model"]
-        if attached_images:
-            vision_model = self.ollama_client.find_first_vision_model()
-            if vision_model:
-                target_model = vision_model
-                logging.info("Dynamic routing: routing to vision model %s", target_model)
-            else:
-                self.add_message(
-                    "⚠️ 偵測到您上傳了圖片，但本地未安裝任何支援視覺的模型。\n"
-                    "請先在終端機執行 `ollama run llava` 下載並安裝視覺模型以進行分析。",
-                    is_user=False,
-                    is_refusal=True
-                )
-                return
-
-        # Capture text attachments and format preview logs
+        # ---- Collect attachments ----------------------------------------
+        attached_images = [f for f in self.attachments if f.suffix.lower() in ALLOWED_IMAGE_EXTENSIONS]
         attachment_text = ""
         attached_names = []
         for file_path in self.attachments:
             attached_names.append(file_path.name)
             suffix = file_path.suffix.lower()
-            if suffix in ['.png', '.jpg', '.jpeg', '.webp', '.bmp']:
+            if suffix in ALLOWED_IMAGE_EXTENSIONS:
                 attachment_text += f"\n\n[Attached Image: {file_path.name}]\n"
             else:
                 try:
@@ -1057,177 +1013,71 @@ class ChatWindow(QWidget):
 
         self.input_field.clear()
         self.add_message(ui_display_text, is_user=True)
-        
-        # Save image list to send via OllamaWorker, then clear the tray
+
         images_to_send = list(attached_images)
         self.clear_attachments()
 
-        # --- Moral Evaluation ---
-        result = self.evaluator.evaluate(user_text)
-        
-        if result.decision == Decision.REFUSE:
-            self.add_message(f"I'm unable to help with that. ({result.rationale})", is_user=False, is_refusal=True)
-            return
-
-        if result.decision == Decision.ESCALATE_OR_PAUSE:
-            self.add_message(f"⚠️ {result.rationale}", is_user=False, is_refusal=True)
-            return
-
-        # --- Alarm Intent Handling ---
-        parsed = self.intent_parser.parse_intent(user_text)
-        if parsed["intent"] != "none":
-            def _gui_call_llm(prompt: str) -> str:
-                return None
-
-            _prompt_holder: list[str] = []
-
-            def _capture_llm(prompt: str) -> str:
-                _prompt_holder.append(prompt)
-                return ""
-
-            result_or_direct = handle_alarm_intent(parsed, self.alarm_manager, _capture_llm)
-
-            if _prompt_holder:
-                reply_prompt = _prompt_holder[0]
-                self.send_btn.setEnabled(False)
-                self.input_field.setEnabled(False)
-                self.title_label.setText("Ann is typing...")
-                messages = [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": reply_prompt},
-                ]
-                self.worker = OllamaWorker(
-                    self.config["llm"].get("base_url", "http://localhost:11434"),
-                    self.config["llm"]["model"],
-                    messages,
-                )
-                self.worker.finished.connect(self.handle_reply)
-                self.worker.start()
-            else:
-                self.add_message(result_or_direct or "", is_user=False, is_refusal=True)
-            return
-
-        # Prepare message payload
-        if result.decision == Decision.COMPLY_WITH_SAFEGUARDS:
-            llm_message = (
-                f"[Important: {result.rationale} Respond carefully and include "
-                f"appropriate disclaimers.]\n\nUser: {user_text}{attachment_text}"
-            )
-        else:
-            llm_message = user_text + attachment_text
-
-        # --- News Intent Handling ---
-        if self.news_manager.intent_parser.should_parse(user_text):
-            self.send_btn.setEnabled(False)
-            self.input_field.setEnabled(False)
-            self.title_label.setText("Ann is fetching news...")
-
-            self.news_worker = NewsWorker(self.news_manager, user_text)
-            self.news_worker.finished.connect(
-                lambda reply, err, articles: self.handle_news_reply(reply, err, user_text, llm_message, target_model, images_to_send, articles)
-            )
-            self.news_worker.start()
-            return
-
-        self.conversation.append({"role": "user", "content": llm_message})
-
-        # Prepend system prompt
-        messages_with_system = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            *self.conversation,
-        ]
-
-        # Call Ollama asynchronously via worker thread
-        llm_base_url = self.config["llm"].get("base_url", "http://localhost:11434")
-
+        # ---- Dispatch to ControllerWorker (background thread) -----------
         self.send_btn.setEnabled(False)
         self.input_field.setEnabled(False)
         self.title_label.setText("Ann is typing...")
 
-        self.worker = OllamaWorker(llm_base_url, target_model, messages_with_system, images_to_send)
-        self.worker.finished.connect(self.handle_reply)
+        self.worker = ControllerWorker(
+            self.controller, user_text, attachment_text, images_to_send
+        )
+        self.worker.status_update.connect(self.on_status_update)
+        self.worker.finished.connect(self.handle_controller_result)
         self.worker.start()
 
-    def handle_news_reply(self, reply: str, error: str, user_text: str, llm_message: str, target_model: str, images_to_send: list, articles: list = None) -> None:
-        if error == "not_news":
-            # Fallback to standard Ollama flow
-            self.conversation.append({"role": "user", "content": llm_message})
-            messages_with_system = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                *self.conversation,
-            ]
-            llm_base_url = self.config["llm"].get("base_url", "http://localhost:11434")
-            
-            # Start normal Ollama worker
-            self.worker = OllamaWorker(llm_base_url, target_model, messages_with_system, images_to_send)
-            self.worker.finished.connect(self.handle_reply)
-            self.worker.start()
+    def on_status_update(self, status: str) -> None:
+        """Update title label based on status key emitted by ControllerWorker."""
+        if status == "fetching_news":
+            self.title_label.setText("Ann is fetching news...")
         else:
-            # Re-enable inputs
-            self.send_btn.setEnabled(True)
-            self.input_field.setEnabled(True)
-            self.title_label.setText("Ann")
+            self.title_label.setText("Ann is typing...")
 
-            if error:
-                self.add_message(f"獲取新聞時發生錯誤：{error}", is_user=False, is_refusal=True)
-            else:
-                self.add_message(reply, is_user=False, articles=articles)
-                # Save to conversation memory (use clean user_text and reply)
-                self.conversation.append({"role": "user", "content": user_text})
-                self.conversation.append({"role": "assistant", "content": reply})
-
-            # Inactivity timer / pink pulsing light logic
-            if self.isVisible():
-                self.start_inactivity_timer()
-            else:
-                if not self.bubble.active_triggered_alarms:
-                    self.bubble.set_new_reply_pending(True)
-
-    def handle_reply(self, reply: str, error: str) -> None:
+    def handle_controller_result(self, result) -> None:
+        """Handle the ControllerResult returned by ControllerWorker."""
         self.send_btn.setEnabled(True)
         self.input_field.setEnabled(True)
         self.title_label.setText("Ann")
 
-        if error:
-            self.add_message(f"(LLM error — is Ollama running? {error})", is_user=False, is_refusal=True)
-            if self.conversation:
-                self.conversation.pop()
-            if self.isVisible():
-                self.start_inactivity_timer()
-            else:
-                if not self.bubble.active_triggered_alarms:
-                    self.bubble.set_new_reply_pending(True)
-            return
-
-        clean_reply, marker = parse_reply_marker(reply)
-        self.conversation.append({"role": "assistant", "content": clean_reply})
-
-        if marker == "[EXIT]":
-            self.add_message(clean_reply, is_user=False)
-            self.send_btn.setEnabled(False)
-            self.input_field.setEnabled(False)
-            self.title_label.setText("Goodbye...")
-            QTimer.singleShot(1500, QApplication.quit)
-        elif marker == "[RESTART]":
-            self.add_message(clean_reply, is_user=False)
-            self.send_btn.setEnabled(False)
-            self.input_field.setEnabled(False)
-            self.title_label.setText("Restarting...")
-            QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_RESTART))
-        elif marker == "[UPDATE]":
-            self.add_message(clean_reply, is_user=False)
-            self.send_btn.setEnabled(False)
-            self.input_field.setEnabled(False)
-            self.title_label.setText("Updating...")
-            QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_UPDATE))
+        if result.error:
+            self.add_message(f"(LLM error — is Ollama running? {result.error})", is_user=False, is_refusal=True)
+        elif result.is_refusal:
+            self.add_message(result.reply, is_user=False, is_refusal=True)
         else:
-            self.add_message(clean_reply, is_user=False)
-            if self.isVisible():
-                self.input_field.setFocus()
-                self.start_inactivity_timer()
+            if result.marker == "[EXIT]":
+                self.add_message(result.reply, is_user=False)
+                self.send_btn.setEnabled(False)
+                self.input_field.setEnabled(False)
+                self.title_label.setText("Goodbye...")
+                QTimer.singleShot(1500, QApplication.quit)
+                return
+            elif result.marker == "[RESTART]":
+                self.add_message(result.reply, is_user=False)
+                self.send_btn.setEnabled(False)
+                self.input_field.setEnabled(False)
+                self.title_label.setText("Restarting...")
+                QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_RESTART))
+                return
+            elif result.marker == "[UPDATE]":
+                self.add_message(result.reply, is_user=False)
+                self.send_btn.setEnabled(False)
+                self.input_field.setEnabled(False)
+                self.title_label.setText("Updating...")
+                QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_UPDATE))
+                return
             else:
-                if not self.bubble.active_triggered_alarms:
-                    self.bubble.set_new_reply_pending(True)
+                self.add_message(result.reply, is_user=False, articles=result.articles)
+
+        if self.isVisible():
+            self.input_field.setFocus()
+            self.start_inactivity_timer()
+        else:
+            if not self.bubble.active_triggered_alarms:
+                self.bubble.set_new_reply_pending(True)
+
 
     def handle_update_check_finished(self, new_version: str, error: str) -> None:
         self.send_btn.setEnabled(True)
@@ -1254,14 +1104,13 @@ class ChatWindow(QWidget):
 
 class FloatingBubble(QWidget):
     """Draggable Floating Bubble (State 1 of Scheme B)."""
-    def __init__(self, config: dict, evaluator: MoralEvaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag: str = None):
+    def __init__(self, config: dict, controller, alarm_manager, alarm_trigger, alarm_scheduler, new_tag: str = None):
         super().__init__()
         self.config = config
-        self.evaluator = evaluator
+        self.controller = controller
         self.alarm_manager = alarm_manager
         self.alarm_trigger = alarm_trigger
         self.alarm_scheduler = alarm_scheduler
-        self.intent_parser = intent_parser
         self.active_triggered_alarms = []
         self.drag_position = QPoint()
         self.click_start_pos = QPoint()
@@ -1291,7 +1140,7 @@ class FloatingBubble(QWidget):
         )
 
         # Initialize Chat Window
-        self.chat_window = ChatWindow(self.config, self.evaluator, self, self.alarm_manager, self.alarm_trigger, self.alarm_scheduler, self.intent_parser, new_tag)
+        self.chat_window = ChatWindow(self.config, self.controller, self, self.alarm_manager, self.alarm_trigger, self.alarm_scheduler, new_tag)
         self.chat_window.closed_to_bubble.connect(self.collapse_from_chat)
 
         # Position bubble in the bottom right corner initially
@@ -1463,16 +1312,23 @@ class FloatingBubble(QWidget):
                         logging.info("Dropped unsupported file format in bubble: %s", suffix)
 
 
-def start_gui(config: dict, evaluator: MoralEvaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag: str = None) -> None:
+def start_gui(
+    config: dict,
+    controller,
+    alarm_manager,
+    alarm_trigger,
+    alarm_scheduler,
+    new_tag: str = None,
+) -> None:
     """Launch the PyQt6 application loop."""
     app = QApplication(sys.argv)
-    
+
     # Premium ToolTip styling matching dark mode
     app.setStyleSheet(
         "QToolTip { color: #ffffff; background-color: #2D3748; border: 1px solid #4A5568; "
         "border-radius: 6px; padding: 6px; font-family: 'Segoe UI', Arial; font-size: 12px; }"
     )
-    
-    bubble = FloatingBubble(config, evaluator, alarm_manager, alarm_trigger, alarm_scheduler, intent_parser, new_tag)
+
+    bubble = FloatingBubble(config, controller, alarm_manager, alarm_trigger, alarm_scheduler, new_tag)
     bubble.show()
     sys.exit(app.exec())
