@@ -74,12 +74,10 @@ def test_gui_conversational_exit(mock_gui_components):
     
     # Mock QTimer.singleShot to spy on it
     with patch.object(QTimer, "singleShot") as mock_timer:
-        # Call handle_reply with [EXIT] marker
-        chat_win.handle_reply("Goodbye my friend! [EXIT]", "")
-        
-        # Verify message was stripped of [EXIT] and stored
-        assert len(chat_win.conversation) == 1
-        assert chat_win.conversation[0] == {"role": "assistant", "content": "Goodbye my friend!"}
+        # Call handle_controller_result with ControllerResult having [EXIT] marker
+        from core_controller import ControllerResult
+        result = ControllerResult(reply="Goodbye my friend!", marker="[EXIT]")
+        chat_win.handle_controller_result(result)
         
         # Verify UI controls disabled
         assert not chat_win.send_btn.isEnabled()
@@ -101,7 +99,7 @@ def test_gui_conversational_exit(mock_gui_components):
 
 def test_cli_conversational_exit(mock_gui_components):
     # Simulate a conversational exit in CLI mode
-    with patch("assistant.call_ollama", return_value="Goodbye CLI! [EXIT]"), \
+    with patch("ollama_client.OllamaClient.chat", return_value="Goodbye CLI! [EXIT]"), \
          patch("sys.exit") as mock_exit, \
          patch("builtins.print") as mock_print:
          

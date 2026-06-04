@@ -105,7 +105,7 @@ def test_send_message_resets_timer(mock_gui_components):
     chat_win.input_field.setText("hello")
     # Mock Ollama call to prevent actual network calls during test
     with patch.object(chat_win, 'start_inactivity_timer') as mock_start:
-        with patch('assistant_gui.OllamaWorker'):
+        with patch('assistant_gui.ControllerWorker'):
             chat_win.send_message()
             assert mock_start.called
 

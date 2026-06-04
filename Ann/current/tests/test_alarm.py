@@ -356,28 +356,28 @@ class TestIntentParser(unittest.TestCase):
         self.assertEqual(res["label"], "\u5403\u85e5")
         self.assertIsNone(res["alarm_id"])
 
-    @patch("assistant.call_ollama")
-    def test_intent_parsing_invalid_json_fallback(self, mock_call):
+    @patch("ollama_client.OllamaClient.chat")
+    def test_intent_parsing_invalid_json_fallback(self, mock_chat):
         parser = IntentParser(base_url="http://mock", model="mock")
         
         # Mock non-JSON response
-        mock_call.return_value = "Sorry, I can't do that."
+        mock_chat.return_value = "Sorry, I can't do that."
         
-        res = parser.parse_intent("\u522a\u9664\u9b27\u9418 123")
+        res = parser.parse_intent("刪除鬧鐘 123")
         # Should fallback to regex rules
         self.assertEqual(res["intent"], "delete_alarm")
         self.assertEqual(res["alarm_id"], "123")
 
-    def test_intent_parsing_update_fallback(self):
+    @patch("ollama_client.OllamaClient.chat", side_effect=Exception("offline"))
+    def test_intent_parsing_update_fallback(self, mock_chat):
         parser = IntentParser(base_url="http://mock", model="mock")
-        with patch("assistant.call_ollama", side_effect=Exception("offline")):
-            res = parser.parse_intent("\u4fee\u6539\u9b27\u9418\u4e0b\u53483\u9ede\u70ba\u4e0b\u53484\u9ede")
-            self.assertEqual(res["intent"], "update_alarm")
-            self.assertEqual(res["target_alarm"], "\u4e0b\u53483\u9ede")
+        res = parser.parse_intent("修改鬧鐘下午3點為下午4點")
+        self.assertEqual(res["intent"], "update_alarm")
+        self.assertEqual(res["target_alarm"], "下午3點")
 
     def test_bidirectional_label_matching(self):
         # Create alarms and test matches target
-        alarm = Alarm(datetime_val=datetime.now(), label="\u958b\u6703")
+        alarm = Alarm(datetime_val=datetime.now(), label="開會")
         # Use a temporary file path
         import tempfile
         temp_file = tempfile.NamedTemporaryFile(delete=False)
@@ -386,27 +386,27 @@ class TestIntentParser(unittest.TestCase):
             manager = AlarmManager(filepath=temp_file.name)
             
             # Exact match
-            self.assertTrue(manager._alarm_matches_target(alarm, "\u958b\u6703"))
+            self.assertTrue(manager._alarm_matches_target(alarm, "開會"))
             # Bidirectional substring matches
-            self.assertTrue(manager._alarm_matches_target(alarm, "\u958b\u6703\u7684\u9b27\u9418"))
-            self.assertTrue(manager._alarm_matches_target(alarm, "\u958b"))
+            self.assertTrue(manager._alarm_matches_target(alarm, "開會的鬧鐘"))
+            self.assertTrue(manager._alarm_matches_target(alarm, "開"))
             
             # Test delete by target
             manager.alarms = [alarm]
-            self.assertTrue(manager.delete_alarm_by_target("\u958b\u6703\u7684\u9b27\u9418"))
+            self.assertTrue(manager.delete_alarm_by_target("開會的鬧鐘"))
             self.assertEqual(len(manager.alarms), 0)
         finally:
             import os
             if os.path.exists(temp_file.name):
                 os.unlink(temp_file.name)
 
-    def test_regex_fallback_chinese_characters(self):
+    @patch("ollama_client.OllamaClient.chat", side_effect=Exception("offline"))
+    def test_regex_fallback_chinese_characters(self, mock_chat):
         parser = IntentParser(base_url="http://mock", model="mock")
-        with patch("assistant.call_ollama", side_effect=Exception("offline")):
-            res = parser.parse_intent("\u522a\u9664\u958b\u6703")
-            self.assertEqual(res["intent"], "delete_alarm")
-            self.assertEqual(res["target_alarm"], "\u958b\u6703")
-            self.assertIsNone(res["alarm_id"])
+        res = parser.parse_intent("刪除開會")
+        self.assertEqual(res["intent"], "delete_alarm")
+        self.assertEqual(res["target_alarm"], "開會")
+        self.assertIsNone(res["alarm_id"])
 
     @patch("ollama_client.OllamaClient.chat")
     def test_clean_val_null_dummy_values(self, mock_chat):

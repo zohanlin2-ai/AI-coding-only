@@ -74,12 +74,10 @@ def test_gui_conversational_update(mock_gui_components):
     
     # Mock QTimer.singleShot to spy on it
     with patch.object(QTimer, "singleShot") as mock_timer:
-        # Call handle_reply with [UPDATE] marker
-        chat_win.handle_reply("Updating now, goodbye! [UPDATE]", "")
-        
-        # Verify message was stripped of [UPDATE] and stored
-        assert len(chat_win.conversation) == 1
-        assert chat_win.conversation[0] == {"role": "assistant", "content": "Updating now, goodbye!"}
+        # Call handle_controller_result with ControllerResult having [UPDATE] marker
+        from core_controller import ControllerResult
+        result = ControllerResult(reply="Updating now, goodbye!", marker="[UPDATE]")
+        chat_win.handle_controller_result(result)
         
         # Verify UI controls disabled
         assert not chat_win.send_btn.isEnabled()

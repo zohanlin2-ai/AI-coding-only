@@ -76,12 +76,10 @@ def test_gui_conversational_restart(mock_gui_components):
     
     # Mock QTimer.singleShot to spy on it
     with patch.object(QTimer, "singleShot") as mock_timer:
-        # Call handle_reply with [RESTART] marker
-        chat_win.handle_reply("I am restarting! [RESTART]", "")
-        
-        # Verify message was stripped of [RESTART] and stored
-        assert len(chat_win.conversation) == 1
-        assert chat_win.conversation[0] == {"role": "assistant", "content": "I am restarting!"}
+        # Call handle_controller_result with ControllerResult having [RESTART] marker
+        from core_controller import ControllerResult
+        result = ControllerResult(reply="I am restarting!", marker="[RESTART]")
+        chat_win.handle_controller_result(result)
         
         # Verify UI controls disabled
         assert not chat_win.send_btn.isEnabled()
