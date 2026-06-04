@@ -962,6 +962,11 @@ class ChatWindow(QWidget):
                 return
             intent = detect_update_intent(user_input_lower)
             if intent == "yes":
+                from security_daemon import SecurityDaemon
+                daemon = SecurityDaemon(self.config)
+                if daemon.running:
+                    self.add_message("偵測到安全監控 Daemon 正在執行，正在先將其關閉...", is_user=False)
+                    daemon.stop()
                 llm_message = build_update_confirm_llm_message(self.pending_version, user_text)
                 self.controller.conversation.append({"role": "user", "content": llm_message})
                 self.awaiting_update_confirm = False
