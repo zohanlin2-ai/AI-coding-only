@@ -137,6 +137,11 @@ def main() -> None:
     controller.setup_alarm_components(alarm_manager, alarm_trigger, alarm_scheduler, alarm_intent_parser)
     controller.setup_modules()
 
+    # Start SecurityDaemon automatically
+    from security_daemon import SecurityDaemon
+    daemon = SecurityDaemon(config)
+    daemon.start()
+
     # Version check
     new_tag = check_for_update(config, BASE_DIR)
 
@@ -154,155 +159,158 @@ def main() -> None:
             except ImportError:
                 has_qt = False
 
-    if not has_qt:
-        # ---- CLI mode ------------------------------------------------
-        if not use_cli:
-            print("\n[Notice] PyQt6 or PySide6 is not installed on this system.")
-            print("         To enable the floating GUI interface, please run: pip install PyQt6")
-        print(f"\n{'='*50}")
-        print(f"  Ann AI Assistant (CLI)  v{version}")
-        print(f"  Model: {config['llm']['model']}")
-        print(f"{'='*50}")
-        print("  Commands: 'exit' to quit | 'update' to update\n")
+    try:
+        if not has_qt:
+            # ---- CLI mode ------------------------------------------------
+            if not use_cli:
+                print("\n[Notice] PyQt6 or PySide6 is not installed on this system.")
+                print("         To enable the floating GUI interface, please run: pip install PyQt6")
+            print(f"\n{'='*50}")
+            print(f"  Ann AI Assistant (CLI)  v{version}")
+            print(f"  Model: {config['llm']['model']}")
+            print(f"{'='*50}")
+            print("  Commands: 'exit' to quit | 'update' to update\n")
 
-        awaiting_update_confirm = False
-        pending_version: str | None = None
-        security_mode = False
+            awaiting_update_confirm = False
+            pending_version: str | None = None
+            security_mode = False
 
-        if new_tag:
-            awaiting_update_confirm = True
-            pending_version = new_tag
-            print(f"\nAnn: 偵測到新版本 {new_tag}。請問您現在需要更新嗎？[y/n]\n")
+            if new_tag:
+                awaiting_update_confirm = True
+                pending_version = new_tag
+                print(f"\nAnn: 偵測到新版本 {new_tag}。請問您現在需要更新嗎？[y/n]\n")
 
-        def cli_alarm_callback(alarm):
-            alarm_scheduler.active_triggered_alarms.append(alarm)
-            alarm_trigger.play_sound()
-            alarm_scheduler.start_cli_alerts(
-                alarm.label or "無備註",
-                alarm.datetime.strftime("%Y-%m-%d %H:%M"),
-            )
+            def cli_alarm_callback(alarm):
+                alarm_scheduler.active_triggered_alarms.append(alarm)
+                alarm_trigger.play_sound()
+                alarm_scheduler.start_cli_alerts(
+                    alarm.label or "無備註",
+                    alarm.datetime.strftime("%Y-%m-%d %H:%M"),
+                )
 
-        try:
-            alarm_scheduler.start_cli_scheduler(cli_alarm_callback)
+            try:
+                alarm_scheduler.start_cli_scheduler(cli_alarm_callback)
 
-            while True:
-                try:
-                    user_input = input("You: ").strip()
-                except (EOFError, KeyboardInterrupt):
-                    print("\nAnn: Goodbye!")
-                    sys.exit(0)
+                while True:
+                    try:
+                        user_input = input("You: ").strip()
+                    except (EOFError, KeyboardInterrupt):
+                        print("\nAnn: Goodbye!")
+                        sys.exit(0)
 
-                # Dismiss triggered alarm
-                if alarm_scheduler.active_triggered_alarms:
-                    alarm_trigger.stop_trigger()
-                    alarm_scheduler.stop_cli_alerts()
-                    alarm_scheduler.active_triggered_alarms.clear()
-                    print("\nAnn: 鬧鐘已關閉。\n")
-                    continue
+                    # Dismiss triggered alarm
+                    if alarm_scheduler.active_triggered_alarms:
+                        alarm_trigger.stop_trigger()
+                        alarm_scheduler.stop_cli_alerts()
+                        alarm_scheduler.active_triggered_alarms.clear()
+                        print("\nAnn: 鬧鐘已關閉。\n")
+                        continue
 
-                if not user_input:
-                    continue
+                    if not user_input:
+                        continue
 
-                user_lower = user_input.lower().strip()
+                    user_lower = user_input.lower().strip()
 
-                # ---- /memory slash commands (fast, no LLM) --------------
-                if user_lower.startswith("/memory"):
-                    reply = handle_memory_command(user_input, controller.memory_manager)
-                    print(f"\nAnn: {reply}\n")
-                    continue
+                    # ---- /memory slash commands (fast, no LLM) --------------
+                    if user_lower.startswith("/memory"):
+                        reply = handle_memory_command(user_input, controller.memory_manager)
+                        print(f"\nAnn: {reply}\n")
+                        continue
 
-                # ---- System commands ------------------------------------
-                if user_lower in _EXIT_CMDS:
-                    print("\nAnn: 再見！有需要隨時找我。\n")
-                    sys.exit(0)
+                    # ---- System commands ------------------------------------
+                    if user_lower in _EXIT_CMDS:
+                        print("\nAnn: 再見！有需要隨時找我。\n")
+                        sys.exit(0)
 
-                if user_lower in _RESTART_CMDS:
-                    print("\nAnn: 好的，我現在重新啟動，稍後見！\n")
-                    sys.exit(EXIT_RESTART)
+                    if user_lower in _RESTART_CMDS:
+                        print("\nAnn: 好的，我現在重新啟動，稍後見！\n")
+                        sys.exit(EXIT_RESTART)
 
-                # ---- Update confirmation flow ----------------------------
-                if awaiting_update_confirm:
-                    intent = detect_update_intent(user_lower)
-                    if intent == "yes":
-                        if security_mode:
+                    # ---- Update confirmation flow ----------------------------
+                    if awaiting_update_confirm:
+                        intent = detect_update_intent(user_lower)
+                        if intent == "yes":
+                            if security_mode:
+                                awaiting_update_confirm = False
+                                pending_version = None
+                                print("\nAnn: 安全模式下無法進行更新。請先關閉安全模式。\n")
+                                continue
+                            awaiting_update_confirm = False
+                            llm_msg = build_update_confirm_llm_message(pending_version, user_input)
+                            controller.conversation.append({"role": "user", "content": llm_msg})
+                            pending_version = None
+                            try:
+                                messages = [
+                                    {"role": "system", "content": SYSTEM_PROMPT},
+                                    *controller.conversation,
+                                ]
+                                reply = controller.ollama_client.chat(controller.llm_model, messages)
+                                clean = reply.replace("[UPDATE]", "").strip()
+                                controller.conversation.append({"role": "assistant", "content": clean})
+                                print(f"\nAnn: {clean}\n")
+                            except Exception:
+                                print("\nAnn: 好的，即將進行更新並重新啟動應用程式...\n")
+                            sys.exit(EXIT_UPDATE)
+                        elif intent == "no":
                             awaiting_update_confirm = False
                             pending_version = None
+                            print(f"\nAnn: {UPDATE_CONFIRM_NO_REPLY}\n")
+                        else:
+                            print(f"\nAnn: {UPDATE_CONFIRM_UNCLEAR_REPLY}\n")
+                        continue
+
+                    # ---- On-demand update check -----------------------------
+                    if any(w in user_lower for w in UPDATE_CHECK_WORDS):
+                        if security_mode:
                             print("\nAnn: 安全模式下無法進行更新。請先關閉安全模式。\n")
                             continue
-                        awaiting_update_confirm = False
-                        llm_msg = build_update_confirm_llm_message(pending_version, user_input)
-                        controller.conversation.append({"role": "user", "content": llm_msg})
-                        pending_version = None
-                        try:
-                            messages = [
-                                {"role": "system", "content": SYSTEM_PROMPT},
-                                *controller.conversation,
-                            ]
-                            reply = controller.ollama_client.chat(controller.llm_model, messages)
-                            clean = reply.replace("[UPDATE]", "").strip()
-                            controller.conversation.append({"role": "assistant", "content": clean})
-                            print(f"\nAnn: {clean}\n")
-                        except Exception:
-                            print("\nAnn: 好的，即將進行更新並重新啟動應用程式...\n")
-                        sys.exit(EXIT_UPDATE)
-                    elif intent == "no":
-                        awaiting_update_confirm = False
-                        pending_version = None
-                        print(f"\nAnn: {UPDATE_CONFIRM_NO_REPLY}\n")
-                    else:
-                        print(f"\nAnn: {UPDATE_CONFIRM_UNCLEAR_REPLY}\n")
-                    continue
-
-                # ---- On-demand update check -----------------------------
-                if any(w in user_lower for w in UPDATE_CHECK_WORDS):
-                    if security_mode:
-                        print("\nAnn: 安全模式下無法進行更新。請先關閉安全模式。\n")
+                        print("\nAnn: 正在檢查更新，請稍候...")
+                        new_version = check_for_update(config, BASE_DIR)
+                        if new_version:
+                            awaiting_update_confirm = True
+                            pending_version = new_version
+                            print(f"\nAnn: 偵測到新版本 {new_version}。請問您現在要更新嗎？[y/n]\n")
+                        else:
+                            print("\nAnn: 您目前已是最新版本，不需要更新。\n")
                         continue
-                    print("\nAnn: 正在檢查更新，請稍候...")
-                    new_version = check_for_update(config, BASE_DIR)
-                    if new_version:
-                        awaiting_update_confirm = True
-                        pending_version = new_version
-                        print(f"\nAnn: 偵測到新版本 {new_version}。請問您現在要更新嗎？[y/n]\n")
-                    else:
-                        print("\nAnn: 您目前已是最新版本，不需要更新。\n")
-                    continue
 
-                # ---- Normal message → CoreController --------------------
-                result: ControllerResult = controller.post_message(user_input)
+                    # ---- Normal message → CoreController --------------------
+                    result: ControllerResult = controller.post_message(user_input)
 
-                if result.error:
-                    print(f"\nAnn: (LLM error — is Ollama running? {result.error})\n")
-                    continue
+                    if result.error:
+                        print(f"\nAnn: (LLM error — is Ollama running? {result.error})\n")
+                        continue
 
-                print(f"\nAnn: {result.reply}\n")
+                    print(f"\nAnn: {result.reply}\n")
 
-                if result.marker == "[EXIT]":
-                    sys.exit(0)
-                elif result.marker == "[RESTART]":
-                    sys.exit(EXIT_RESTART)
-                elif result.marker == "[UPDATE]":
-                    sys.exit(EXIT_UPDATE)
-                elif result.marker == "[SECURITY_ON]":
-                    security_mode = True
-                elif result.marker == "[SECURITY_OFF]":
-                    security_mode = False
+                    if result.marker == "[EXIT]":
+                        sys.exit(0)
+                    elif result.marker == "[RESTART]":
+                        sys.exit(EXIT_RESTART)
+                    elif result.marker == "[UPDATE]":
+                        sys.exit(EXIT_UPDATE)
+                    elif result.marker == "[SECURITY_ON]":
+                        security_mode = True
+                    elif result.marker == "[SECURITY_OFF]":
+                        security_mode = False
 
-        finally:
-            alarm_scheduler.stop_cli_scheduler()
-            alarm_trigger.stop_trigger()
+            finally:
+                alarm_scheduler.stop_cli_scheduler()
+                alarm_trigger.stop_trigger()
 
-    else:
-        # ---- GUI mode -----------------------------------------------
-        import assistant_gui
-        assistant_gui.start_gui(
-            config,
-            controller,
-            alarm_manager,
-            alarm_trigger,
-            alarm_scheduler,
-            new_tag,
-        )
+        else:
+            # ---- GUI mode -----------------------------------------------
+            import assistant_gui
+            assistant_gui.start_gui(
+                config,
+                controller,
+                alarm_manager,
+                alarm_trigger,
+                alarm_scheduler,
+                new_tag,
+            )
+    finally:
+        daemon.stop()
 
 
 if __name__ == "__main__":

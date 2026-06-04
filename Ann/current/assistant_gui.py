@@ -707,7 +707,7 @@ class ChatWindow(QWidget):
 
         # --- Security Dashboard (index 1 in stack; lazy-imported to avoid Qt init issues) ---
         from security_dashboard import SecurityDashboardWidget
-        self.security_dashboard = SecurityDashboardWidget()
+        self.security_dashboard = SecurityDashboardWidget(self.config)
         self.security_dashboard.alert_triggered.connect(self._on_security_alert)
 
         # --- QStackedWidget: index 0 = chat, index 1 = security dashboard ---

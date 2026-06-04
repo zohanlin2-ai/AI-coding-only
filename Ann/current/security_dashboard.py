@@ -290,10 +290,14 @@ class SecurityDashboardWidget(QWidget):
 
     alert_triggered = pyqtSignal(str, str)  # (severity, title)
 
-    def __init__(self, parent=None):
+    def __init__(self, config: dict = None, parent=None):
         super().__init__(parent)
-        # Daemon always running by default; resets to True on every Ann startup.
-        self._daemon_running = True
+        self.config = config or {}
+        # Get daemon singleton instance
+        from security_daemon import SecurityDaemon
+        self.daemon = SecurityDaemon(self.config)
+        self._daemon_running = self.daemon.running
+
         # IDs already notified in this session — avoids duplicate notifications.
         self._notified_ids: set[str] = set()
         # Current severity filter in Alerts view (None = ALL).
@@ -339,15 +343,15 @@ class SecurityDashboardWidget(QWidget):
         self._stack.addWidget(self._build_coverage())   # 3
         root.addWidget(self._stack)
 
-        # 30-second refresh timer (Phase 2: poll real data)
+        # 5-second refresh timer (Phase 2: poll real data)
         self._refresh_timer = QTimer(self)
-        self._refresh_timer.setInterval(30_000)
+        self._refresh_timer.setInterval(5_000)
         self._refresh_timer.timeout.connect(self.refresh)
 
-        # First alert check fires 5 s after entering security mode
+        # First alert check fires 2 s after entering security mode
         self._notification_timer = QTimer(self)
         self._notification_timer.setSingleShot(True)
-        self._notification_timer.setInterval(5_000)
+        self._notification_timer.setInterval(2_000)
         self._notification_timer.timeout.connect(self._check_new_alerts)
 
     # ------------------------------------------------------------------
@@ -826,6 +830,7 @@ class SecurityDashboardWidget(QWidget):
     def _toggle_daemon(self) -> None:
         self._daemon_running = not self._daemon_running
         if self._daemon_running:
+            self.daemon.start()
             self._daemon_val_lbl.setText("Running")
             self._daemon_val_lbl.setStyleSheet(
                 "color: #68D391; font-size: 16px; font-weight: bold; "
@@ -839,6 +844,7 @@ class SecurityDashboardWidget(QWidget):
                 "QPushButton:hover { background-color: #3D1515; }"
             )
         else:
+            self.daemon.stop()
             self._daemon_val_lbl.setText("Stopped")
             self._daemon_val_lbl.setStyleSheet(
                 "color: #FC8181; font-size: 16px; font-weight: bold; "
@@ -869,14 +875,32 @@ class SecurityDashboardWidget(QWidget):
         self._notification_timer.stop()
         self._notif_banner.hide()
 
+    def _load_alerts(self) -> list[dict]:
+        import json
+        from security_daemon import ALERTS_JSONL
+        alerts = []
+        if ALERTS_JSONL.exists():
+            try:
+                with open(ALERTS_JSONL, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.strip():
+                            alerts.append(json.loads(line.strip()))
+            except Exception:
+                pass
+        if not alerts:
+            # Fallback to keep UI interesting when empty
+            return _MOCK_ALERTS
+        return alerts
+
     def refresh(self) -> None:
         """Rebuild overview feed and alerts list from current data."""
         self._rebuild_overview_feed()
         self._rebuild_alerts_list()
+        self._check_new_alerts()
 
     def _rebuild_overview_feed(self) -> None:
         _clear_layout(self._overview_feed_layout)
-        alerts = sorted(_MOCK_ALERTS, key=lambda a: _SEVERITY_PRIORITY.get(a.get("severity", "low"), 4))[:4]
+        alerts = sorted(self._load_alerts(), key=lambda a: _SEVERITY_PRIORITY.get(a.get("severity", "low"), 4))[:4]
         for alert in alerts:
             self._overview_feed_layout.insertWidget(
                 self._overview_feed_layout.count() - 1, _AlertFeedItem(alert, compact=True)
@@ -886,9 +910,8 @@ class SecurityDashboardWidget(QWidget):
     def _check_new_alerts(self) -> None:
         """
         Emit alert_triggered for the first unnotified critical alert.
-        Phase 2: replace with real daemon event stream.
         """
-        for alert in _MOCK_ALERTS:
+        for alert in self._load_alerts():
             if alert.get("severity") == "critical" and alert["id"] not in self._notified_ids:
                 self._notified_ids.add(alert["id"])
                 self._notif_label.setText(f"🚨 {alert['title']}  ({alert.get('host', '')})")
