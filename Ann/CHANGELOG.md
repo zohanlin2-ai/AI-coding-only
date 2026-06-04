@@ -10,8 +10,8 @@ All notable changes to the **Ann** AI assistant project will be documented in th
 - Extended `_MARKERS` in `alarm_handler.py` to include `[SECURITY_ON]` and `[SECURITY_OFF]`, reusing the same marker-stripping pipeline as `[EXIT]` / `[RESTART]`.
 
 ### Changed
-- `assistant_gui.py` — `ChatWindow`: added `QStackedWidget` that holds the chat scroll area (index 0) and `SecurityDashboardWidget` (index 1); added `enter_security_mode()` / `exit_security_mode()` helpers; added `🛡️ Security` badge in title bar; `handle_controller_result()` now handles `[SECURITY_ON]` / `[SECURITY_OFF]` markers; `input_field` placeholder changes per mode.
-- `assistant_gui.py` — `FloatingBubble`: added `security_mode` flag and `set_security_mode()` method; `paintEvent()` draws a dual-ring red pulse effect (outer faint halo + inner pulsing ring) when security mode is active; inner circle fill unchanged; `set_new_reply_pending()` respects security mode priority.
+- `assistant_gui.py` — `ChatWindow`: added `QStackedWidget` that holds the chat scroll area (index 0) and `SecurityDashboardWidget` (index 1); added `enter_security_mode()` / `exit_security_mode()` helpers; added `🛡️ Security` badge in title bar; `handle_controller_result()` now handles `[SECURITY_ON]` / `[SECURITY_OFF]` markers; `input_field` placeholder changes per mode. Blocked update checks and update confirmations when security mode is active.
+- `assistant.py` (CLI mode): added state tracking for security mode via markers, blocking update commands and update confirmations if security mode is active.
 - `core_controller.py` — `setup_modules()`: registers `SecurityIntentParser` after news and file parsers.
 - `core_controller.py` — `SYSTEM_PROMPT`: clarified that security mode is handled automatically by the plugin system (LLM does not need to append markers for it).
 

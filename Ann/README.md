@@ -331,6 +331,7 @@ Ann supports a conversational security monitoring mode backed by the `realtime-s
 - **Bubble Visual Feedback**: The floating bubble switches to a dual-ring red pulse effect (outer faint halo + inner breathing ring) while security mode is active. The inner circle colour is unchanged.
 - **Security Dashboard**: The chat content area switches to a compact dashboard showing Daemon status, Queue depth, and a scrollable alert feed with severity colour coding and click-to-expand details including MITRE ATT&CK mapping and response recommendations.
 - **Persistent Input Bar**: The conversation input bar remains available in security mode so you can continue asking questions.
+- **Update Lock**: For system safety and operational integrity, program updates cannot be checked or performed while security monitoring mode is active ("在安全模式下，是無法進行更新的").
 - **Status Queries**: Ask "有幾個告警" / "daemon 狀態" for a plain-text status summary without entering full dashboard mode.
 - Phase 1 uses mock data; Phase 2 will read from the real security daemon's `alerts.jsonl` / SQLite store.
 For the daemon architecture and UI spec, see the [`realtime-security-daemon/`](./realtime-security-daemon/) directory.

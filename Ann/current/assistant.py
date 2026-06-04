@@ -167,6 +167,7 @@ def main() -> None:
 
         awaiting_update_confirm = False
         pending_version: str | None = None
+        security_mode = False
 
         if new_tag:
             awaiting_update_confirm = True
@@ -223,6 +224,11 @@ def main() -> None:
                 if awaiting_update_confirm:
                     intent = detect_update_intent(user_lower)
                     if intent == "yes":
+                        if security_mode:
+                            awaiting_update_confirm = False
+                            pending_version = None
+                            print("\nAnn: 安全模式下無法進行更新。請先關閉安全模式。\n")
+                            continue
                         awaiting_update_confirm = False
                         llm_msg = build_update_confirm_llm_message(pending_version, user_input)
                         controller.conversation.append({"role": "user", "content": llm_msg})
@@ -249,6 +255,9 @@ def main() -> None:
 
                 # ---- On-demand update check -----------------------------
                 if any(w in user_lower for w in UPDATE_CHECK_WORDS):
+                    if security_mode:
+                        print("\nAnn: 安全模式下無法進行更新。請先關閉安全模式。\n")
+                        continue
                     print("\nAnn: 正在檢查更新，請稍候...")
                     new_version = check_for_update(config, BASE_DIR)
                     if new_version:
@@ -274,6 +283,10 @@ def main() -> None:
                     sys.exit(EXIT_RESTART)
                 elif result.marker == "[UPDATE]":
                     sys.exit(EXIT_UPDATE)
+                elif result.marker == "[SECURITY_ON]":
+                    security_mode = True
+                elif result.marker == "[SECURITY_OFF]":
+                    security_mode = False
 
         finally:
             alarm_scheduler.stop_cli_scheduler()

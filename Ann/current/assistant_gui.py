@@ -955,6 +955,11 @@ class ChatWindow(QWidget):
         if self.awaiting_update_confirm:
             self.input_field.clear()
             self.add_message(user_text, is_user=True)
+            if self._security_mode:
+                self.awaiting_update_confirm = False
+                self.pending_version = None
+                self.add_message("安全模式下無法進行更新。請先關閉安全模式。", is_user=False)
+                return
             intent = detect_update_intent(user_input_lower)
             if intent == "yes":
                 llm_message = build_update_confirm_llm_message(self.pending_version, user_text)
@@ -999,6 +1004,9 @@ class ChatWindow(QWidget):
         if any(w in user_input_lower for w in UPDATE_CHECK_WORDS):
             self.input_field.clear()
             self.add_message(user_text, is_user=True)
+            if self._security_mode:
+                self.add_message("在安全模式下，是無法進行更新的。", is_user=False)
+                return
             self.add_message("正在檢查更新，請稍候...", is_user=False)
             self.send_btn.setEnabled(False)
             self.input_field.setEnabled(False)
