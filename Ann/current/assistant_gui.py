@@ -708,6 +708,7 @@ class ChatWindow(QWidget):
         # --- Security Dashboard (index 1 in stack; lazy-imported to avoid Qt init issues) ---
         from security_dashboard import SecurityDashboardWidget
         self.security_dashboard = SecurityDashboardWidget()
+        self.security_dashboard.alert_triggered.connect(self._on_security_alert)
 
         # --- QStackedWidget: index 0 = chat, index 1 = security dashboard ---
         try:
@@ -1058,6 +1059,21 @@ class ChatWindow(QWidget):
             self.title_label.setText("Ann is fetching news...")
         else:
             self.title_label.setText("Ann is typing...")
+
+    def _on_security_alert(self, severity: str, title: str) -> None:
+        """
+        Handle a proactive security alert notification from the daemon.
+        Adds a chat message (visible in both modes) and nudges the bubble
+        if the chat window is hidden.
+        """
+        self.add_message(
+            f"🚨 [{severity.upper()} ALERT]  {title}\n"
+            f"切換至『告警』頁查看詳情，或在下方輸入框詢問 Ann。",
+            is_user=False,
+        )
+        # If in bubble mode, let bubble know there is new content to review.
+        if not self.isVisible():
+            self.bubble.set_new_reply_pending(True)
 
     def enter_security_mode(self) -> None:
         """Switch the content area to the Security Dashboard."""
