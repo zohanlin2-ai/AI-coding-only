@@ -302,14 +302,15 @@ class CoreController:
         # ---- 4. Intent routing ------------------------------------------
         module_result = self.router.route(user_text, context)
         if module_result is not None:
+            clean_reply, marker = parse_reply_marker(module_result.reply)
             # Save to conversation history if there is a meaningful reply
-            if module_result.reply:
+            if clean_reply:
                 self.conversation.append({"role": "user", "content": user_text})
-                self.conversation.append({"role": "assistant", "content": module_result.reply})
+                self.conversation.append({"role": "assistant", "content": clean_reply})
             return ControllerResult(
-                reply=module_result.reply,
+                reply=clean_reply,
                 articles=module_result.articles,
-                marker=module_result.marker,
+                marker=marker or module_result.marker,
             )
 
         # ---- 5. Vision routing for image attachments --------------------
