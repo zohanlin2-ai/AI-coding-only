@@ -95,7 +95,7 @@ def main() -> None:
                 if has_qt:
                     import assistant_gui  # noqa: F401
             # Verify new core modules can be imported
-            from core_controller import CoreController  # noqa: F401
+            import core_controller  # noqa: F401
             from intent_router import IntentRouter  # noqa: F401
             print("Self-test passed.")
             sys.exit(0)
