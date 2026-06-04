@@ -63,6 +63,199 @@ graph TD
     Launcher -.->|Startup crash after update: rollback| Versions
 ```
 
+## 🧩 Adding a New Module — Rules & Guidelines
+
+Ann 採用 **IntentRouter + BaseIntentParser** 的插件架構。每個功能模組是一個獨立的類別，只要遵守以下規範，就能在不修改任何現有業務邏輯的情況下掛載新功能。
+
+---
+
+### 1. 插件合約（Plugin Contract）
+
+所有功能模組**必須**繼承 `BaseIntentParser`，並實作以下 5 個方法：
+
+```python
+from base_intent_parser import BaseIntentParser, ModuleResult
+
+class MyModule(BaseIntentParser):
+    # ── 必填：關鍵字清單（快速前置過濾，不呼叫 Ollama）──────────────────
+    KEYWORDS = ["my_keyword", "我的功能"]
+
+    # ── 必填：給 Ollama 的系統提示（定義 JSON schema）────────────────────
+    def _build_system_prompt(self) -> str:
+        return "Your system prompt here..."
+
+    # ── 必填：驗證 Ollama 回傳的 JSON，確保欄位型別正確 ─────────────────
+    def _validate_and_normalize(self, result: dict) -> dict:
+        # 確保 intent 只有允許的值
+        if result.get("intent") not in {"do_something", "none"}:
+            result["intent"] = "none"
+        return result
+
+    # ── 必填：當 intent 沒有命中時回傳的空結果 ───────────────────────────
+    def _empty_result(self) -> dict:
+        return {"intent": "none", "param": None}
+
+    # ── 必填：Ollama 離線或 JSON 解析失敗時的 regex 備援邏輯 ─────────────
+    def _regex_fallback(self, text: str) -> dict:
+        if "my_keyword" in text.lower():
+            return {"intent": "do_something", "param": text}
+        return self._empty_result()
+
+    # ── 必填：模組的業務邏輯，回傳 ModuleResult ───────────────────────────
+    def execute(self, parsed: dict, context: dict) -> ModuleResult:
+        reply = f"Handled: {parsed.get('param', '')}"
+        return ModuleResult(reply=reply)
+```
+
+> [!IMPORTANT]
+> `execute()` 會在 **背景執行緒（ControllerWorker）** 中被呼叫。可以自由執行阻塞式 I/O（網路請求、檔案讀寫、Ollama 呼叫），**不可**在 `execute()` 中直接操作任何 Qt 物件（Widget、QLabel、QTimer 等）。
+
+---
+
+### 2. `context` 字典 API
+
+`execute()` 的第二個參數 `context` 由 `CoreController.post_message()` 提供，包含以下保證可用的鍵：
+
+| Key | 型別 | 說明 |
+|:----|:-----|:-----|
+| `config` | `dict` | 完整的 `config.yml` 設定 |
+| `conversation` | `list[dict]` | 當前對話歷史（`[{"role": "user"/"assistant", "content": "..."}]`）|
+| `base_dir` | `Path` | Ann 根目錄（用於讀寫持久化資料）|
+| `user_text` | `str` | 使用者原始輸入文字 |
+| `call_llm` | `Callable[[str], str]` | 直接呼叫 Ollama 的同步函式，接受單一 prompt 字串 |
+| `alarm_manager` | `AlarmManager \| None` | 鬧鐘管理員實例 |
+| `news_manager` | `NewsManager \| None` | 新聞管理員實例 |
+
+> [!NOTE]
+> 如果您的模組需要自己初始化的物件（如資料庫連線、API client），請在模組的 `__init__` 中初始化並儲存為 `self.xxx`，**不要**透過 `context` 傳入（context 只提供全域共享資源）。
+
+---
+
+### 3. 使用 `conversation` 的注意事項
+
+- `conversation` 是 **共享的可變 list，所有模組共用同一份對話歷史。
+- 在 `execute()` 中**不要直接 append** 到 `conversation`——`CoreController` 會在路由成功後自動處理對話記錄。
+- 若您的模組需要呼叫 `call_llm()` 並希望對話記錄包含此次交流，**請在 `execute()` 回傳後**，透過 `CoreController` 的標準流程處理（而非在 execute 內手動 append）。
+
+---
+
+### 4. `ModuleResult` 欄位說明
+
+```python
+@dataclass
+class ModuleResult:
+    reply: str                  # 必填：要顯示給使用者的文字
+    articles: list = []         # 選填：新聞卡片清單（僅新聞模組使用）
+    marker: str | None = None   # 選填：控制指令，如 '[EXIT]', '[RESTART]'
+```
+
+> [!WARNING]
+> `marker` 欄位僅保留給系統層級的控制流程（退出、重啟、更新）。**一般功能模組不應設定 `marker`。**
+
+---
+
+### 5. 命名與檔案位置規範
+
+| 規範項目 | 要求 |
+|:---------|:-----|
+| **模組目錄** | 若功能複雜，建立 `current/<your_module>/` 子目錄；單一功能可直接放 `current/<your_module>_handler.py` |
+| **IntentParser 類別名稱** | 以 `IntentParser` 結尾，例如 `TodoIntentParser` |
+| **KEYWORDS** | 使用中英文混合，盡量涵蓋使用者可能的輸入方式 |
+| **`_build_system_prompt()`** | 必須明確要求 Ollama 只回傳 JSON，並附上欄位 schema |
+| **測試檔案** | 必須在 `current/tests/test_<your_module>.py` 建立對應單元測試 |
+
+---
+
+### 6. 註冊模組
+
+模組建立後，在 `CoreController.setup_modules()` 中註冊：
+
+```python
+# current/core_controller.py → CoreController.setup_modules()
+def setup_modules(self) -> None:
+    # ... 現有模組 ...
+
+    from my_module import MyModule  # 替換為您的模組
+    my_module = MyModule(self.llm_base_url, self.llm_model)
+    self.router.register(my_module)
+```
+
+> [!IMPORTANT]
+> **路由器是有序的（first-match-wins）**。在 `register()` 的呼叫順序決定了優先級：排在前面的模組會先被嘗試。請將**特定性更高**的模組放在前面，**通用型**的模組放在後面，避免過度攔截。
+
+---
+
+### 7. 禁止事項
+
+| ❌ 禁止 | ✅ 應改為 |
+|:--------|:---------|
+| 在 `execute()` 內操作 Qt Widget | 透過 `ModuleResult.reply` 回傳文字，由 GUI 渲染 |
+| 在模組內直接存取 `assistant_gui.py` | 透過 `context` 取得所需資料 |
+| 在 `execute()` 內 `append` 到 `context["conversation"]` | 讓 `CoreController` 在路由後自動記錄 |
+| 在模組內實作 exit / restart / update 等系統指令 | 系統指令只在 `assistant.py` / `assistant_gui.py` 的主迴圈中處理 |
+| 在 `should_parse()` 中呼叫 Ollama | `should_parse()` 必須是純關鍵字比對，不允許任何 I/O |
+
+---
+
+### 8. 快速範例：新增一個 TodoModule
+
+**Step 1 — 建立 `current/todo_handler.py`**
+
+```python
+from base_intent_parser import BaseIntentParser, ModuleResult
+
+class TodoIntentParser(BaseIntentParser):
+    KEYWORDS = ["todo", "待辦", "任務清單", "提醒我"]
+
+    def _build_system_prompt(self) -> str:
+        return (
+            "Extract todo intent from the user message.\n"
+            "Respond ONLY with valid JSON: "
+            '{"intent": "add_todo | list_todo | none", "content": "string or null"}'
+        )
+
+    def _validate_and_normalize(self, result: dict) -> dict:
+        if result.get("intent") not in {"add_todo", "list_todo", "none"}:
+            result["intent"] = "none"
+        return result
+
+    def _empty_result(self) -> dict:
+        return {"intent": "none", "content": None}
+
+    def _regex_fallback(self, text: str) -> dict:
+        if "todo" in text.lower() or "待辦" in text:
+            return {"intent": "add_todo", "content": text}
+        return self._empty_result()
+
+    def execute(self, parsed: dict, context: dict) -> ModuleResult:
+        base_dir = context["base_dir"]
+        todo_file = base_dir / "todos.txt"
+
+        if parsed["intent"] == "add_todo":
+            content = parsed.get("content") or context["user_text"]
+            with open(todo_file, "a", encoding="utf-8") as f:
+                f.write(f"- {content}\n")
+            return ModuleResult(reply=f"✅ 已新增待辦：{content}")
+
+        if parsed["intent"] == "list_todo":
+            if todo_file.exists():
+                items = todo_file.read_text(encoding="utf-8").strip()
+                return ModuleResult(reply=f"📋 待辦事項：\n{items}" if items else "目前沒有待辦事項。")
+            return ModuleResult(reply="目前沒有待辦事項。")
+
+        return ModuleResult(reply="")
+```
+
+**Step 2 — 在 `CoreController.setup_modules()` 中註冊**
+
+```python
+from todo_handler import TodoIntentParser
+todo_parser = TodoIntentParser(self.llm_base_url, self.llm_model)
+self.router.register(todo_parser)
+```
+
+**Step 3 — 在 `tests/test_todo.py` 補上單元測試，完成。**
+
 ---
 
 ## ⚙️ Installation & Usage (安裝與使用)
