@@ -46,7 +46,9 @@ SYSTEM_PROMPT = (
     "When the user indicates they want to restart the assistant program "
     "(e.g., 'restart', 'reboot', '重啟', '重新啟動'), respond with a warm response "
     "(e.g., 'I will restart now, see you in a moment!') and append the marker '[RESTART]' "
-    "at the very end of your response so the system can restart."
+    "at the very end of your response so the system can restart.\n"
+    "Security mode is handled automatically by the system — you do not need to append "
+    "any marker for it yourself."
 )
 
 
@@ -207,6 +209,9 @@ class CoreController:
             model=self.llm_model,
         )
         self.router.register(self.news_manager.intent_parser)
+
+        from security_plugin import SecurityIntentParser
+        self.router.register(SecurityIntentParser(self.llm_base_url, self.llm_model))
 
     # ------------------------------------------------------------------
     # LLM helper (synchronous — call from a worker thread in GUI)

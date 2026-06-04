@@ -630,6 +630,7 @@ class ChatWindow(QWidget):
         self.awaiting_update_confirm = False
         self.pending_version = None
         self.update_worker = None
+        self._security_mode = False
 
         # 閒置自動縮回計時器（3 分鐘）
         self.inactivity_timer = QTimer(self)
@@ -663,6 +664,16 @@ class ChatWindow(QWidget):
         title_layout.addWidget(self.title_label)
         title_layout.addStretch()
 
+        # Security mode indicator (hidden by default)
+        self.security_badge = QLabel("🛡️ Security")
+        self.security_badge.setStyleSheet(
+            "color: #FC8181; font-size: 11px; font-weight: bold; "
+            "font-family: 'Segoe UI'; border: 1px solid #E53E3E44; "
+            "border-radius: 6px; padding: 2px 6px; background: #3D1515;"
+        )
+        self.security_badge.hide()
+        title_layout.addWidget(self.security_badge)
+
         # Minimize/Shrink button
         self.shrink_btn = QPushButton("▼")
         self.shrink_btn.setFixedSize(28, 28)
@@ -694,7 +705,19 @@ class ChatWindow(QWidget):
         self.scroll_layout.addStretch()
         self.scroll_area.setWidget(self.scroll_widget)
 
-        card_layout.addWidget(self.scroll_area)
+        # --- Security Dashboard (index 1 in stack; lazy-imported to avoid Qt init issues) ---
+        from security_dashboard import SecurityDashboardWidget
+        self.security_dashboard = SecurityDashboardWidget()
+
+        # --- QStackedWidget: index 0 = chat, index 1 = security dashboard ---
+        try:
+            from PyQt6.QtWidgets import QStackedWidget
+        except ImportError:
+            from PySide6.QtWidgets import QStackedWidget
+        self.view_stack = QStackedWidget()
+        self.view_stack.addWidget(self.scroll_area)        # index 0
+        self.view_stack.addWidget(self.security_dashboard) # index 1
+        card_layout.addWidget(self.view_stack)
 
         # --- Dismiss Alarm Button ---
         self.dismiss_btn = QPushButton("🔔 關閉鬧鐘 🔔")
@@ -1036,11 +1059,29 @@ class ChatWindow(QWidget):
         else:
             self.title_label.setText("Ann is typing...")
 
+    def enter_security_mode(self) -> None:
+        """Switch the content area to the Security Dashboard."""
+        self._security_mode = True
+        self.view_stack.setCurrentIndex(1)
+        self.security_dashboard.start_monitoring()
+        self.security_badge.show()
+        self.title_label.setText("Ann — Security")
+        self.input_field.setPlaceholderText("Ask about security alerts...")
+
+    def exit_security_mode(self) -> None:
+        """Switch the content area back to normal chat."""
+        self._security_mode = False
+        self.security_dashboard.stop_monitoring()
+        self.view_stack.setCurrentIndex(0)
+        self.security_badge.hide()
+        self.title_label.setText("Ann")
+        self.input_field.setPlaceholderText("Type a message...")
+
     def handle_controller_result(self, result) -> None:
         """Handle the ControllerResult returned by ControllerWorker."""
         self.send_btn.setEnabled(True)
         self.input_field.setEnabled(True)
-        self.title_label.setText("Ann")
+        self.title_label.setText("Ann — Security" if self._security_mode else "Ann")
 
         if result.error:
             self.add_message(f"(LLM error — is Ollama running? {result.error})", is_user=False, is_refusal=True)
@@ -1067,6 +1108,16 @@ class ChatWindow(QWidget):
                 self.input_field.setEnabled(False)
                 self.title_label.setText("Updating...")
                 QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_UPDATE))
+                return
+            elif result.marker == "[SECURITY_ON]":
+                self.add_message(result.reply, is_user=False)
+                self.enter_security_mode()
+                self.bubble.set_security_mode(True)
+                return
+            elif result.marker == "[SECURITY_OFF]":
+                self.add_message(result.reply, is_user=False)
+                self.exit_security_mode()
+                self.bubble.set_security_mode(False)
                 return
             else:
                 self.add_message(result.reply, is_user=False, articles=result.articles)
@@ -1122,6 +1173,9 @@ class FloatingBubble(QWidget):
         self._pulse_alpha = 80          # 當前透明度（80~230 之間震盪）
         self._pulse_direction = 1       # 1=加深, -1=變淡
 
+        # 安全模式狀態（紅色雙圈效果）
+        self.security_mode = False
+
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(30)          # ~33fps
         self._pulse_timer.timeout.connect(self._update_pulse)
@@ -1156,7 +1210,7 @@ class FloatingBubble(QWidget):
 
         alarm_active = self.property("alarm_active")
 
-        # Draw bubble circle gradient
+        # Draw bubble circle gradient (inner fill — never changes in security mode)
         painter.setPen(Qt.PenStyle.NoPen)
         grad = QLinearGradient(0, 0, 0, self.height())
         if alarm_active:
@@ -1173,11 +1227,20 @@ class FloatingBubble(QWidget):
         pad = 2 if self.drag_active else 5
         painter.drawEllipse(pad, pad, self.width() - (pad * 2), self.height() - (pad * 2))
 
-        # Glowing border
+        # Security mode: outer halo ring (drawn before the main border)
+        if self.security_mode:
+            halo_pen = QPen(QColor(229, 62, 62, 55), 2)  # faint red outer glow
+            painter.setPen(halo_pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(1, 1, self.width() - 2, self.height() - 2)
+
+        # Main border / inner ring
         if alarm_active:
             pen = QPen(QColor(246, 224, 94, 230), 3)  # Flashing yellow border
         elif self.drag_active:
             pen = QPen(QColor(72, 187, 120, 230), 3)  # Glowing green border for drop target
+        elif self.security_mode:
+            pen = QPen(QColor(239, 68, 68, self._pulse_alpha), 3)  # Pulsing red border
         elif self.new_reply_pending:
             pen = QPen(QColor(236, 72, 153, self._pulse_alpha), 3)  # Pulsing pink border
         else:
@@ -1209,14 +1272,27 @@ class FloatingBubble(QWidget):
                     self.expand_to_chat()
             event.accept()
 
-    def set_new_reply_pending(self, state: bool) -> None:
-        """設定粉紅燈狀態，並啟動/停止脈衝動畫。"""
-        self.new_reply_pending = state
+    def set_security_mode(self, state: bool) -> None:
+        """切換安全模式外圈雙圈紅色脈衝效果。"""
+        self.security_mode = state
         if state:
+            self.new_reply_pending = False  # 安全模式優先，取消粉紅燈
             self._pulse_alpha = 80
             self._pulse_direction = 1
             self._pulse_timer.start()
         else:
+            if not self.new_reply_pending:
+                self._pulse_timer.stop()
+        self.update()
+
+    def set_new_reply_pending(self, state: bool) -> None:
+        """設定粉紅燈狀態，並啟動/停止脈衝動畫。"""
+        self.new_reply_pending = state
+        if state and not self.security_mode:  # 安全模式中不啟動粉紅燈
+            self._pulse_alpha = 80
+            self._pulse_direction = 1
+            self._pulse_timer.start()
+        elif not state and not self.security_mode:
             self._pulse_timer.stop()
         self.update()
 

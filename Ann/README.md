@@ -325,6 +325,16 @@ Ann integrates a local conversational memory system designed in [AI_Memory_Syste
   - `/memory delete <id>` — Discards a specific context memory.
   - `/memory off` / `/memory on` — Globally pauses/resumes the memory layer.
 
+### 🛡️ Security Mode (安全監控模式)
+Ann supports a conversational security monitoring mode backed by the `realtime-security-daemon` design:
+- **Conversation-Triggered Switch**: Say "開啟安全模式" / "enable security mode" to enter, or "關閉安全模式" / "exit security mode" to leave. The switch is handled by `SecurityIntentParser` — no additional GUI controls needed.
+- **Bubble Visual Feedback**: The floating bubble switches to a dual-ring red pulse effect (outer faint halo + inner breathing ring) while security mode is active. The inner circle colour is unchanged.
+- **Security Dashboard**: The chat content area switches to a compact dashboard showing Daemon status, Queue depth, and a scrollable alert feed with severity colour coding and click-to-expand details including MITRE ATT&CK mapping and response recommendations.
+- **Persistent Input Bar**: The conversation input bar remains available in security mode so you can continue asking questions.
+- **Status Queries**: Ask "有幾個告警" / "daemon 狀態" for a plain-text status summary without entering full dashboard mode.
+- Phase 1 uses mock data; Phase 2 will read from the real security daemon's `alerts.jsonl` / SQLite store.
+For the daemon architecture and UI spec, see the [`realtime-security-daemon/`](./realtime-security-daemon/) directory.
+
 ### 🔄 Conversational System Commands (對話式系統指令)
 Ann supports executing system actions directly through natural conversation, featuring warm LLM response generation prior to execution:
 - **Exit Program (關閉程式)**: Commands like "再見", "關閉視窗", "exit", "close the app" trigger a warm goodbye, append `[EXIT]`, disable inputs, and shut down after a 1.5 seconds delay.
@@ -358,6 +368,8 @@ The recommended layout for deployment and development:
 │   ├── ollama_client.py     # Unified Ollama API client with vision routing
 │   ├── file_handler.py      # File generation & export intent handler
 │   ├── moral_evaluator.py   # Moral/safety risk classifier
+│   ├── security_plugin.py   # Security mode intent parser plugin
+│   ├── security_dashboard.py# Security Dashboard widget (QStackedWidget view)
 │   ├── version_check.py     # GitHub API version check helper
 │   ├── alarms/              # Alarm storage and scheduler
 │   ├── news/                # News parsing, fetching, extracting, and summarization

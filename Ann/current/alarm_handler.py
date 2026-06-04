@@ -48,7 +48,7 @@ def detect_update_intent(user_input_lower: str) -> str:
 # Reply marker parsing (single source of truth for CLI + GUI)
 # ---------------------------------------------------------------------------
 
-_MARKERS = ("[EXIT]", "[RESTART]", "[UPDATE]")
+_MARKERS = ("[EXIT]", "[RESTART]", "[UPDATE]", "[SECURITY_ON]", "[SECURITY_OFF]")
 
 
 def parse_reply_marker(reply: str) -> tuple[str, str | None]:

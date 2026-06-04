@@ -2,7 +2,21 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.2.2] - 2026-06-04
+
+### Added
+- **Security Mode Plugin** (`current/security_plugin.py`): new `SecurityIntentParser` plugin that detects security mode switch requests and status queries. Follows the standard `BaseIntentParser` plugin contract. Returns `[SECURITY_ON]` / `[SECURITY_OFF]` embedded in the reply text, flowing through the existing `parse_reply_marker()` pipeline.
+- **Security Dashboard** (`current/security_dashboard.py`): new `SecurityDashboardWidget` displayed inside `ChatWindow` when security mode is active. Shows compact status cards (Daemon / Queue / Alerts) and a scrollable alert feed with click-to-expand detail rows and response recommendations. Uses mock data in Phase 1; real daemon reads in Phase 2.
+- Extended `_MARKERS` in `alarm_handler.py` to include `[SECURITY_ON]` and `[SECURITY_OFF]`, reusing the same marker-stripping pipeline as `[EXIT]` / `[RESTART]`.
+
+### Changed
+- `assistant_gui.py` — `ChatWindow`: added `QStackedWidget` that holds the chat scroll area (index 0) and `SecurityDashboardWidget` (index 1); added `enter_security_mode()` / `exit_security_mode()` helpers; added `🛡️ Security` badge in title bar; `handle_controller_result()` now handles `[SECURITY_ON]` / `[SECURITY_OFF]` markers; `input_field` placeholder changes per mode.
+- `assistant_gui.py` — `FloatingBubble`: added `security_mode` flag and `set_security_mode()` method; `paintEvent()` draws a dual-ring red pulse effect (outer faint halo + inner pulsing ring) when security mode is active; inner circle fill unchanged; `set_new_reply_pending()` respects security mode priority.
+- `core_controller.py` — `setup_modules()`: registers `SecurityIntentParser` after news and file parsers.
+- `core_controller.py` — `SYSTEM_PROMPT`: clarified that security mode is handled automatically by the plugin system (LLM does not need to append markers for it).
+
 ## [0.2.1] - 2026-06-04
+
 
 ### Changed (Architecture Refactoring — Extensibility & Responsiveness)
 - **Extracted `CoreController`** (`current/core_controller.py`): unified business logic controller shared by both CLI and GUI. Encapsulates moral evaluation, memory retrieval, intent routing, vision routing, and Ollama fallback in a single `post_message()` method.
