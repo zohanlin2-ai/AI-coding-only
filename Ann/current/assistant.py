@@ -278,7 +278,11 @@ def main() -> None:
                         continue
 
                     # ---- Normal message → CoreController --------------------
-                    result: ControllerResult = controller.post_message(user_input)
+                    daemon.pause()
+                    try:
+                        result: ControllerResult = controller.post_message(user_input)
+                    finally:
+                        daemon.resume()
 
                     if result.error:
                         print(f"\nAnn: (LLM error — is Ollama running? {result.error})\n")

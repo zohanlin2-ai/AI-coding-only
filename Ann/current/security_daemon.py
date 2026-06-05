@@ -11,6 +11,7 @@ import os
 import json
 import socket
 import logging
+import platform
 import threading
 import subprocess
 import time
@@ -91,14 +92,21 @@ class NormalizedEvent:
 
 
 class ProcessCollector(threading.Thread):
-    """Monitors running processes using PowerShell on Windows."""
+    """Monitors running processes (cross-platform)."""
     def __init__(self, event_queue: Queue, interval: float = 3.0):
         super().__init__(daemon=True, name="ProcessCollector")
         self.event_queue = event_queue
         self.interval = interval
         self._stop_event = threading.Event()
+        self._paused = threading.Event()
         self.seen_pids: set[int] = set()
         self.is_healthy_flag = True
+
+    def pause(self) -> None:
+        self._paused.set()
+
+    def resume(self) -> None:
+        self._paused.clear()
 
     def run(self) -> None:
         # Initialize seen_pids so we don't alert on startup processes
@@ -106,6 +114,9 @@ class ProcessCollector(threading.Thread):
         logger.info("ProcessCollector initialized with %d processes", len(self.seen_pids))
 
         while not self._stop_event.is_set():
+            if self._paused.is_set():
+                self._stop_event.wait(self.interval)
+                continue
             try:
                 current_procs = self._get_current_processes()
                 for pid, proc in current_procs.items():
@@ -135,23 +146,50 @@ class ProcessCollector(threading.Thread):
         return self.is_healthy_flag
 
     def _get_current_processes(self) -> dict[int, dict[str, Any]]:
-        """Executes a PowerShell Command to grab current processes as JSON."""
+        """Executes a platform-specific command to grab current processes."""
         procs = {}
-        try:
-            # Get processes via PowerShell
-            cmd = ["powershell", "-NoProfile", "-Command", 
-                   "Get-CimInstance Win32_Process | Select-Object Name, ProcessId, CommandLine | ConvertTo-Json"]
-            res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=10)
-            if res.returncode == 0 and res.stdout.strip():
-                data = json.loads(res.stdout.strip())
-                if isinstance(data, dict):
-                    data = [data]
-                for item in data:
-                    pid = item.get("ProcessId")
-                    if pid is not None:
-                        procs[pid] = item
-        except Exception as e:
-            logger.debug("Failed to list processes: %s", e)
+        system = platform.system()
+        if system == "Windows":
+            try:
+                # Get processes via PowerShell
+                cmd = ["powershell", "-NoProfile", "-Command", 
+                       "Get-CimInstance Win32_Process | Select-Object Name, ProcessId, CommandLine | ConvertTo-Json"]
+                res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=10)
+                if res.returncode == 0 and res.stdout.strip():
+                    data = json.loads(res.stdout.strip())
+                    if isinstance(data, dict):
+                        data = [data]
+                    for item in data:
+                        pid = item.get("ProcessId")
+                        if pid is not None:
+                            procs[pid] = item
+            except Exception as e:
+                logger.debug("Failed to list Windows processes: %s", e)
+        else:
+            # macOS or Linux: use ps command
+            try:
+                # pid, comm (command/process name), args (arguments)
+                cmd = ["ps", "-eo", "pid,comm,args"]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                if res.returncode == 0:
+                    lines = res.stdout.strip().split("\n")
+                    if len(lines) > 1:
+                        for line in lines[1:]:
+                            parts = line.strip().split(None, 2)
+                            if len(parts) >= 2:
+                                try:
+                                    pid = int(parts[0])
+                                    name = parts[1]
+                                    cmdline = parts[2] if len(parts) > 2 else name
+                                    procs[pid] = {
+                                        "Name": name,
+                                        "ProcessId": pid,
+                                        "CommandLine": cmdline
+                                    }
+                                except ValueError:
+                                    continue
+            except Exception as e:
+                logger.debug("Failed to list Unix processes: %s", e)
         return procs
 
 
@@ -163,8 +201,15 @@ class FileCollector(threading.Thread):
         self.watch_path = Path(watch_path)
         self.interval = interval
         self._stop_event = threading.Event()
+        self._paused = threading.Event()
         self.file_states: dict[str, tuple[float, int]] = {}  # path -> (mtime, size)
         self.is_healthy_flag = True
+
+    def pause(self) -> None:
+        self._paused.set()
+
+    def resume(self) -> None:
+        self._paused.clear()
 
     def run(self) -> None:
         LOGS_DIR.mkdir(exist_ok=True)
@@ -173,6 +218,9 @@ class FileCollector(threading.Thread):
         logger.info("FileCollector watching %s with %d files initially", self.watch_path, len(self.file_states))
 
         while not self._stop_event.is_set():
+            if self._paused.is_set():
+                self._stop_event.wait(self.interval)
+                continue
             try:
                 self._scan_directory()
                 self.is_healthy_flag = True
@@ -472,3 +520,13 @@ class SecurityDaemon:
         self.process_collector.join(timeout=2.0)
         self.file_collector.join(timeout=2.0)
         self.engine.join(timeout=2.0)
+
+    def pause(self) -> None:
+        logger.info("Pausing SecurityDaemon collectors...")
+        self.process_collector.pause()
+        self.file_collector.pause()
+
+    def resume(self) -> None:
+        logger.info("Resuming SecurityDaemon collectors...")
+        self.process_collector.resume()
+        self.file_collector.resume()

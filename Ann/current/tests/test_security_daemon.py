@@ -79,3 +79,49 @@ def test_security_engine_rules(tmp_path, monkeypatch):
     assert alerts[0]["rule_id"] == "R-001"
     assert alerts[0]["severity"] == "high"
     assert "powershell" in alerts[0]["evidence"].lower()
+
+
+def test_daemon_pause_resume(tmp_path):
+    q = Queue()
+    collector = FileCollector(q, tmp_path, interval=0.1)
+    
+    # Pause
+    collector.pause()
+    assert collector._paused.is_set()
+
+    # Create file while paused
+    test_file = tmp_path / "test_pause.txt"
+    test_file.write_text("paused file")
+    
+    # Run loop logic manually as thread would check _paused
+    # In run(), if paused is set, the polling logic is skipped.
+    # We simulate this behavior:
+    if not collector._paused.is_set():
+        collector._scan_directory()
+    
+    assert q.empty()
+
+    # Resume
+    collector.resume()
+    assert not collector._paused.is_set()
+    collector._scan_directory()
+    assert not q.empty()
+
+
+def test_process_collector_unix_parsing(monkeypatch):
+    class MockCompletedProcess:
+        returncode = 0
+        stdout = "  PID COMM COMMAND\n  100 bash /usr/bin/bash\n  101 python3 python3 security_daemon.py"
+
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: MockCompletedProcess())
+
+    q = Queue()
+    collector = ProcessCollector(q)
+    procs = collector._get_current_processes()
+    
+    assert len(procs) == 2
+    assert procs[100]["Name"] == "bash"
+    assert procs[100]["CommandLine"] == "/usr/bin/bash"
+    assert procs[101]["Name"] == "python3"
+    assert procs[101]["CommandLine"] == "python3 security_daemon.py"

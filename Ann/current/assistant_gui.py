@@ -1055,6 +1055,9 @@ class ChatWindow(QWidget):
         self.clear_attachments()
 
         # ---- Dispatch to ControllerWorker (background thread) -----------
+        from security_daemon import SecurityDaemon
+        SecurityDaemon(self.config).pause()
+
         self.send_btn.setEnabled(False)
         self.input_field.setEnabled(False)
         self.title_label.setText("Ann is typing...")
@@ -1108,6 +1111,9 @@ class ChatWindow(QWidget):
 
     def handle_controller_result(self, result) -> None:
         """Handle the ControllerResult returned by ControllerWorker."""
+        from security_daemon import SecurityDaemon
+        SecurityDaemon(self.config).resume()
+
         self.send_btn.setEnabled(True)
         self.input_field.setEnabled(True)
         self.title_label.setText("Ann — Security" if self._security_mode else "Ann")
