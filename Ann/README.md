@@ -334,7 +334,7 @@ Ann supports a conversational security monitoring mode backed by the `realtime-s
 - **Update Lock**: For system safety and operational integrity, program updates cannot be checked or performed while security monitoring mode is active ("在安全模式下，是無法進行更新的").
 - **Status Queries**: Ask "有幾個告警" / "daemon 狀態" for a plain-text status summary without entering full dashboard mode.
 - Phase 1 uses mock data; Phase 2 will read from the real security daemon's `alerts.jsonl` / SQLite store.
-For the daemon architecture and UI spec, see the [`realtime-security-daemon/`](./realtime-security-daemon/) directory.
+For details, see the [Daemon Architecture Guide](./realtime-security-daemon/nist-csf-mitre-attack-realtime-daemon-guide-enhanced.md), [Dashboard UI Spec](./realtime-security-daemon/nist-csf-mitre-attack-realtime-ui-spec.md), and [Network Packet Monitor UI Spec](./realtime-security-daemon/network-packet-monitor-ui-spec.md) in the [`realtime-security-daemon/`](./realtime-security-daemon/) directory.
 
 ### 🔄 Conversational System Commands (對話式系統指令)
 Ann supports executing system actions directly through natural conversation, featuring warm LLM response generation prior to execution:

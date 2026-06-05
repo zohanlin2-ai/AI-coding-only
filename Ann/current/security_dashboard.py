@@ -292,6 +292,7 @@ class SecurityDashboardWidget(QWidget):
 
     def __init__(self, config: dict = None, parent=None):
         super().__init__(parent)
+        self._packet_monitor_win = None
         self.config = config or {}
         # Get daemon singleton instance
         from security_daemon import SecurityDaemon
@@ -310,13 +311,31 @@ class SecurityDashboardWidget(QWidget):
         root.setContentsMargins(4, 4, 4, 4)
         root.setSpacing(5)
 
-        # Header
+        # Header Row
+        hdr_widget = QWidget()
+        hdr_widget.setStyleSheet("background: transparent;")
+        hdr_layout = QHBoxLayout(hdr_widget)
+        hdr_layout.setContentsMargins(0, 0, 0, 0)
+        hdr_layout.setSpacing(6)
+
         hdr = QLabel("🛡️  Security Dashboard")
         hdr.setStyleSheet(
             "color: #FC8181; font-size: 13px; font-weight: bold; "
             "font-family: 'Segoe UI'; border: none; background: transparent;"
         )
-        root.addWidget(hdr)
+        hdr_layout.addWidget(hdr)
+        hdr_layout.addStretch()
+
+        self.btn_packet_monitor = QPushButton("🌐 封包監控")
+        self.btn_packet_monitor.setStyleSheet(
+            "QPushButton { color: #63B3ED; background: transparent; "
+            "border: 1px solid #63B3ED55; border-radius: 4px; "
+            "font-size: 10px; padding: 2px 8px; font-family: 'Segoe UI'; font-weight: bold; }"
+            "QPushButton:hover { background-color: #1E2D3D; }"
+        )
+        self.btn_packet_monitor.clicked.connect(self._open_packet_monitor)
+        hdr_layout.addWidget(self.btn_packet_monitor)
+        root.addWidget(hdr_widget)
 
         # Nav bar (4 compact buttons, no tabs)
         nav_widget = QWidget()
@@ -858,6 +877,17 @@ class SecurityDashboardWidget(QWidget):
                 "QPushButton:hover { background-color: #153D1D; }"
             )
 
+    def _open_packet_monitor(self) -> None:
+        if self._packet_monitor_win is None:
+            import sys
+            from pathlib import Path
+            sys.path.insert(0, str(Path(__file__).parent))
+            from network_packet_monitor import NetworkPacketMonitorWindow
+            self._packet_monitor_win = NetworkPacketMonitorWindow(config=self.config)
+        self._packet_monitor_win.show()
+        self._packet_monitor_win.raise_()
+        self._packet_monitor_win.activateWindow()
+
     # ------------------------------------------------------------------
     # Monitoring lifecycle
     # ------------------------------------------------------------------
@@ -874,6 +904,9 @@ class SecurityDashboardWidget(QWidget):
         self._refresh_timer.stop()
         self._notification_timer.stop()
         self._notif_banner.hide()
+        if self._packet_monitor_win:
+            self._packet_monitor_win.close()
+            self._packet_monitor_win = None
 
     def _load_alerts(self) -> list[dict]:
         import json
