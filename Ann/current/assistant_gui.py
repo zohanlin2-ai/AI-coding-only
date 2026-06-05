@@ -1433,6 +1433,7 @@ def start_gui(
 ) -> None:
     """Launch the PyQt6 application loop."""
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
 
     # Premium ToolTip styling matching dark mode
     app.setStyleSheet(
