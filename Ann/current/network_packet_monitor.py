@@ -378,6 +378,16 @@ class NetworkPacketMonitorWindow(QWidget):
         self.lbl_total_counter.setStyleSheet(f"color: {_COLORS['text_main']}; font-weight: bold; border: none; padding-left: 6px;")
         tbl.addWidget(self.lbl_total_counter)
 
+        # Close Button
+        btn_close = QPushButton("✕ Close")
+        btn_close.setStyleSheet(
+            f"QPushButton {{ color: {_COLORS['danger']}; background: transparent; border: 1px solid {_COLORS['danger']}55; "
+            f"border-radius: 4px; padding: 3px 10px; font-weight: bold; }}"
+            f"QPushButton:hover {{ background-color: #3D1515; }}"
+        )
+        btn_close.clicked.connect(self.close)
+        tbl.addWidget(btn_close)
+
         return tb
 
     def _build_stats_bar(self) -> QWidget:
