@@ -100,7 +100,7 @@ _MOCK_RULES = [
         "id": "R-003", "name": "Network Connection to Suspicious IP",
         "severity": "medium", "source": "network_activity",
         "mitre_id": "T1071", "mitre_name": "Application Layer Protocol",
-        "csf": "Detect", "enabled": False, "has_window": False, "dedup_cooldown": 180,
+        "csf": "Detect", "enabled": True, "has_window": False, "dedup_cooldown": 180,
     },
 ]
 
@@ -108,15 +108,15 @@ _MOCK_CSF = [
     {"function": "Govern",   "status": "missing", "coverage": "—",                      "alerts": 0},
     {"function": "Identify", "status": "partial", "coverage": "ProcessCollector",        "alerts": 0},
     {"function": "Protect",  "status": "partial", "coverage": "Allowlists",              "alerts": 0},
-    {"function": "Detect",   "status": "yes",     "coverage": "R-001, R-002",            "alerts": 12},
+    {"function": "Detect",   "status": "yes",     "coverage": "R-001, R-002, R-003",     "alerts": 12},
     {"function": "Respond",  "status": "yes",     "coverage": "AlertHandler, Playbooks", "alerts": 12},
     {"function": "Recover",  "status": "missing", "coverage": "—",                       "alerts": 0},
 ]
 
 _MOCK_MITRE = [
-    {"id": "T1059", "name": "Command and Scripting Interpreter", "tactic": "Execution", "rules": "R-001",            "alerts": 9},
-    {"id": "T1486", "name": "Data Encrypted for Impact",         "tactic": "Impact",    "rules": "R-002",            "alerts": 3},
-    {"id": "T1071", "name": "Application Layer Protocol",        "tactic": "C2",        "rules": "R-003 (disabled)", "alerts": 0},
+    {"id": "T1059", "name": "Command and Scripting Interpreter", "tactic": "Execution", "rules": "R-001", "alerts": 9},
+    {"id": "T1486", "name": "Data Encrypted for Impact",         "tactic": "Impact",    "rules": "R-002", "alerts": 3},
+    {"id": "T1071", "name": "Application Layer Protocol",        "tactic": "C2",        "rules": "R-003", "alerts": 0},
 ]
 
 _SEVERITY_COLORS = {

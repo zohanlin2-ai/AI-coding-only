@@ -2,6 +2,15 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.2.3] - 2026-06-05
+
+### Added
+- **Network Connection Status Monitoring (NetworkCollector)** (`current/security_daemon.py`): New zero-dependency network collector checking TCP connection states using PowerShell json outputs on Windows and netstat fallbacks on Linux/macOS. Adds active detection of Command and Control (C2) servers via rule `R-003`.
+- **Unit Tests for Network Mode** (`current/tests/test_security_daemon.py`): Appended unit tests `test_network_collector_parsing` and `test_r003_rule_matching` to verify Windows/Unix output parsing and matching logic.
+
+### Changed
+- **Security Dashboard Coverage Integration** (`current/security_dashboard.py`): Updated CSF coverage table and MITRE ATT&CK coverage table mapping to show `R-003` active and mapped to MITRE C2 tactic.
+
 ## [0.2.2] - 2026-06-04
 
 ### Added

@@ -79,6 +79,29 @@ DEFAULT_RULES = [
                 "Validate backup availability."
             ]
         }
+    },
+    {
+        "id": "R-003",
+        "name": "Network connection to suspicious IP (C2)",
+        "severity": "medium",
+        "event_source": "network_activity",
+        "mitre": {
+            "tactic": "Command and Control",
+            "technique_id": "T1071",
+            "technique_name": "Application Layer Protocol"
+        },
+        "csf": {"function": "Detect", "category": "DE.CM"},
+        "logic": {
+            "suspicious_ips": ["123.123.123.123", "8.8.8.8", "1.1.1.1"],
+            "suspicious_ports": [4444, 6666, 8000]
+        },
+        "response": {
+            "recommended_actions": [
+                "Inspect process causing connection.",
+                "Review outbound IP reputation.",
+                "Block remote IP on network firewall if malicious."
+            ]
+        }
     }
 ]
 
@@ -282,6 +305,121 @@ class FileCollector(threading.Thread):
         self.event_queue.put(evt)
 
 
+class NetworkCollector(threading.Thread):
+    """Monitors active TCP connections (cross-platform netstat)."""
+    def __init__(self, event_queue: Queue, interval: float = 5.0):
+        super().__init__(daemon=True, name="NetworkCollector")
+        self.event_queue = event_queue
+        self.interval = interval
+        self._stop_event = threading.Event()
+        self._paused = threading.Event()
+        self.seen_connections: set[tuple[str, int, str, int]] = set()
+        self.is_healthy_flag = True
+
+    def pause(self) -> None:
+        self._paused.set()
+
+    def resume(self) -> None:
+        self._paused.clear()
+
+    def run(self) -> None:
+        # Initial scan to populate seen connections
+        self._get_active_connections()
+        logger.info("NetworkCollector initialized with %d connections", len(self.seen_connections))
+
+        while not self._stop_event.is_set():
+            if self._paused.is_set():
+                self._stop_event.wait(self.interval)
+                continue
+            try:
+                current_conns = self._get_active_connections()
+                for conn in current_conns:
+                    if conn not in self.seen_connections:
+                        # New connection!
+                        local_ip, local_port, remote_ip, remote_port = conn
+                        evt = NormalizedEvent(
+                            event_source="network_activity",
+                            data={
+                                "local_ip": local_ip,
+                                "local_port": local_port,
+                                "remote_ip": remote_ip,
+                                "remote_port": remote_port,
+                                "status": "ESTABLISHED",
+                                "user": os.getlogin() if hasattr(os, "getlogin") else "system"
+                            }
+                        )
+                        self.event_queue.put(evt)
+                self.seen_connections = current_conns
+                self.is_healthy_flag = True
+            except Exception as e:
+                logger.error("Error in NetworkCollector loop: %s", e)
+                self.is_healthy_flag = False
+            self._stop_event.wait(self.interval)
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    def is_healthy(self) -> bool:
+        return self.is_healthy_flag
+
+    def _get_active_connections(self) -> set[tuple[str, int, str, int]]:
+        conns = set()
+        system = platform.system()
+        if system == "Windows":
+            try:
+                # Use powershell to list connections
+                cmd = ["powershell", "-NoProfile", "-Command",
+                       "Get-NetTCPConnection | Where-Object { $_.State -eq 'Established' } | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort | ConvertTo-Json"]
+                res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=10)
+                if res.returncode == 0 and res.stdout.strip():
+                    data = json.loads(res.stdout.strip())
+                    if isinstance(data, dict):
+                        data = [data]
+                    for item in data:
+                        local_ip = item.get("LocalAddress")
+                        local_port = item.get("LocalPort")
+                        remote_ip = item.get("RemoteAddress")
+                        remote_port = item.get("RemotePort")
+                        if local_ip and local_port and remote_ip and remote_port:
+                            conns.add((str(local_ip), int(local_port), str(remote_ip), int(remote_port)))
+            except Exception as e:
+                logger.debug("Failed to list Windows connections: %s", e)
+        else:
+            # macOS / Linux: use netstat -an
+            try:
+                cmd = ["netstat", "-an"]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                if res.returncode == 0:
+                    for line in res.stdout.splitlines():
+                        if "ESTABLISHED" in line:
+                            parts = line.strip().split()
+                            if len(parts) >= 5:
+                                local_part = parts[3]
+                                remote_part = parts[4]
+                                
+                                def parse_addr(addr_str: str) -> tuple[str, int]:
+                                    if "." in addr_str and addr_str.count(".") >= 4:
+                                        ip_parts = addr_str.split(".")
+                                        ip = ".".join(ip_parts[:-1])
+                                        port = int(ip_parts[-1])
+                                        return ip, port
+                                    elif ":" in addr_str:
+                                        ip_parts = addr_str.rsplit(":", 1)
+                                        return ip_parts[0], int(ip_parts[1])
+                                    return addr_str, 0
+                                
+                                try:
+                                    lip, lport = parse_addr(local_part)
+                                    rip, rport = parse_addr(remote_part)
+                                    if lip and lport and rip and rport:
+                                        conns.add((lip, lport, rip, rport))
+                                except Exception:
+                                    continue
+            except Exception as e:
+                logger.debug("Failed to list Unix connections: %s", e)
+        return conns
+
+
 class SecurityEngine(threading.Thread):
     """Consumes normalized events and matches them against active rules."""
     def __init__(self, event_queue: Queue, rules: list[dict], config: dict):
@@ -354,6 +492,15 @@ class SecurityEngine(threading.Thread):
                     evt.data["extension_change_count_5m"] = ext_count
                     self._trigger_alert(rule, evt)
 
+            elif rule["id"] == "R-003":
+                # Network C2 connection check
+                remote_ip = evt.data.get("remote_ip", "")
+                remote_port = evt.data.get("remote_port", 0)
+                matched_ip = remote_ip in rule["logic"]["suspicious_ips"]
+                matched_port = remote_port in rule["logic"]["suspicious_ports"]
+                if matched_ip or matched_port:
+                    self._trigger_alert(rule, evt)
+
     def _clean_windows(self, now: float) -> None:
         # 5 minutes = 300 seconds window
         cutoff = now - 300.0
@@ -379,7 +526,10 @@ class SecurityEngine(threading.Thread):
             "user": evt.data.get("user", "system"),
             "time": datetime.now().strftime("%H:%M:%S"),
             "status": "open",
-            "evidence": evt.data.get("command_line") or evt.data.get("path") or "No command line raw info",
+            "evidence": (evt.data.get("command_line") 
+                         or evt.data.get("path") 
+                         or f"Connection: {evt.data.get('local_ip')}:{evt.data.get('local_port')} -> {evt.data.get('remote_ip')}:{evt.data.get('remote_port')}"
+                         or "No command line raw info"),
             "response": rule["response"]["recommended_actions"]
         }
         logger.warning("ALERT TRIGGERED: %s", alert_record["title"])
@@ -489,6 +639,7 @@ class SecurityDaemon:
         self.event_queue: Queue = Queue(maxsize=10000)
         self.process_collector = ProcessCollector(self.event_queue)
         self.file_collector = FileCollector(self.event_queue, BASE_DIR)
+        self.network_collector = NetworkCollector(self.event_queue)
         self.engine = SecurityEngine(self.event_queue, DEFAULT_RULES, config)
         self.running = False
         self._initialized = True
@@ -501,10 +652,12 @@ class SecurityDaemon:
         # Start collectors & engine
         self.process_collector = ProcessCollector(self.event_queue)
         self.file_collector = FileCollector(self.event_queue, BASE_DIR)
+        self.network_collector = NetworkCollector(self.event_queue)
         self.engine = SecurityEngine(self.event_queue, DEFAULT_RULES, self.config)
 
         self.process_collector.start()
         self.file_collector.start()
+        self.network_collector.start()
         self.engine.start()
 
     def stop(self) -> None:
@@ -514,19 +667,23 @@ class SecurityDaemon:
         self.running = False
         self.process_collector.stop()
         self.file_collector.stop()
+        self.network_collector.stop()
         self.engine.stop()
 
         # Join threads
         self.process_collector.join(timeout=2.0)
         self.file_collector.join(timeout=2.0)
+        self.network_collector.join(timeout=2.0)
         self.engine.join(timeout=2.0)
 
     def pause(self) -> None:
         logger.info("Pausing SecurityDaemon collectors...")
         self.process_collector.pause()
         self.file_collector.pause()
+        self.network_collector.pause()
 
     def resume(self) -> None:
         logger.info("Resuming SecurityDaemon collectors...")
         self.process_collector.resume()
         self.file_collector.resume()
+        self.network_collector.resume()
