@@ -18,7 +18,7 @@ The goal is to allow users to easily save (export) code and document blocks gene
   - Render code blocks in a dedicated container with a distinct background (`#1E222A`).
   - Display a top header bar containing:
     - The detected language badge (e.g., `PYTHON`, `C++`, `HTML`).
-    - An interactive **"Save" (💾 另存新檔)** button.
+    - An interactive **"Save" (💾 Save File)** button.
   - Display the code in a read-only scrollable view with a monospace font.
 - **File Dialog & Save Interaction**:
   - Clicking the "Save" button triggers a standard system save file dialog (`QFileDialog.getSaveFileName`).
@@ -60,7 +60,7 @@ Ann's UI decomposes this message into a vertical stack of widgets inside the mes
   - Height: $28\text{px}$.
   - Background: `#181A1F`.
   - Language label: Left-aligned, bold, gray text (`#ABB2BF`), font size $11\text{px}$.
-  - Save button: Right-aligned, text link style `💾 另存新檔`, blue text (`#61AFEF`) changing to cyan on hover.
+  - Save button: Right-aligned, text link style `💾 Save File`, blue text (`#61AFEF`) changing to cyan on hover.
 - **Code View**: Monospace font (`Consolas`, `Courier New`), padding $8\text{px}$, text color `#ABB2BF`.
 
 ### 3.3 Extension Filters Mapping
@@ -132,15 +132,15 @@ An LLM-based intent parser `FileIntentParser` analyses incoming user queries and
 }
 ```
 
-* **`export_history`**: The user wants to export the conversation log to a markdown file (e.g., `"匯出對話紀錄到 history.md"`).
-* **`save_code`**: The user wants to save code blocks/snippets from the previous assistant reply into a file (e.g., `"把剛才的程式碼存成 app.py"`).
+* **`export_history`**: The user wants to export the conversation log to a markdown file (e.g., `"Export conversation history to history.md"`).
+* **`save_code`**: The user wants to save code blocks/snippets from the previous assistant reply into a file (e.g., `"Save the previous code as app.py"`).
 * **`none`**: No file operations requested.
 
 ### 6.2 Regex Fallback Rules
 
 If the LLM is offline or fails to output a valid JSON pattern, the parser falls back to rule-based regex parsing:
-* Matches history keywords (`對話`, `聊天`, `歷史`, `紀錄`, `log`, `history`) for `export_history`.
-* Matches code keywords (`code`, `程式`, `代碼`, `區塊`, `snippet`) or filename patterns containing code extensions for `save_code`.
+* Matches history keywords (`conversation`, `chat`, `history`, `log`) for `export_history`.
+* Matches code keywords (`code`, `snippet`, `block`) or filename patterns containing code extensions for `save_code`.
 
 ### 6.3 Processing & Writing
 
@@ -159,9 +159,9 @@ If the LLM is offline or fails to output a valid JSON pattern, the parser falls 
 ### 7.2 Manual Verification Scenario
 1. Run Ann in GUI mode.
 2. Ask Ann: "Write a python function to add two numbers, and a small html page."
-3. Click `💾 另存新檔` on the Python block UI. Verify that saving via the dialog works.
-4. Input message: "把剛才的 HTML 程式碼儲存為 index.html".
+3. Click `💾 Save File` on the Python block UI. Verify that saving via the dialog works.
+4. Input message: "Save the previous HTML code as index.html".
 5. Verify that Ann directly responds with a confirmation containing a clickable `file:///` link to `index.html`.
 6. Open `index.html` from the workspace directory and confirm the HTML content is identical to the AI block.
-7. Input message: "匯出對話紀錄到 log.md".
+7. Input message: "Export the conversation history to log.md".
 8. Verify that `log.md` is generated, containing the structured conversation logs.

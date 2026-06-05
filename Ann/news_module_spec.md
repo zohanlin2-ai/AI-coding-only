@@ -73,11 +73,11 @@ After the system retrieves and filters news, Ollama generates a natural language
 
 | Intent | Example Utterances |
 |--------|-------------------|
-| `query_news` | 「最新科技新聞」、「幫我看看今天的財經消息」、「有沒有關於 AI 的新聞」 |
-| `summarize_article` | 「幫我摘要這篇」、「這篇說什麼」、「詳細說明一下」 |
-| `filter_by_keyword` | 「找找看有沒有關於台灣的消息」、「只看跟 Python 有關的」 |
-| `list_sources` | 「你有哪些新聞來源」、「可以看哪些媒體」 |
-| `none` | 與新聞無關的對話 |
+| `query_news` | "Latest tech news", "Show me today's finance news", "Any news about AI?" |
+| `summarize_article` | "Summarize this article for me", "What does this say?", "Give me more detail" |
+| `filter_by_keyword` | "Find news about Taiwan", "Only show Python-related news" |
+| `list_sources` | "What news sources do you have?", "Which media can I read from?" |
+| `none` | Conversation unrelated to news |
 
 ### 4.2 Ollama Parsing Prompt
 
@@ -109,7 +109,7 @@ Rules:
 ```json
 {
   "intent": "query_news",
-  "keywords": ["AI", "人工智慧"],
+  "keywords": ["AI", "artificial intelligence"],
   "category": "technology",
   "source": null,
   "article_url": null
@@ -129,16 +129,16 @@ The system uses a **Dual-track News Sources** mechanism that separates system de
 
 The following sources are active by default:
 
-* **Google News 台灣** (general, taiwan, zh-TW)
-* **Google News 科技** (technology, taiwan, zh-TW)
-* **Google News 財經** (finance, taiwan, zh-TW)
-* **Google News 國際** (general, foreign, zh-TW)
-* **Google News 政治** (politics, taiwan, zh-TW)
-* **Google News 體育** (sports, taiwan, zh-TW)
-* **Google News 健康** (health, taiwan, zh-TW)
-* **Google News 娛樂** (entertainment, taiwan, zh-TW)
-* **Google News 國際體育** (sports, foreign, en-US)
-* **Google News 國際科技** (technology, foreign, en-US)
+* **Google News Taiwan** (general, taiwan, zh-TW)
+* **Google News Technology** (technology, taiwan, zh-TW)
+* **Google News Finance** (finance, taiwan, zh-TW)
+* **Google News International** (general, foreign, zh-TW)
+* **Google News Politics** (politics, taiwan, zh-TW)
+* **Google News Sports** (sports, taiwan, zh-TW)
+* **Google News Health** (health, taiwan, zh-TW)
+* **Google News Entertainment** (entertainment, taiwan, zh-TW)
+* **Google News International Sports** (sports, foreign, en-US)
+* **Google News International Technology** (technology, foreign, en-US)
 * **BBC Sport Football** (sports, foreign, en-GB)
 
 ### 5.2 User Custom Sources (`config/news_sources.yml`)
@@ -156,7 +156,7 @@ sources:
   - name: BBC Sport Football
     enabled: false  # Disables the default BBC Sports Football feed
 
-  - name: Google News 科技
+  - name: Google News Technology
     url: https://custom-url.com/tech/rss  # Overrides the URL of default Tech feed
 
   - name: My Custom Tech Blog
@@ -232,8 +232,8 @@ Summarization is triggered only when:
 ### 9.1 Summarization Prompt
 
 ```
-You are a news summarizer. Summarize the following article in Traditional Chinese.
-Be concise: 3–5 sentences. Focus on the key facts. Do not editorialize.
+You are a news summarizer. Summarize the following article concisely in 3-5 sentences.
+Focus on the key facts. Do not editorialize.
 
 Article title: {title}
 Article content:
@@ -252,18 +252,18 @@ Article content:
 ### 10.1 Default Query Response (title + link)
 
 ```
-找到 3 則相關新聞：
+Found 3 related news articles:
 
-1. [標題一](https://...)
-   來源：Reuters｜2026-05-28 14:30
+1. [Article Title 1](https://...)
+   Source: Reuters | 2026-05-28 14:30
 
-2. [標題二](https://...)
-   來源：Google News｜2026-05-28 13:15
+2. [Article Title 2](https://...)
+   Source: Google News | 2026-05-28 13:15
 
-3. [標題三](https://...)
-   來源：Google News｜2026-05-28 12:00
+3. [Article Title 3](https://...)
+   Source: Google News | 2026-05-28 12:00
 
-想要我摘要某篇嗎？
+Would you like me to summarize one of these?
 ```
 
 ### 10.2 GUI Card Layout Response (PyQt6)
@@ -280,11 +280,11 @@ In GUI mode, Ann intercepts default news queries and presents them as a scrollab
 ### 10.3 Summarization Response
 
 ```
-【標題一摘要】
+[Article Title 1 — Summary]
 
-（3–5 句摘要內容）
+(3–5 sentence summary)
 
-原文連結：https://...
+Original link: https://...
 ```
 
 ---

@@ -65,147 +65,147 @@ graph TD
 
 ## 🧩 Adding a New Module — Rules & Guidelines
 
-Ann 採用 **IntentRouter + BaseIntentParser** 的插件架構。每個功能模組是一個獨立的類別，只要遵守以下規範，就能在不修改任何現有業務邏輯的情況下掛載新功能。
+Ann uses an **IntentRouter + BaseIntentParser** plugin architecture. Each feature module is an independent class that can be mounted without modifying any existing business logic, as long as it follows the contract below.
 
 ---
 
-### 1. 插件合約（Plugin Contract）
+### 1. Plugin Contract
 
-所有功能模組**必須**繼承 `BaseIntentParser`，並實作以下 5 個方法：
+All feature modules **must** extend `BaseIntentParser` and implement the following 5 methods:
 
 ```python
 from base_intent_parser import BaseIntentParser, ModuleResult
 
 class MyModule(BaseIntentParser):
-    # ── 必填：關鍵字清單（快速前置過濾，不呼叫 Ollama）──────────────────
-    KEYWORDS = ["my_keyword", "我的功能"]
+    # Required: keyword list (fast pre-filter, no Ollama call)────
+    KEYWORDS = ["my_keyword", "my_feature"]
 
-    # ── 必填：給 Ollama 的系統提示（定義 JSON schema）────────────────────
+    # Required: system prompt for Ollama (defines JSON schema)──
     def _build_system_prompt(self) -> str:
         return "Your system prompt here..."
 
-    # ── 必填：驗證 Ollama 回傳的 JSON，確保欄位型別正確 ─────────────────
+    # Required: validate and normalize the JSON returned by Ollama────
     def _validate_and_normalize(self, result: dict) -> dict:
-        # 確保 intent 只有允許的值
+        # Ensure intent is one of the allowed values
         if result.get("intent") not in {"do_something", "none"}:
             result["intent"] = "none"
         return result
 
-    # ── 必填：當 intent 沒有命中時回傳的空結果 ───────────────────────────
+    # Required: empty result returned when intent does not match────────
     def _empty_result(self) -> dict:
         return {"intent": "none", "param": None}
 
-    # ── 必填：Ollama 離線或 JSON 解析失敗時的 regex 備援邏輯 ─────────────
+    # Required: regex fallback when Ollama is offline or JSON parsing fails──
     def _regex_fallback(self, text: str) -> dict:
         if "my_keyword" in text.lower():
             return {"intent": "do_something", "param": text}
         return self._empty_result()
 
-    # ── 必填：模組的業務邏輯，回傳 ModuleResult ───────────────────────────
+    # Required: module business logic, returns a ModuleResult────────
     def execute(self, parsed: dict, context: dict) -> ModuleResult:
         reply = f"Handled: {parsed.get('param', '')}"
         return ModuleResult(reply=reply)
 ```
 
 > [!IMPORTANT]
-> `execute()` 會在 **背景執行緒（ControllerWorker）** 中被呼叫。可以自由執行阻塞式 I/O（網路請求、檔案讀寫、Ollama 呼叫），**不可**在 `execute()` 中直接操作任何 Qt 物件（Widget、QLabel、QTimer 等）。
+> `execute()` is called inside a **background thread (ControllerWorker)**. Blocking I/O (network requests, file reads, Ollama calls) is allowed. **Do not** directly manipulate any Qt object (Widget, QLabel, QTimer, etc.) inside `execute()`.
 
 ---
 
-### 2. `context` 字典 API
+### 2. `context` Dictionary API
 
-`execute()` 的第二個參數 `context` 由 `CoreController.post_message()` 提供，包含以下保證可用的鍵：
+`execute()`'s second argument `context` is provided by `CoreController.post_message()` and contains the following guaranteed keys:
 
-| Key | 型別 | 說明 |
-|:----|:-----|:-----|
-| `config` | `dict` | 完整的 `config.yml` 設定 |
-| `conversation` | `list[dict]` | 當前對話歷史（`[{"role": "user"/"assistant", "content": "..."}]`）|
-| `base_dir` | `Path` | Ann 根目錄（用於讀寫持久化資料）|
-| `user_text` | `str` | 使用者原始輸入文字 |
-| `call_llm` | `Callable[[str], str]` | 直接呼叫 Ollama 的同步函式，接受單一 prompt 字串 |
-| `alarm_manager` | `AlarmManager \| None` | 鬧鐘管理員實例 |
-| `news_manager` | `NewsManager \| None` | 新聞管理員實例 |
+| Key | Type | Description |
+|:----|:-----|:------------|
+| `config` | `dict` | Full `config.yml` settings |
+| `conversation` | `list[dict]` | Current conversation history (`[{"role": "user"/"assistant", "content": "..."}]`) |
+| `base_dir` | `Path` | Ann root directory (for reading/writing persistent data) |
+| `user_text` | `str` | The user's original input text |
+| `call_llm` | `Callable[[str], str]` | Synchronous function to call Ollama directly, accepts a single prompt string |
+| `alarm_manager` | `AlarmManager \| None` | Alarm manager instance |
+| `news_manager` | `NewsManager \| None` | News manager instance |
 
 > [!NOTE]
-> 如果您的模組需要自己初始化的物件（如資料庫連線、API client），請在模組的 `__init__` 中初始化並儲存為 `self.xxx`，**不要**透過 `context` 傳入（context 只提供全域共享資源）。
+> If your module needs its own initialized object (e.g. a database connection or API client), initialize it in the module's `__init__` and store it as `self.xxx`. **Do not** pass it through `context` — `context` only provides globally shared resources.
 
 ---
 
-### 3. 使用 `conversation` 的注意事項
+### 3. Notes on Using `conversation`
 
-- `conversation` 是 **共享的可變 list，所有模組共用同一份對話歷史。
-- 在 `execute()` 中**不要直接 append** 到 `conversation`——`CoreController` 會在路由成功後自動處理對話記錄。
-- 若您的模組需要呼叫 `call_llm()` 並希望對話記錄包含此次交流，**請在 `execute()` 回傳後**，透過 `CoreController` 的標準流程處理（而非在 execute 內手動 append）。
+- `conversation` is a **shared mutable list used by all modules**.
+- **Do not directly `append`** to `conversation` inside `execute()` — `CoreController` automatically handles conversation logging after routing succeeds.
+- If your module calls `call_llm()` and wants the exchange to appear in the conversation history, let `CoreController`'s standard flow handle it after `execute()` returns (do not manually append inside `execute()`).
 
 ---
 
-### 4. `ModuleResult` 欄位說明
+### 4. `ModuleResult` Field Descriptions
 
 ```python
 @dataclass
 class ModuleResult:
-    reply: str                  # 必填：要顯示給使用者的文字
-    articles: list = []         # 選填：新聞卡片清單（僅新聞模組使用）
-    marker: str | None = None   # 選填：控制指令，如 '[EXIT]', '[RESTART]'
+    reply: str                  # Required: text to display to the user
+    articles: list = []         # Optional: news card list (news module only)
+    marker: str | None = None   # Optional: control marker e.g. '[EXIT]', '[RESTART]'
 ```
 
 > [!WARNING]
-> `marker` 欄位僅保留給系統層級的控制流程（退出、重啟、更新）。**一般功能模組不應設定 `marker`。**
+> The `marker` field is reserved only for system-level control flows (exit, restart, update). **General feature modules must not set `marker`.**
 
 ---
 
-### 5. 命名與檔案位置規範
+### 5. Naming & File Location Rules
 
-| 規範項目 | 要求 |
-|:---------|:-----|
-| **模組目錄** | 若功能複雜，建立 `current/<your_module>/` 子目錄；單一功能可直接放 `current/<your_module>_handler.py` |
-| **IntentParser 類別名稱** | 以 `IntentParser` 結尾，例如 `TodoIntentParser` |
-| **KEYWORDS** | 使用中英文混合，盡量涵蓋使用者可能的輸入方式 |
-| **`_build_system_prompt()`** | 必須明確要求 Ollama 只回傳 JSON，並附上欄位 schema |
-| **測試檔案** | 必須在 `current/tests/test_<your_module>.py` 建立對應單元測試 |
+| Item | Requirement |
+|:-----|:------------|
+| **Module directory** | For complex features, create `current/<your_module>/`; single-file features can be placed directly as `current/<your_module>_handler.py` |
+| **IntentParser class name** | Must end with `IntentParser`, e.g. `TodoIntentParser` |
+| **KEYWORDS** | Use a mix of English terms to cover likely user inputs |
+| **`_build_system_prompt()`** | Must explicitly instruct Ollama to return only JSON and include the field schema |
+| **Test file** | Must create a corresponding unit test at `current/tests/test_<your_module>.py` |
 
 ---
 
-### 6. 註冊模組
+### 6. Registering a Module
 
-模組建立後，在 `CoreController.setup_modules()` 中註冊：
+After creating the module, register it in `CoreController.setup_modules()`:
 
 ```python
 # current/core_controller.py → CoreController.setup_modules()
 def setup_modules(self) -> None:
-    # ... 現有模組 ...
+    # ... existing modules ...
 
-    from my_module import MyModule  # 替換為您的模組
+    from my_module import MyModule  # Replace with your module
     my_module = MyModule(self.llm_base_url, self.llm_model)
     self.router.register(my_module)
 ```
 
 > [!IMPORTANT]
-> **路由器是有序的（first-match-wins）**。在 `register()` 的呼叫順序決定了優先級：排在前面的模組會先被嘗試。請將**特定性更高**的模組放在前面，**通用型**的模組放在後面，避免過度攔截。
+> **The router is ordered (first-match-wins)**. The order of `register()` calls determines priority: modules registered first are tried first. Place **more specific** modules before **more general** ones to avoid over-interception.
 
 ---
 
-### 7. 禁止事項
+### 7. Prohibited Patterns
 
-| ❌ 禁止 | ✅ 應改為 |
+| ❌ Prohibited | ✅ Do Instead |
 |:--------|:---------|
-| 在 `execute()` 內操作 Qt Widget | 透過 `ModuleResult.reply` 回傳文字，由 GUI 渲染 |
-| 在模組內直接存取 `assistant_gui.py` | 透過 `context` 取得所需資料 |
-| 在 `execute()` 內 `append` 到 `context["conversation"]` | 讓 `CoreController` 在路由後自動記錄 |
-| 在模組內實作 exit / restart / update 等系統指令 | 系統指令只在 `assistant.py` / `assistant_gui.py` 的主迴圈中處理 |
-| 在 `should_parse()` 中呼叫 Ollama | `should_parse()` 必須是純關鍵字比對，不允許任何 I/O |
+| Manipulate Qt Widgets inside `execute()` | Return text via `ModuleResult.reply`; let the GUI render it |
+| Access `assistant_gui.py` directly from a module | Retrieve needed data via `context` |
+| `append` to `context["conversation"]` inside `execute()` | Let `CoreController` record it automatically after routing |
+| Implement exit / restart / update system commands inside a module | System commands are handled only in the main loop of `assistant.py` / `assistant_gui.py` |
+| Call Ollama inside `should_parse()` | `should_parse()` must be a pure keyword check — no I/O allowed |
 
 ---
 
-### 8. 快速範例：新增一個 TodoModule
+### 8. Quick Example: Adding a TodoModule
 
-**Step 1 — 建立 `current/todo_handler.py`**
+**Step 1 — Create `current/todo_handler.py`**
 
 ```python
 from base_intent_parser import BaseIntentParser, ModuleResult
 
 class TodoIntentParser(BaseIntentParser):
-    KEYWORDS = ["todo", "待辦", "任務清單", "提醒我"]
+    KEYWORDS = ["todo", "task", "remind me"]
 
     def _build_system_prompt(self) -> str:
         return (
@@ -223,7 +223,7 @@ class TodoIntentParser(BaseIntentParser):
         return {"intent": "none", "content": None}
 
     def _regex_fallback(self, text: str) -> dict:
-        if "todo" in text.lower() or "待辦" in text:
+        if "todo" in text.lower() or "task" in text.lower():
             return {"intent": "add_todo", "content": text}
         return self._empty_result()
 
@@ -235,18 +235,18 @@ class TodoIntentParser(BaseIntentParser):
             content = parsed.get("content") or context["user_text"]
             with open(todo_file, "a", encoding="utf-8") as f:
                 f.write(f"- {content}\n")
-            return ModuleResult(reply=f"✅ 已新增待辦：{content}")
+            return ModuleResult(reply=f"Added todo: {content}")
 
         if parsed["intent"] == "list_todo":
             if todo_file.exists():
                 items = todo_file.read_text(encoding="utf-8").strip()
-                return ModuleResult(reply=f"📋 待辦事項：\n{items}" if items else "目前沒有待辦事項。")
-            return ModuleResult(reply="目前沒有待辦事項。")
+                return ModuleResult(reply=f"Todo list:\n{items}" if items else "No todos yet.")
+            return ModuleResult(reply="No todos yet.")
 
         return ModuleResult(reply="")
 ```
 
-**Step 2 — 在 `CoreController.setup_modules()` 中註冊**
+**Step 2 — Register in `CoreController.setup_modules()`**
 
 ```python
 from todo_handler import TodoIntentParser
@@ -254,13 +254,13 @@ todo_parser = TodoIntentParser(self.llm_base_url, self.llm_model)
 self.router.register(todo_parser)
 ```
 
-**Step 3 — 在 `tests/test_todo.py` 補上單元測試，完成。**
+**Step 3 — Add unit tests in `tests/test_todo.py`. Done.**
 
 ---
 
-## ⚙️ Installation & Usage (安裝與使用)
+## ⚙️ Installation & Usage
 
-### 1. Prerequisites (環境要求)
+### 1. Prerequisites
 - **Python**: Version 3.10 or higher.
 - **Ollama**: Local LLM server running on your machine.
   - Install Ollama from [ollama.com](https://ollama.com).
@@ -269,14 +269,14 @@ self.router.register(todo_parser)
     ollama run gemma4:e4b
     ```
 
-### 2. Dependency Installation (安裝依賴)
+### 2. Dependency Installation
 Install the required packages from the dependency manifest:
 ```bash
 pip install -r current/requirements.txt
 ```
 This installs `PyQt6` (for GUI), `pygame` (for audio alarms), `ollama` (for API integration), `requests` (for HTTP APIs), `pyyaml` (for configuration parsing), `pytest` (for unit testing), and all news module dependencies (`feedparser`, `newspaper3k`, `readability-lxml`, `beautifulsoup4`, and `httpx`).
 
-### 3. Running Ann (啟動方式)
+### 3. Running Ann
 You can run Ann in two modes. The launcher automatically monitors and updates the core:
 - **GUI Mode (Default)**:
   ```bash
@@ -290,30 +290,30 @@ You can run Ann in two modes. The launcher automatically monitors and updates th
   ```
   Runs as a conversational shell in the terminal. If an alarm triggers, it prints reminder alerts every 2 seconds and can be dismissed by pressing Enter.
 
-### ⏰ Alarm Module (鬧鐘功能)
+### ⏰ Alarm Module
 Ann supports conversational alarm management (create, delete, list) through natural conversation. You can set relative/absolute alarms, check active alarms, and cancel them.
 For complete architectural details, audio loop specs, and UI animations, see [alarm_module_spec.md](./alarm_module_spec.md).
 
-### 📂 Drag & Drop Module (拖放功能)
+### 📂 Drag & Drop Module
 Ann supports dragging and dropping plain text and image files onto the floating bubble or the chat window. Dropped files are attached to the conversation context and can be clicked to display a popup preview (viewing full text or images).
 For detailed interaction specifications, see [drag_drop_spec.md](./drag_drop_spec.md).
 
-### 🤖 AI Engine Module (AI 引擎模組)
+### 🤖 AI Engine Module
 Ann encapsulates all communication with the local Ollama API into a modular `OllamaClient` component within the AI Engine. It automatically detects installed models and their capabilities (such as vision support). When an image is attached, it dynamically routes the request to a local vision-capable model (like `llava`) or guides the user if none is installed.
 For technical details, see [ai_engine_spec.md](./ai_engine_spec.md).
 
-### 📝 File Generation & Export Module (檔案生成與匯出功能)
+### 📝 File Generation & Export Module
 Ann supports exporting and saving AI-generated code blocks and documentation directly to the local filesystem:
 - **UI-Based Saving**: Code blocks in the chat GUI are rendered with a custom code container displaying a language badge and a "Save File" button, allowing quick, secure, and filtered saving for `.py`, `.c`, `.cpp`, `.java`, `.sh`, `.html`, `.xml`, `.css`, `.js`, `.ts`, `.sql`, `.toml`, `.env`, `.md`, and `.txt` files.
-- **Conversational Saving (Option C)**: You can request file generation directly in the dialogue (e.g., "把剛才的 code 儲存為 app.py" or "匯出對話紀錄到 history.md"). Ann will parse the intent locally and save the file directly to the workspace directory.
+- **Conversational Saving (Option C)**: You can request file generation directly in the dialogue (e.g., "Save the previous code as app.py" or "Export the conversation history to history.md"). Ann will parse the intent locally and save the file directly to the workspace directory.
 
 For complete specs, see [file_generation_spec.md](./file_generation_spec.md).
 
-### 📰 News Module (新聞模組)
-Ann supports conversational news queries using local Ollama model to parse search intents, retrieve and parse RSS feeds (e.g. Google News, Reuters), filter articles by keywords/categories, and generate concise article summarizations (3–5 sentences) in Traditional Chinese upon request.
+### 📰 News Module
+Ann supports conversational news queries using local Ollama model to parse search intents, retrieve and parse RSS feeds (e.g. Google News, Reuters), filter articles by keywords/categories, and generate concise article summarizations (3–5 sentences) upon request.
 For full specifications, caching policies, and architecture, see [news_module_spec.md](./news_module_spec.md).
 
-### 🧠 Memory Module (記憶模組)
+### 🧠 Memory Module
 Ann integrates a local conversational memory system designed in [AI_Memory_System_Design_v2.md](./AI_Memory_System_Design_v2.md) to persist user context across CLI and GUI sessions:
 - **Two-Phase Background Extraction**: Facts stated by the user are extracted on input (Phase 1), and commitments/conclusions are extracted after response generation (Phase 2) using separate background threads.
 - **Concurrent Safe Persistence**: Stored under `memory/` directory via daily JSON file slices and managed registry index with strict `filelock` synchronization.
@@ -325,22 +325,22 @@ Ann integrates a local conversational memory system designed in [AI_Memory_Syste
   - `/memory delete <id>` — Discards a specific context memory.
   - `/memory off` / `/memory on` — Globally pauses/resumes the memory layer.
 
-### 🛡️ Security Mode (安全監控模式)
+### 🛡️ Security Mode
 Ann supports a conversational security monitoring mode backed by the `realtime-security-daemon` design:
-- **Conversation-Triggered Switch**: Say "開啟安全模式" / "enable security mode" to enter, or "關閉安全模式" / "exit security mode" to leave. The switch is handled by `SecurityIntentParser` — no additional GUI controls needed.
+- **Conversation-Triggered Switch**: Say "enable security mode" to enter, or "exit security mode" to leave. The switch is handled by `SecurityIntentParser` — no additional GUI controls needed.
 - **Bubble Visual Feedback**: The floating bubble switches to a dual-ring red pulse effect (outer faint halo + inner breathing ring) while security mode is active. The inner circle colour is unchanged.
 - **Security Dashboard**: The chat content area switches to a compact dashboard showing Daemon status, Queue depth, and a scrollable alert feed with severity colour coding and click-to-expand details including MITRE ATT&CK mapping and response recommendations.
 - **Persistent Input Bar**: The conversation input bar remains available in security mode so you can continue asking questions.
-- **Update Lock**: For system safety and operational integrity, program updates cannot be checked or performed while security monitoring mode is active ("在安全模式下，是無法進行更新的").
-- **Status Queries**: Ask "有幾個告警" / "daemon 狀態" for a plain-text status summary without entering full dashboard mode.
+- **Update Lock**: For system safety and operational integrity, program updates cannot be checked or performed while security monitoring mode is active.
+- **Status Queries**: Ask "how many alerts are there" / "daemon status" for a plain-text status summary without entering full dashboard mode.
 - Phase 1 uses mock data; Phase 2 will read from the real security daemon's `alerts.jsonl` / SQLite store.
 For details, see the [Daemon Architecture Guide](./realtime-security-daemon/nist-csf-mitre-attack-realtime-daemon-guide-enhanced.md), [Dashboard UI Spec](./realtime-security-daemon/nist-csf-mitre-attack-realtime-ui-spec.md), and [Network Packet Monitor UI Spec](./realtime-security-daemon/network-packet-monitor-ui-spec.md) in the [`realtime-security-daemon/`](./realtime-security-daemon/) directory.
 
-### 🔄 Conversational System Commands (對話式系統指令)
+### 🔄 Conversational System Commands
 Ann supports executing system actions directly through natural conversation, featuring warm LLM response generation prior to execution:
-- **Exit Program (關閉程式)**: Commands like "再見", "關閉視窗", "exit", "close the app" trigger a warm goodbye, append `[EXIT]`, disable inputs, and shut down after a 1.5 seconds delay.
-- **Restart Program (重啟程式)**: Commands like "重啟", "重新啟動", "restart", "reboot" trigger a warm "see you later" reply, append `[RESTART]`, and relaunch the assistant immediately.
-- **Update Program (系統更新)**: Commands like "更新", "升級", "update" trigger an update check. Upon confirmation, Ann replies with a warm goodbye, appends `[UPDATE]`, and runs the self-updater.
+- **Exit Program**: Commands like "goodbye", "close the window", "exit", "close the app" trigger a warm goodbye, append `[EXIT]`, disable inputs, and shut down after a 1.5 seconds delay.
+- **Restart Program**: Commands like "restart", "reboot" trigger a warm "see you later" reply, append `[RESTART]`, and relaunch the assistant immediately.
+- **Update Program**: Commands like "update", "upgrade" trigger an update check. Upon confirmation, Ann replies with a warm goodbye, appends `[UPDATE]`, and runs the self-updater.
 
 ---
 

@@ -65,11 +65,11 @@ After the system executes the action, Ollama generates a natural language reply 
 
 | Intent | Example Utterances |
 |--------|-------------------|
-| `set_alarm` | 「明天早上八點叫我」、「三十分鐘後提醒我」、「晚上十一點五十分，備註吃藥」 |
-| `list_alarms` | 「我設了哪些鬧鐘」、「現在有幾個鬧鐘」、「列出所有提醒」 |
-| `delete_alarm` | 「刪掉早上八點的鬧鐘」、「取消 ID 3 的提醒」、「刪掉吃藥那個」 |
-| `update_alarm` | 「把下午3點的鬧鐘改成4點」、「將開會的鬧鐘時間改成下午5點」 |
-| `none` | 與鬧鐘無關的對話 |
+| `set_alarm` | "Wake me up at 8 AM tomorrow", "Remind me in 30 minutes", "Set an alarm at 11:50 PM, note: take medicine" |
+| `list_alarms` | "What alarms have I set?", "How many alarms do I have?", "List all reminders" |
+| `delete_alarm` | "Delete the 8 AM alarm", "Cancel reminder ID 3", "Remove the take-medicine one" |
+| `update_alarm` | "Change the 3 PM alarm to 4 PM", "Move the meeting alarm to 5 PM" |
+| `none` | Conversation unrelated to alarms |
 
 ### 4.2 Ollama Parsing Prompt
 
@@ -98,7 +98,7 @@ Rules:
 - If the user says a time without a date and it has already passed today, assume today unless context implies otherwise.
 - label is optional free text the user wants attached to the alarm.
 - alarm_id is used only for delete_alarm or update_alarm intent if user specifies ID.
-- target_alarm is used for delete_alarm or update_alarm to identify which alarm (e.g. '下午3點', '開會').
+- target_alarm is used for delete_alarm or update_alarm to identify which alarm (e.g. '3 PM', 'meeting').
 ```
 
 ### 4.3 Parsed Output Example
@@ -107,7 +107,7 @@ Rules:
 {
   "intent": "set_alarm",
   "time": "2026-05-28T08:00:00",
-  "label": "吃藥",
+  "label": "take medicine",
   "alarm_id": null
 }
 ```
@@ -181,7 +181,7 @@ When an alarm is due, the system executes the following in order:
 4. Wait for user dismissal or timeout.
 5. Stop sound and visual effect.
 6. Mark the alarm as triggered and remove it from the store.
-7. Have Ollama generate a brief contextual message in the chat (e.g. 「吃藥時間到了！」).
+7. Have Ollama generate a brief contextual message in the chat (e.g. "Time to take your medicine!").
 
 ### 9.1 Sound
 
@@ -233,8 +233,8 @@ Effect behavior:
 
 **Example exchange:**
 ```
-User:   明天早上七點半叫我，備註開會
-System: 好的，已設定 2026-05-28 07:30 的鬧鐘，備註：開會。
+User:   Wake me up at 7:30 AM tomorrow, note: meeting
+System: Done. Alarm set for 2026-05-28 07:30, note: meeting.
 ```
 
 ### 10.2 List Alarms
@@ -246,10 +246,10 @@ System: 好的，已設定 2026-05-28 07:30 的鬧鐘，備註：開會。
 
 **Example exchange:**
 ```
-User:   我現在有哪些鬧鐘？
-System: 目前有 2 個鬧鐘：
-        1. [ID: a1b2] 2026-05-28 07:30 — 開會
-        2. [ID: c3d4] 2026-05-28 12:00 — 吃藥
+User:   What alarms do I have?
+System: You have 2 active alarms:
+        1. [ID: a1b2] 2026-05-28 07:30 — meeting
+        2. [ID: c3d4] 2026-05-28 12:00 — take medicine
 ```
 
 ### 10.3 Delete Alarm
@@ -264,8 +264,8 @@ System: 目前有 2 個鬧鐘：
 
 **Example exchange:**
 ```
-User:   刪掉開會那個鬧鐘
-System: 已刪除 2026-05-28 07:30 的鬧鐘（開會）。
+User:   Delete the meeting alarm
+System: Deleted alarm at 2026-05-28 07:30 (meeting).
 ```
 
 ### 10.4 Update Alarm
@@ -279,8 +279,8 @@ System: 已刪除 2026-05-28 07:30 的鬧鐘（開會）。
 
 **Example exchange:**
 ```
-User:   把下午3點的鬧鐘改成4點
-System: 已成功將鬧鐘（原時間: 15:00）更改為 16:00。
+User:   Move the 3 PM alarm to 4 PM
+System: Done. Alarm updated from 15:00 to 16:00.
 ```
 
 ---

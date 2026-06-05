@@ -1,0 +1,5 @@
+2026-05-26 16:18:04,437 [WARNING] Update check failed: 404 Client Error: Not Found for url: https://api.github.com/repos/zohanlin2-ai/AI-coding-only/releases/latest
+2026-05-26 17:01:56,945 [WARNING] Update check failed for both main and master branches.
+2026-05-26 17:09:43,896 [WARNING] Update check failed for both main and master branches.
+2026-05-26 17:35:13,565 [INFO] New version available: 20260526-9ed3574 (current: 20260526-9c13425)
+2026-05-26 17:35:54,247 [INFO] New version available: 20260526-9ed3574 (current: 20260526-9c13425)

@@ -47,7 +47,7 @@ The goal is to allow users to easily import files (plain text and images) into t
 ### 3.2 Chat Window (State 2) DND State
 - **Drag Hover State**:
   - A semi-transparent overlay widget (`DragDropOverlay`) fades in over the message viewport.
-  - Text on overlay: `松開滑鼠以載入檔案 (Drop files to load)` with a modern dashed border design.
+  - Text on overlay: `Drop files to load` with a modern dashed border design.
 - **Drop Action**:
   - The overlay fades out.
   - Files are processed and appended to the **Attachment Tray**.

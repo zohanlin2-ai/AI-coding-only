@@ -1,0 +1,117 @@
+
+--- Debug Session: 2026-06-03 10:09:15.788296 ---
+User Input: 伊朗新聞
+Parsed Dict: {'intent': 'query_news', 'keywords': ['伊朗'], 'category': None, 'source': None, 'article_url': None}
+Cleaned Keywords: ['伊朗']
+Selected Sources: ['Google News 台灣', 'Google News 科技', 'Google News 財經', 'Google News 國際', 'Google News 政治', 'Google News 體育', 'Google News 健康', 'Google News 娛樂', 'Google News 國際體育', 'Google News 國際科技', 'BBC Sport Football']
+Fetched Articles Count: 549
+Filtered Articles Count: 10
+Matched Titles Example: ['中東局勢又升溫！伊朗彈襲美軍駐科威特基地 中央司令部火速反擊 - UDN', '魯比歐認了伊朗在荷莫茲海峽大範圍布雷！分析師：航運難復戰前水準| 中東戰火連綿| 全球 - UDN', '曝伊朗最高領袖最新動態 魯比歐：美伊隨時可能達成協議 - 自由時報', '複製伊朗防禦模式？台灣沒那國土面積先天限制多了- 軍事 - 中時新聞網', '波斯灣貨輪出事！遭連環攻擊爆炸 無人機盤旋下秒竄火 - UDN']
+
+--- Debug Session: 2026-06-03 10:09:22.576904 ---
+User Input: 烏克蘭新聞
+Parsed Dict: {'intent': 'query_news', 'keywords': ['烏克蘭'], 'category': None, 'source': None, 'article_url': None}
+Cleaned Keywords: ['烏克蘭']
+Selected Sources: ['Google News 台灣', 'Google News 科技', 'Google News 財經', 'Google News 國際', 'Google News 政治', 'Google News 體育', 'Google News 健康', 'Google News 娛樂', 'Google News 國際體育', 'Google News 國際科技', 'BBC Sport Football']
+Fetched Articles Count: 549
+Filtered Articles Count: 4
+Matched Titles Example: ['俄羅斯對烏克蘭發動大規模襲擊 多人遇難 - Yahoo新聞', '法聯手夥伴扣押俄影子艦隊油輪 突擊隊直升機垂降登船 - 壹蘋新聞網', '俄無人機襲擊羅馬尼亞民宅釀2傷 確定是「俄版見證者」幹的 - 自由軍武頻道', '曾和習近平大聊「長生不老」 普廷砸8000億培育人體器官 - 自由時報']
+
+--- Debug Session: 2026-06-03 10:09:24.790775 ---
+User Input: 戰爭新聞
+Parsed Dict: {'intent': 'query_news', 'keywords': ['戰爭'], 'category': None, 'source': None, 'article_url': None}
+Cleaned Keywords: ['戰爭']
+Selected Sources: ['Google News 台灣', 'Google News 科技', 'Google News 財經', 'Google News 國際', 'Google News 政治', 'Google News 體育', 'Google News 健康', 'Google News 娛樂', 'Google News 國際體育', 'Google News 國際科技', 'BBC Sport Football']
+Fetched Articles Count: 549
+Filtered Articles Count: 6
+Matched Titles Example: ['中東局勢又升溫！伊朗彈襲美軍駐科威特基地 中央司令部火速反擊 - UDN', '全球航班不敢飛伊朗大改道！「這國家」靠收過路費賺翻了 - 自由財經', '彭博：俄央行與財政部官員警告普丁戰爭開支越來越撐不下去| 國際 - Newtalk新聞', '香格里拉對話 中方團隊因無禮遭譏諷 - 大纪元', '蘇林批評世界充斥強權競爭，越南在美中之間尋找出路- 紐約時報中文網 - 纽约时报中文网']
+
+--- Debug Session: 2026-06-03 10:09:41.686152 ---
+User Input: 伊朗新聞
+Parsed Dict: {'intent': 'query_news', 'category': 'politics', 'keywords': ['伊朗']}
+Cleaned Keywords: ['伊朗']
+Selected Sources: ['Google News 政治']
+Fetched Articles Count: 32
+Filtered Articles Count: 1
+Matched Titles Example: ['孟加拉水牛神似川普網路爆紅 當局出手相救免當祭品 - Yahoo新聞']
+
+--- Debug Session: 2026-06-03 10:09:45.115977 ---
+User Input: 烏克蘭新聞
+Parsed Dict: {'intent': 'query_news', 'category': 'politics', 'keywords': ['烏克蘭']}
+Cleaned Keywords: ['烏克蘭']
+Selected Sources: ['Google News 政治']
+Fetched Articles Count: 32
+Filtered Articles Count: 1
+Matched Titles Example: ['曾和習近平大聊「長生不老」 普廷砸8000億培育人體器官 - 自由時報']
+
+--- Debug Session: 2026-06-03 10:09:46.108093 ---
+User Input: 戰爭新聞
+Parsed Dict: {'intent': 'query_news', 'category': 'politics', 'keywords': ['戰爭']}
+Cleaned Keywords: ['戰爭']
+Selected Sources: ['Google News 政治']
+Fetched Articles Count: 32
+Filtered Articles Count: 2
+Matched Titles Example: ['香格里拉對話 中方團隊因無禮遭譏諷 - 大纪元', '曾和習近平大聊「長生不老」 普廷砸8000億培育人體器官 - 自由時報']
+
+--- Debug Session: 2026-06-03 10:19:26.533759 ---
+User Input: 伊朗新聞
+Parsed Dict: {'intent': 'query_news', 'keywords': ['Iran', '伊朗', 'ایران'], 'category': 'politics', 'source': None, 'article_url': None}
+Cleaned Keywords: ['Iran', '伊朗', 'ایران']
+Selected Sources: ['Google News 政治']
+Fetched Articles Count: 33
+Filtered Articles Count: 1
+Matched Titles Example: ['孟加拉水牛神似川普網路爆紅 當局出手相救免當祭品 - Yahoo新聞']
+
+--- Debug Session: 2026-06-03 10:19:30.242464 ---
+User Input: 烏克蘭新聞
+Parsed Dict: {'intent': 'query_news', 'keywords': ['Ukraine', '烏克蘭', 'Україна'], 'category': 'politics', 'source': None, 'article_url': None}
+Cleaned Keywords: ['Ukraine', '烏克蘭', 'Україна']
+Selected Sources: ['Google News 政治']
+Fetched Articles Count: 33
+Filtered Articles Count: 1
+Matched Titles Example: ['曾和習近平大聊「長生不老」 普廷砸8000億培育人體器官 - 自由時報']
+
+--- Debug Session: 2026-06-03 10:19:31.973789 ---
+User Input: 戰爭新聞
+Parsed Dict: {'intent': 'query_news', 'keywords': ['war', '戰爭', '衝突'], 'category': 'politics', 'source': None, 'article_url': None}
+Cleaned Keywords: ['war', '戰爭', '衝突']
+Selected Sources: ['Google News 政治']
+Fetched Articles Count: 33
+Filtered Articles Count: 3
+Matched Titles Example: ['鄭麗文抵舊金山 僑胞以「拐杖式劍門禮」相迎 - 中時新聞網', '香格里拉對話 中方團隊因無禮遭譏諷 - 大纪元', '曾和習近平大聊「長生不老」 普廷砸8000億培育人體器官 - 自由時報']
+
+--- Debug Session: 2026-06-03 10:21:42.452771 ---
+User Input: 伊朗新聞
+Parsed Dict: {'intent': 'query_news', 'keywords': ['Iran', '伊朗', 'ایران'], 'category': 'politics', 'source': None, 'article_url': None}
+Cleaned Keywords: ['Iran', '伊朗', 'ایران']
+Selected Sources: ['Google News 政治', 'Google News 國際']
+Fetched Articles Count: 102
+Filtered Articles Count: 8
+Matched Titles Example: ['中東局勢又升溫！伊朗彈襲美軍駐科威特基地 中央司令部火速反擊 - UDN', '魯比歐認了伊朗在荷莫茲海峽大範圍布雷！分析師：航運難復戰前水準| 中東戰火連綿| 全球 - UDN', '曝伊朗最高領袖最新動態 魯比歐：美伊隨時可能達成協議 - 自由時報', '波斯灣貨輪出事！遭連環攻擊爆炸 無人機盤旋下秒竄火 - UDN', '全球航班不敢飛伊朗大改道！「這國家」靠收過路費賺翻了 - 自由財經']
+
+--- Debug Session: 2026-06-03 10:21:45.071051 ---
+User Input: 烏克蘭新聞
+Parsed Dict: {'intent': 'query_news', 'keywords': ['Ukraine', '烏克蘭', 'Україна'], 'category': 'politics', 'source': None, 'article_url': None}
+Cleaned Keywords: ['Ukraine', '烏克蘭', 'Україна']
+Selected Sources: ['Google News 政治', 'Google News 國際']
+Fetched Articles Count: 102
+Filtered Articles Count: 4
+Matched Titles Example: ['俄無人機狂轟烏克蘭增至23死 澤倫斯基急求援 - Yahoo新聞', '法聯手夥伴扣押俄影子艦隊油輪 突擊隊直升機垂降登船 - 壹蘋新聞網', '俄無人機襲擊羅馬尼亞民宅釀2傷 確定是「俄版見證者」幹的 - 自由軍武頻道', '曾和習近平大聊「長生不老」 普廷砸8000億培育人體器官 - 自由時報']
+
+--- Debug Session: 2026-06-03 10:21:47.544486 ---
+User Input: 戰爭新聞
+Parsed Dict: {'intent': 'query_news', 'keywords': ['war', '戰爭', '衝突'], 'category': 'politics', 'source': None, 'article_url': None}
+Cleaned Keywords: ['war', '戰爭', '衝突']
+Selected Sources: ['Google News 政治', 'Google News 國際']
+Fetched Articles Count: 102
+Filtered Articles Count: 8
+Matched Titles Example: ['中東局勢又升溫！伊朗彈襲美軍駐科威特基地 中央司令部火速反擊 - UDN', '英國白男遇刺呼救「無法呼吸」 警方處置掀種族爭議 - 自由時報', '鄭麗文抵舊金山 僑胞以「拐杖式劍門禮」相迎 - 中時新聞網', '全球航班不敢飛伊朗大改道！「這國家」靠收過路費賺翻了 - 自由財經', '彭博：俄央行與財政部官員警告普丁戰爭開支越來越撐不下去| 國際 - Newtalk新聞']
+
+--- Debug Session: 2026-06-04 17:18:57.836857 ---
+User Input: 足球新聞
+Parsed Dict: {'intent': 'query_news', 'category': None, 'source': None, 'keywords': ['足球']}
+Cleaned Keywords: ['足球']
+Selected Sources: ['Google News 台灣', 'Google News 科技', 'Google News 財經', 'Google News 國際', 'Google News 政治', 'Google News 體育', 'Google News 健康', 'Google News 娛樂', 'Google News 國際體育', 'Google News 國際科技', 'BBC Sport Football']
+Fetched Articles Count: 545
+Filtered Articles Count: 59
+Matched Titles Example: ['Fifa bans fans from taking water bottles into World Cup stadiums', 'Podcast: What is it actually like to play at a World Cup?', "The stories behind Scotland's World Cup bogeymen", 'Video vault and Leeds litter picking - inside the mind of Bielsa', 'A higher ceiling than Messi? What next for Lamine Yamal?']
