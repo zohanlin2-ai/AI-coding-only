@@ -352,7 +352,7 @@ Recommended refresh behavior:
 | Queue depth | Update every tick or every 1 second. |
 | Bottom tabs | Update when new related events arrive. |
 
-Prototype demos may generate 1 to 4 fake packets every 800ms. Production mode should receive packets from WebSocket, SSE, or HTTP polling.
+The interface must receive real active network connection events from the system daemon.
 
 Performance notes:
 

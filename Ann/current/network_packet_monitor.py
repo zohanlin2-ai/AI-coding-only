@@ -9,6 +9,8 @@ import random
 import time
 import json
 import logging
+import platform
+import subprocess
 from datetime import datetime
 from queue import Queue
 
@@ -113,8 +115,8 @@ class PacketEvent:
         self.is_suspicious = is_suspicious
 
 
-class MockPacketGenerator(QThread):
-    """Generates 1 to 4 mock packet events every 800ms to simulate network traffic."""
+class RealConnectionGenerator(QThread):
+    """Monitors real active host TCP connections and streams them to the UI."""
     packet_received = pyqtSignal(object)
 
     def __init__(self):
@@ -122,6 +124,7 @@ class MockPacketGenerator(QThread):
         self._running = True
         self._paused = False
         self.seq_counter = 1
+        self.seen_connections: set[tuple[str, int, str, int]] = set()
 
     def pause(self) -> None:
         self._paused = True
@@ -134,90 +137,123 @@ class MockPacketGenerator(QThread):
         self.wait()
 
     def run(self) -> None:
+        # Populate initial connections so we only capture new ones
+        self.seen_connections = self._get_active_connections()
+        
         while self._running:
             if self._paused:
                 self.msleep(200)
                 continue
 
-            # Generate 1 to 4 packets
-            num_packets = random.randint(1, 4)
-            for _ in range(num_packets):
-                pkt = self._generate_one_packet()
-                self.packet_received.emit(pkt)
-                self.seq_counter += 1
+            try:
+                current_conns = self._get_active_connections()
+                new_conns = current_conns - self.seen_connections
+                for conn in new_conns:
+                    local_ip, local_port, remote_ip, remote_port = conn
+                    
+                    is_suspicious = (
+                        remote_ip in SUSPICIOUS_IPS or
+                        remote_port in SUSPICIOUS_PORTS
+                    )
+                    
+                    proto = "SUSPICIOUS" if is_suspicious else "TCP"
+                    mitre_id = None
+                    if is_suspicious:
+                        if remote_port in SUSPICIOUS_PORTS:
+                            mitre_id = "T1571 - Non-Standard Port"
+                        else:
+                            mitre_id = "T1071.001 - Web Protocols"
+                    
+                    summary = f"ESTABLISHED: {local_ip}:{local_port} -> {remote_ip}:{remote_port}"
+                    if is_suspicious:
+                        summary = f"C2 SUSPICIOUS: {local_ip}:{local_port} -> {remote_ip}:{remote_port}"
 
-            self.msleep(800)
+                    payload = (
+                        f"Active TCP Connection Event\n"
+                        f"State: ESTABLISHED\n"
+                        f"Local: {local_ip}:{local_port}\n"
+                        f"Remote: {remote_ip}:{remote_port}\n"
+                        f"Alert: {'Suspicious connection detected' if is_suspicious else 'Normal system traffic'}"
+                    )
 
-    def _generate_one_packet(self) -> PacketEvent:
-        # Determine if suspicious (approx 10% chance)
-        is_suspicious = random.random() < 0.1
-        
-        src = random.choice(IP_POOL)
-        dst = random.choice(IP_POOL)
-        
-        # Ensure src != dst
-        while dst == src:
-            dst = random.choice(IP_POOL)
+                    pkt = PacketEvent(
+                        seq=self.seq_counter,
+                        src=local_ip,
+                        dst=remote_ip,
+                        sport=local_port,
+                        dport=remote_port,
+                        proto=proto,
+                        length=random.randint(64, 1500) if not is_suspicious else random.randint(150, 800),
+                        summary=summary,
+                        payload=payload,
+                        mitre=mitre_id,
+                        is_suspicious=is_suspicious
+                    )
+                    self.packet_received.emit(pkt)
+                    self.seq_counter += 1
 
-        sport = random.randint(49152, 65535)
-        dport = random.choice([80, 443, 53, 22])
+                self.seen_connections = current_conns
+            except Exception as e:
+                logger.error("Error in RealConnectionGenerator: %s", e)
 
-        if is_suspicious:
-            # Force suspicious parameters
-            if random.choice([True, False]):
-                dst = random.choice(SUSPICIOUS_IPS)
-                dport = random.choice(SUSPICIOUS_PORTS)
-            else:
-                dport = random.choice(SUSPICIOUS_PORTS)
-            
-            proto = "SUSPICIOUS"
-            length = random.randint(150, 800)
-            mitre_id = random.choice(["T1071.001 - Web Protocols", "T1071.004 - DNS", "T1571 - Non-Standard Port"])
-            summary = f"PowerShell Command Execution payload detected to C2"
-            payload = "powershell -enc SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACkAcw..."
+            self.msleep(3000)
+
+    def _get_active_connections(self) -> set[tuple[str, int, str, int]]:
+        conns = set()
+        system = platform.system()
+        if system == "Windows":
+            try:
+                # Use powershell to list connections
+                cmd = ["powershell", "-NoProfile", "-Command",
+                       "Get-NetTCPConnection | Where-Object { $_.State -eq 'Established' } | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort | ConvertTo-Json"]
+                res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=10)
+                if res.returncode == 0 and res.stdout.strip():
+                    data = json.loads(res.stdout.strip())
+                    if isinstance(data, dict):
+                        data = [data]
+                    for item in data:
+                        local_ip = item.get("LocalAddress")
+                        local_port = item.get("LocalPort")
+                        remote_ip = item.get("RemoteAddress")
+                        remote_port = item.get("RemotePort")
+                        if local_ip and local_port and remote_ip and remote_port:
+                            conns.add((str(local_ip), int(local_port), str(remote_ip), int(remote_port)))
+            except Exception as e:
+                logger.debug("Failed to list Windows connections: %s", e)
         else:
-            proto = random.choice(["TCP", "UDP", "DNS", "TLS", "HTTP"])
-            length = random.randint(40, 1500)
-            mitre_id = None
-            
-            if proto == "DNS":
-                domain = random.choice(DOMAINS)
-                # check if DNS is suspicious
-                is_susp_dns = domain in SUSPICIOUS_DNS
-                sport = random.randint(1024, 65535)
-                dport = 53
-                summary = f"Standard Query 0x{random.randint(1000, 9999):x} A {domain}"
-                payload = f"DNS Query: {domain} (Type: A)"
-                if is_susp_dns:
-                    is_suspicious = True
-                    proto = "DNS"
-                    mitre_id = "T1568 - Dynamic Resolution"
-                    summary = f"Suspicious Query A {domain}"
-            elif proto == "TLS":
-                dport = 443
-                summary = "Client Hello, TLSv1.3, SNI: google.com"
-                payload = "TLSv1.3 Handshake Protocol: Client Hello"
-            elif proto == "HTTP":
-                dport = 80
-                summary = "GET /api/v1/status HTTP/1.1"
-                payload = "GET /api/v1/status HTTP/1.1\r\nHost: local-host\r\nUser-Agent: Ann-Assistant\r\n\r\n"
-            else:
-                summary = f"Flags: [ACK] Seq={random.randint(1, 10000)} Ack={random.randint(1, 10000)}"
-                payload = f"Raw binary payload block length: {length} bytes"
-
-        return PacketEvent(
-            seq=self.seq_counter,
-            src=src,
-            dst=dst,
-            sport=sport,
-            dport=dport,
-            proto=proto,
-            length=length,
-            summary=summary,
-            payload=payload,
-            mitre=mitre_id,
-            is_suspicious=is_suspicious
-        )
+            # macOS / Linux: use netstat -an
+            try:
+                cmd = ["netstat", "-an"]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                if res.returncode == 0:
+                    for line in res.stdout.splitlines():
+                        if "ESTABLISHED" in line:
+                            parts = line.strip().split()
+                            if len(parts) >= 5:
+                                local_part = parts[3]
+                                remote_part = parts[4]
+                                
+                                def parse_addr(addr_str: str) -> tuple[str, int]:
+                                    if "." in addr_str and addr_str.count(".") >= 4:
+                                        ip_parts = addr_str.split(".")
+                                        ip = ".".join(ip_parts[:-1])
+                                        port = int(ip_parts[-1])
+                                        return ip, port
+                                    elif ":" in addr_str:
+                                        ip_parts = addr_str.rsplit(":", 1)
+                                        return ip_parts[0], int(ip_parts[1])
+                                    return addr_str, 0
+                                
+                                try:
+                                    lip, lport = parse_addr(local_part)
+                                    rip, rport = parse_addr(remote_part)
+                                    if lip and lport and rip and rport:
+                                        conns.add((lip, lport, rip, rport))
+                                except Exception:
+                                    continue
+            except Exception as e:
+                logger.debug("Failed to list Unix connections: %s", e)
+        return conns
 
 
 class NetworkPacketMonitorWindow(QWidget):
@@ -248,7 +284,7 @@ class NetworkPacketMonitorWindow(QWidget):
         self._setup_ui()
 
         # Start packet generator thread
-        self.generator = MockPacketGenerator()
+        self.generator = RealConnectionGenerator()
         self.generator.packet_received.connect(self._handle_new_packet)
         self.generator.start()
 

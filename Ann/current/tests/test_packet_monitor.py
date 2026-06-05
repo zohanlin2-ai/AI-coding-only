@@ -23,7 +23,7 @@ pytestmark = pytest.mark.skipif(not HAS_QT, reason="PyQt6 or PySide6 is required
 if HAS_QT:
     app = QApplication.instance() or QApplication(sys.argv)
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from network_packet_monitor import PacketEvent, MockPacketGenerator, NetworkPacketMonitorWindow
+    from network_packet_monitor import PacketEvent, RealConnectionGenerator, NetworkPacketMonitorWindow
 
 def test_packet_event_creation():
     pkt = PacketEvent(
@@ -53,17 +53,28 @@ def test_packet_event_creation():
     assert pkt.time is not None
 
 
-def test_mock_packet_generator():
-    generator = MockPacketGenerator()
-    pkt = generator._generate_one_packet()
+def test_real_connection_generator(monkeypatch):
+    generator = RealConnectionGenerator()
     
-    assert pkt.seq == 1
-    assert pkt.src in generator._generate_one_packet().src or pkt.src is not None
-    assert pkt.dst is not None
-    assert pkt.proto in ["TCP", "UDP", "DNS", "TLS", "HTTP", "SUSPICIOUS"]
-    assert pkt.length > 0
-    assert pkt.summary is not None
-    assert pkt.payload is not None
+    # Mock platform and connections
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+    
+    import json
+    class MockWindowsCompletedProcess:
+        returncode = 0
+        stdout = json.dumps([
+            {
+                "LocalAddress": "192.168.1.100",
+                "LocalPort": 50505,
+                "RemoteAddress": "8.8.8.8",
+                "RemotePort": 53
+            }
+        ])
+        
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: MockWindowsCompletedProcess())
+    conns = generator._get_active_connections()
+    assert len(conns) == 1
+    assert ("192.168.1.100", 50505, "8.8.8.8", 53) in conns
 
 
 def test_filter_matching():
