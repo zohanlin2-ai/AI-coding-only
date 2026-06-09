@@ -36,6 +36,7 @@ from alarm_handler import (  # noqa: E402
     detect_update_intent,
 )
 from core_controller import CoreController, ControllerResult, handle_memory_command, SYSTEM_PROMPT  # noqa: E402
+from slash_commands import handle_slash_command  # noqa: E402
 from version_check import check_for_update  # noqa: E402
 
 EXIT_UPDATE = 42
@@ -217,6 +218,12 @@ def main() -> None:
                         print(f"\nAnn: {reply}\n")
                         continue
 
+                    # ---- Slash commands (fast, no LLM) ----------------------
+                    slash_result = handle_slash_command(user_input, controller, BASE_DIR)
+                    if slash_result.handled:
+                        print(f"\nAnn: {slash_result.reply}\n")
+                        continue
+
                     # ---- System commands ------------------------------------
                     if user_lower in _EXIT_CMDS:
                         print("\nAnn: 再見！有需要隨時找我。\n")
@@ -228,7 +235,7 @@ def main() -> None:
 
                     # ---- Update confirmation flow ----------------------------
                     if awaiting_update_confirm:
-                        intent = detect_update_intent(user_lower)
+                        intent = detect_update_intent(user_lower) if user_lower != "/y" else "yes"
                         if intent == "yes":
                             if security_mode:
                                 awaiting_update_confirm = False
@@ -263,7 +270,7 @@ def main() -> None:
                         continue
 
                     # ---- On-demand update check -----------------------------
-                    if any(w in user_lower for w in UPDATE_CHECK_WORDS):
+                    if user_lower == "/update" or any(w in user_lower for w in UPDATE_CHECK_WORDS):
                         if security_mode:
                             print("\nAnn: 安全模式下無法進行更新。請先關閉安全模式。\n")
                             continue

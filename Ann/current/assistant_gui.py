@@ -30,6 +30,7 @@ from alarm_handler import (
 )
 from assistant import load_config, BASE_DIR, EXIT_UPDATE, EXIT_RESTART
 from core_controller import CoreController, ControllerResult, handle_memory_command, SYSTEM_PROMPT
+from slash_commands import handle_slash_command
 from file_handler import parse_markdown_blocks
 
 # Set up logging for GUI
@@ -928,6 +929,14 @@ class ChatWindow(QWidget):
             self.add_message(reply, is_user=False)
             return
 
+        # ---- Slash commands (fast, no LLM) ------------------------------
+        slash_result = handle_slash_command(user_text, self.controller, BASE_DIR)
+        if slash_result.handled:
+            self.input_field.clear()
+            self.add_message(user_text, is_user=True)
+            self.add_message(slash_result.reply, is_user=False)
+            return
+
         # ---- System commands (fast, synchronous) ------------------------
         exit_cmds = {"exit", "close", "terminate", "close the window", "shut down", "再見", "關閉程式", "關閉"}
         if user_input_lower in exit_cmds:
@@ -960,7 +969,7 @@ class ChatWindow(QWidget):
                 self.pending_version = None
                 self.add_message("安全模式下無法進行更新。請先關閉安全模式。", is_user=False)
                 return
-            intent = detect_update_intent(user_input_lower)
+            intent = "yes" if user_input_lower == "/y" else detect_update_intent(user_input_lower)
             if intent == "yes":
                 from security_daemon import SecurityDaemon
                 daemon = SecurityDaemon(self.config)
@@ -1006,7 +1015,7 @@ class ChatWindow(QWidget):
             return
 
         # ---- On-demand update check -------------------------------------
-        if any(w in user_input_lower for w in UPDATE_CHECK_WORDS):
+        if user_input_lower == "/update" or any(w in user_input_lower for w in UPDATE_CHECK_WORDS):
             self.input_field.clear()
             self.add_message(user_text, is_user=True)
             if self._security_mode:
