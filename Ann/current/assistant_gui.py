@@ -975,6 +975,7 @@ class ChatWindow(QWidget):
                     self.add_message("偵測到安全監控 Daemon 正在執行，正在先將其關閉...", is_user=False)
                     daemon.stop()
                 self.awaiting_update_confirm = False
+                confirmed_version = self.pending_version
                 self.pending_version = None
                 self.send_btn.setEnabled(False)
                 self.input_field.setEnabled(False)
@@ -983,7 +984,7 @@ class ChatWindow(QWidget):
                     self.add_message("Sounds good! Updating now — see you on the other side! 🚀", is_user=False)
                     QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_UPDATE))
                     return
-                llm_message = build_update_confirm_llm_message(self.pending_version, user_text)
+                llm_message = build_update_confirm_llm_message(confirmed_version, user_text)
                 self.controller.conversation.append({"role": "user", "content": llm_message})
                 messages_with_system = [
                     {"role": "system", "content": SYSTEM_PROMPT},
