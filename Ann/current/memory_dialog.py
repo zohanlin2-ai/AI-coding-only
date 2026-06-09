@@ -196,11 +196,11 @@ class MemoryDialog(QDialog):
         top.addWidget(conf_label)
         layout.addLayout(top)
 
-        # Summary (editable on demand)
-        self._summary_label = QLabel(unit["summary"])
-        self._summary_label.setStyleSheet(f"color: {_TEXT}; font-size: 12px;")
-        self._summary_label.setWordWrap(True)
-        layout.addWidget(self._summary_label)
+        # Summary (editable on demand; located by layout index in _on_edit)
+        summary_label = QLabel(unit["summary"])
+        summary_label.setStyleSheet(f"color: {_TEXT}; font-size: 12px;")
+        summary_label.setWordWrap(True)
+        layout.addWidget(summary_label)
 
         # Keywords
         kw_label = QLabel("  ".join(f"#{k}" for k in unit.get("keywords", [])))
