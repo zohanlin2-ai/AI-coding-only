@@ -620,14 +620,14 @@ class ChatWindow(QWidget):
     """Main Chat Window (State 2 of Scheme B)."""
     closed_to_bubble = pyqtSignal(QPoint)
 
-    def __init__(self, config: dict, controller, bubble, alarm_manager, alarm_trigger, alarm_scheduler, new_tag: str = None):
+    def __init__(self, config: dict, controller, bubble, new_tag: str = None):
         super().__init__()
         self.config = config
         self.controller = controller
         self.bubble = bubble
-        self.alarm_manager = alarm_manager
-        self.alarm_trigger = alarm_trigger
-        self.alarm_scheduler = alarm_scheduler
+        self.alarm_manager = controller.alarm_manager
+        self.alarm_trigger = controller.alarm_trigger
+        self.alarm_scheduler = controller.alarm_scheduler
         self.drag_position = QPoint()
         self.awaiting_update_confirm = False
         self.pending_version = None
@@ -1193,13 +1193,13 @@ class ChatWindow(QWidget):
 
 class FloatingBubble(QWidget):
     """Draggable Floating Bubble (State 1 of Scheme B)."""
-    def __init__(self, config: dict, controller, alarm_manager, alarm_trigger, alarm_scheduler, new_tag: str = None):
+    def __init__(self, config: dict, controller, new_tag: str = None):
         super().__init__()
         self.config = config
         self.controller = controller
-        self.alarm_manager = alarm_manager
-        self.alarm_trigger = alarm_trigger
-        self.alarm_scheduler = alarm_scheduler
+        self.alarm_manager = controller.alarm_manager
+        self.alarm_trigger = controller.alarm_trigger
+        self.alarm_scheduler = controller.alarm_scheduler
         self.active_triggered_alarms = []
         self.drag_position = QPoint()
         self.click_start_pos = QPoint()
@@ -1232,7 +1232,7 @@ class FloatingBubble(QWidget):
         )
 
         # Initialize Chat Window
-        self.chat_window = ChatWindow(self.config, self.controller, self, self.alarm_manager, self.alarm_trigger, self.alarm_scheduler, new_tag)
+        self.chat_window = ChatWindow(self.config, self.controller, self, new_tag)
         self.chat_window.closed_to_bubble.connect(self.collapse_from_chat)
 
         # Position bubble in the bottom right corner initially
@@ -1429,9 +1429,6 @@ class FloatingBubble(QWidget):
 def start_gui(
     config: dict,
     controller,
-    alarm_manager,
-    alarm_trigger,
-    alarm_scheduler,
     new_tag: str = None,
 ) -> None:
     """Launch the PyQt6 application loop."""
@@ -1444,6 +1441,6 @@ def start_gui(
         "border-radius: 6px; padding: 6px; font-family: 'Segoe UI', Arial; font-size: 12px; }"
     )
 
-    bubble = FloatingBubble(config, controller, alarm_manager, alarm_trigger, alarm_scheduler, new_tag)
+    bubble = FloatingBubble(config, controller, new_tag)
     bubble.show()
     sys.exit(app.exec())

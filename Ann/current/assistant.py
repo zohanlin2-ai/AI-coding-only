@@ -114,27 +114,13 @@ def main() -> None:
         print("\n[Notice] pygame is not installed. Alarm audio notifications will be disabled.")
         print("         To enable sound, please run: pip install pygame\n")
 
-    # Initialize Alarm components
-    from alarms.alarm_manager import AlarmManager
-    from alarms.alarm_trigger import AlarmTrigger
-    from alarms.alarm_scheduler import AlarmScheduler
-    from alarms.intent_parser import IntentParser as AlarmIntentParser
-
-    alarm_config = config.get("alarm", {})
-    sound_filename = alarm_config.get("sound_path", "428157__setuniman__charade-1q62b.wav")
-    sound_path = CURRENT_DIR / sound_filename
-    alarm_manager = AlarmManager()
-    alarm_trigger = AlarmTrigger(sound_path=str(sound_path), volume=alarm_config.get("volume", 0.8))
-    alarm_scheduler = AlarmScheduler(alarm_manager, alarm_trigger)
-    alarm_intent_parser = AlarmIntentParser(
-        base_url=config["llm"].get("base_url", "http://localhost:11434"),
-        model=config["llm"]["model"],
-    )
-
-    # Build controller
+    # Build controller (alarm components initialised inside setup_modules)
     controller = CoreController(config, BASE_DIR)
-    controller.setup_alarm_components(alarm_manager, alarm_trigger, alarm_scheduler, alarm_intent_parser)
     controller.setup_modules()
+
+    alarm_manager = controller.alarm_manager
+    alarm_trigger = controller.alarm_trigger
+    alarm_scheduler = controller.alarm_scheduler
 
     # Start SecurityDaemon automatically
     from security_daemon import SecurityDaemon
@@ -313,14 +299,7 @@ def main() -> None:
         else:
             # ---- GUI mode -----------------------------------------------
             import assistant_gui
-            assistant_gui.start_gui(
-                config,
-                controller,
-                alarm_manager,
-                alarm_trigger,
-                alarm_scheduler,
-                new_tag,
-            )
+            assistant_gui.start_gui(config, controller, new_tag)
     finally:
         daemon.stop()
 

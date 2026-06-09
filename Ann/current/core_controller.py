@@ -183,21 +183,25 @@ class CoreController:
     # Setup helpers
     # ------------------------------------------------------------------
 
-    def setup_alarm_components(
-        self,
-        alarm_manager,
-        alarm_trigger,
-        alarm_scheduler,
-        alarm_intent_parser,
-    ) -> None:
-        """Store alarm infrastructure and register the alarm module."""
-        self.alarm_manager = alarm_manager
-        self.alarm_trigger = alarm_trigger
-        self.alarm_scheduler = alarm_scheduler
-        self.router.register(alarm_intent_parser)
-
     def setup_modules(self) -> None:
         """Instantiate and register all feature modules into the router."""
+        from pathlib import Path as _Path
+
+        # ---- Alarm ----------------------------------------------------------
+        from alarms.alarm_manager import AlarmManager
+        from alarms.alarm_trigger import AlarmTrigger
+        from alarms.alarm_scheduler import AlarmScheduler
+        from alarms.intent_parser import IntentParser as AlarmIntentParser
+
+        alarm_config = self.config.get("alarm", {})
+        sound_filename = alarm_config.get("sound_path", "428157__setuniman__charade-1q62b.wav")
+        sound_path = _Path(__file__).parent / sound_filename
+        self.alarm_manager = AlarmManager()
+        self.alarm_trigger = AlarmTrigger(sound_path=str(sound_path), volume=alarm_config.get("volume", 0.8))
+        self.alarm_scheduler = AlarmScheduler(self.alarm_manager, self.alarm_trigger)
+        self.router.register(AlarmIntentParser(self.llm_base_url, self.llm_model))
+
+        # ---- File -----------------------------------------------------------
         from file_handler import FileIntentParser
         file_parser = FileIntentParser(self.llm_base_url, self.llm_model)
         self.router.register(file_parser)
