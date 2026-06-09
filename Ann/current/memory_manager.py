@@ -354,6 +354,21 @@ class MemoryManager:
                 return True
             return False
 
+    def get_stats(self) -> dict:
+        """Return memory usage statistics from the index."""
+        lock = FileLock(self.lock_path)
+        with lock:
+            data = self._get_index_locked()
+        return {
+            "active":   data.get("active_memories", 0),
+            "outdated": data.get("outdated_memories", 0),
+            "deleted":  data.get("deleted_memories", 0),
+            "total":    data.get("total_memories", 0),
+            "files":    len(data.get("files", [])),
+            "size_kb":  round(data.get("total_size_bytes", 0) / 1024, 1),
+            "enabled":  data.get("enabled", True),
+        }
+
     def list_memories(self) -> list[dict]:
         """List all active memories."""
         lock = FileLock(self.lock_path)

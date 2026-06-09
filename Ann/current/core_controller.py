@@ -124,6 +124,19 @@ def handle_memory_command(user_input: str, memory_manager) -> str:
         success = memory_manager.edit_memory(mem_id, summary=new_summary)
         return f"已成功編輯記憶 {mem_id}。" if success else f"找不到記憶 {mem_id}。"
 
+    if cmd == "stats":
+        s = memory_manager.get_stats()
+        status = "開啟" if s["enabled"] else "關閉"
+        return (
+            f"📊 記憶統計\n"
+            f"• 狀態: {status}\n"
+            f"• 活躍記憶: {s['active']} 筆\n"
+            f"• 已過期: {s['outdated']} 筆\n"
+            f"• 已刪除: {s['deleted']} 筆\n"
+            f"• 記憶檔案: {s['files']} 個\n"
+            f"• 儲存大小: {s['size_kb']} KB"
+        )
+
     if cmd == "off":
         memory_manager.toggle(False)
         return "記憶功能已關閉。"
@@ -132,7 +145,7 @@ def handle_memory_command(user_input: str, memory_manager) -> str:
         memory_manager.toggle(True)
         return "記憶功能已開啟。"
 
-    return "未知的記憶指令。可用指令: /memory list | add | edit | delete | off | on"
+    return "未知的記憶指令。可用指令: /memory list | add | edit | delete | stats | off | on"
 
 
 # ---------------------------------------------------------------------------
