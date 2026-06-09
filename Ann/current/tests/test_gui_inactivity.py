@@ -37,30 +37,22 @@ def mock_gui_components():
         "llm": {"model": "test-model", "base_url": "http://localhost:11434"},
         "alarm": {"sound_path": "test.wav", "volume": 0.5}
     }
-    evaluator = MagicMock()
-    alarm_manager = MagicMock()
-    alarm_trigger = MagicMock()
-    alarm_scheduler = MagicMock()
-    intent_parser = MagicMock()
-    
+    controller = MagicMock()
+    controller.alarm_manager = MagicMock()
+    controller.alarm_trigger = MagicMock()
+    controller.alarm_scheduler = MagicMock()
+
     return {
         "config": config,
-        "evaluator": evaluator,
-        "alarm_manager": alarm_manager,
-        "alarm_trigger": alarm_trigger,
-        "alarm_scheduler": alarm_scheduler,
-        "intent_parser": intent_parser
+        "controller": controller,
     }
 
 
 def test_inactivity_timer_initialization(mock_gui_components):
     c = mock_gui_components
     bubble = MagicMock()
-    chat_win = ChatWindow(
-        c["config"], c["evaluator"], bubble, c["alarm_manager"],
-        c["alarm_trigger"], c["alarm_scheduler"], c["intent_parser"]
-    )
-    
+    chat_win = ChatWindow(c["config"], c["controller"], bubble)
+
     assert chat_win.inactivity_timer is not None
     assert chat_win.inactivity_timer.isSingleShot()
     assert chat_win.inactivity_timer.interval() == 3 * 60 * 1000  # 3 minutes
@@ -69,14 +61,11 @@ def test_inactivity_timer_initialization(mock_gui_components):
 def test_start_stop_timer(mock_gui_components):
     c = mock_gui_components
     bubble = MagicMock()
-    chat_win = ChatWindow(
-        c["config"], c["evaluator"], bubble, c["alarm_manager"],
-        c["alarm_trigger"], c["alarm_scheduler"], c["intent_parser"]
-    )
-    
+    chat_win = ChatWindow(c["config"], c["controller"], bubble)
+
     chat_win.start_inactivity_timer()
     assert chat_win.inactivity_timer.isActive()
-    
+
     chat_win.stop_inactivity_timer()
     assert not chat_win.inactivity_timer.isActive()
 
@@ -84,11 +73,8 @@ def test_start_stop_timer(mock_gui_components):
 def test_timeout_triggers_shrink(mock_gui_components):
     c = mock_gui_components
     bubble = MagicMock()
-    chat_win = ChatWindow(
-        c["config"], c["evaluator"], bubble, c["alarm_manager"],
-        c["alarm_trigger"], c["alarm_scheduler"], c["intent_parser"]
-    )
-    
+    chat_win = ChatWindow(c["config"], c["controller"], bubble)
+
     with patch.object(chat_win, 'shrink_back') as mock_shrink:
         chat_win._on_inactivity_timeout()
         assert mock_shrink.called
@@ -97,11 +83,8 @@ def test_timeout_triggers_shrink(mock_gui_components):
 def test_send_message_resets_timer(mock_gui_components):
     c = mock_gui_components
     bubble = MagicMock()
-    chat_win = ChatWindow(
-        c["config"], c["evaluator"], bubble, c["alarm_manager"],
-        c["alarm_trigger"], c["alarm_scheduler"], c["intent_parser"]
-    )
-    
+    chat_win = ChatWindow(c["config"], c["controller"], bubble)
+
     chat_win.input_field.setText("hello")
     # Mock Ollama call to prevent actual network calls during test
     with patch.object(chat_win, 'start_inactivity_timer') as mock_start:
@@ -113,15 +96,12 @@ def test_send_message_resets_timer(mock_gui_components):
 def test_alarm_extends_inactivity(mock_gui_components):
     c = mock_gui_components
     bubble = MagicMock()
-    chat_win = ChatWindow(
-        c["config"], c["evaluator"], bubble, c["alarm_manager"],
-        c["alarm_trigger"], c["alarm_scheduler"], c["intent_parser"]
-    )
-    
+    chat_win = ChatWindow(c["config"], c["controller"], bubble)
+
     # 1. Timer inactive -> should not extend
     chat_win.extend_inactivity_if_alarm()
     assert not chat_win.inactivity_timer.isActive()
-    
+
     # 2. Timer active -> should extend if remaining < 10s
     chat_win.start_inactivity_timer()
     # Mock remainingTime to return 5 seconds
@@ -133,18 +113,15 @@ def test_alarm_extends_inactivity(mock_gui_components):
 
 def test_pink_light_states(mock_gui_components):
     c = mock_gui_components
-    bubble = FloatingBubble(
-        c["config"], c["evaluator"], c["alarm_manager"],
-        c["alarm_trigger"], c["alarm_scheduler"], c["intent_parser"]
-    )
-    
+    bubble = FloatingBubble(c["config"], c["controller"])
+
     assert not bubble.new_reply_pending
     assert not bubble._pulse_timer.isActive()
-    
+
     bubble.set_new_reply_pending(True)
     assert bubble.new_reply_pending
     assert bubble._pulse_timer.isActive()
-    
+
     bubble.set_new_reply_pending(False)
     assert not bubble.new_reply_pending
     assert not bubble._pulse_timer.isActive()
@@ -152,13 +129,10 @@ def test_pink_light_states(mock_gui_components):
 
 def test_expand_clears_pink_light_and_starts_timer(mock_gui_components):
     c = mock_gui_components
-    bubble = FloatingBubble(
-        c["config"], c["evaluator"], c["alarm_manager"],
-        c["alarm_trigger"], c["alarm_scheduler"], c["intent_parser"]
-    )
-    
+    bubble = FloatingBubble(c["config"], c["controller"])
+
     bubble.set_new_reply_pending(True)
-    
+
     with patch.object(bubble.chat_window, 'start_inactivity_timer') as mock_timer_start:
         with patch.object(bubble.chat_window, 'show') as mock_show:
             bubble.expand_to_chat()

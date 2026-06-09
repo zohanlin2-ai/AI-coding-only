@@ -43,18 +43,20 @@ def qapp():
     return app
 
 
+def _make_controller():
+    controller = MagicMock()
+    controller.alarm_manager = MagicMock()
+    controller.alarm_trigger = MagicMock()
+    controller.alarm_scheduler = MagicMock()
+    return controller
+
+
 def test_gui_init_with_update(qapp) -> None:
     config = {"llm": {"model": "test-model"}}
-    controller = MagicMock()
+    controller = _make_controller()
     bubble = MagicMock()
-    alarm_manager = MagicMock()
-    alarm_trigger = MagicMock()
-    alarm_scheduler = MagicMock()
 
-    # ChatWindow initialized with new_tag
-    chat_window = ChatWindow(
-        config, controller, bubble, alarm_manager, alarm_trigger, alarm_scheduler, "20260527-latest"
-    )
+    chat_window = ChatWindow(config, controller, bubble, "20260527-latest")
 
     assert chat_window.awaiting_update_confirm is True
     assert chat_window.pending_version == "20260527-latest"
@@ -62,20 +64,14 @@ def test_gui_init_with_update(qapp) -> None:
 
 def test_gui_update_confirm_yes(qapp) -> None:
     config = {"llm": {"model": "test-model"}}
-    controller = MagicMock()
+    controller = _make_controller()
     bubble = MagicMock()
-    alarm_manager = MagicMock()
-    alarm_trigger = MagicMock()
-    alarm_scheduler = MagicMock()
 
-    chat_window = ChatWindow(
-        config, controller, bubble, alarm_manager, alarm_trigger, alarm_scheduler, "20260527-latest"
-    )
+    chat_window = ChatWindow(config, controller, bubble, "20260527-latest")
 
     chat_window.input_field.setText("好")
-    with patch("assistant_gui.ControllerWorker.start") as mock_worker_start:
-        # Mocking the ollama chat client call which might be triggered
-        with patch.object(chat_window.controller.ollama_client, "chat") as mock_chat:
+    with patch("assistant_gui.ControllerWorker.start"):
+        with patch.object(chat_window.controller.ollama_client, "chat"):
             chat_window.send_message()
             assert chat_window.awaiting_update_confirm is False
             assert chat_window.pending_version is None
@@ -83,15 +79,10 @@ def test_gui_update_confirm_yes(qapp) -> None:
 
 def test_gui_update_confirm_no(qapp) -> None:
     config = {"llm": {"model": "test-model"}}
-    controller = MagicMock()
+    controller = _make_controller()
     bubble = MagicMock()
-    alarm_manager = MagicMock()
-    alarm_trigger = MagicMock()
-    alarm_scheduler = MagicMock()
 
-    chat_window = ChatWindow(
-        config, controller, bubble, alarm_manager, alarm_trigger, alarm_scheduler, "20260527-latest"
-    )
+    chat_window = ChatWindow(config, controller, bubble, "20260527-latest")
 
     chat_window.input_field.setText("不要")
     chat_window.send_message()
@@ -101,15 +92,10 @@ def test_gui_update_confirm_no(qapp) -> None:
 
 def test_gui_manual_update_check_no_new_version(qapp) -> None:
     config = {"llm": {"model": "test-model"}}
-    controller = MagicMock()
+    controller = _make_controller()
     bubble = MagicMock()
-    alarm_manager = MagicMock()
-    alarm_trigger = MagicMock()
-    alarm_scheduler = MagicMock()
 
-    chat_window = ChatWindow(
-        config, controller, bubble, alarm_manager, alarm_trigger, alarm_scheduler
-    )
+    chat_window = ChatWindow(config, controller, bubble)
 
     with patch("assistant_gui.UpdateCheckWorker.start") as mock_worker_start:
         chat_window.input_field.setText("更新")
@@ -120,15 +106,10 @@ def test_gui_manual_update_check_no_new_version(qapp) -> None:
 
 def test_gui_handle_update_check_finished_with_version(qapp) -> None:
     config = {"llm": {"model": "test-model"}}
-    controller = MagicMock()
+    controller = _make_controller()
     bubble = MagicMock()
-    alarm_manager = MagicMock()
-    alarm_trigger = MagicMock()
-    alarm_scheduler = MagicMock()
 
-    chat_window = ChatWindow(
-        config, controller, bubble, alarm_manager, alarm_trigger, alarm_scheduler
-    )
+    chat_window = ChatWindow(config, controller, bubble)
 
     chat_window.handle_update_check_finished("20260527-latest", "")
     assert chat_window.awaiting_update_confirm is True
@@ -138,15 +119,10 @@ def test_gui_handle_update_check_finished_with_version(qapp) -> None:
 
 def test_gui_handle_update_check_finished_no_version(qapp) -> None:
     config = {"llm": {"model": "test-model"}}
-    controller = MagicMock()
+    controller = _make_controller()
     bubble = MagicMock()
-    alarm_manager = MagicMock()
-    alarm_trigger = MagicMock()
-    alarm_scheduler = MagicMock()
 
-    chat_window = ChatWindow(
-        config, controller, bubble, alarm_manager, alarm_trigger, alarm_scheduler
-    )
+    chat_window = ChatWindow(config, controller, bubble)
 
     chat_window.handle_update_check_finished("", "")
     assert chat_window.awaiting_update_confirm is False

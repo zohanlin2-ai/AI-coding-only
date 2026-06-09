@@ -42,19 +42,14 @@ def mock_gui_components():
         "llm": {"model": "test-model", "base_url": "http://localhost:11434"},
         "alarm": {"sound_path": "test.wav", "volume": 0.5}
     }
-    evaluator = MagicMock()
-    alarm_manager = MagicMock()
-    alarm_trigger = MagicMock()
-    alarm_scheduler = MagicMock()
-    intent_parser = MagicMock()
-    
+    controller = MagicMock()
+    controller.alarm_manager = MagicMock()
+    controller.alarm_trigger = MagicMock()
+    controller.alarm_scheduler = MagicMock()
+
     return {
         "config": config,
-        "evaluator": evaluator,
-        "alarm_manager": alarm_manager,
-        "alarm_trigger": alarm_trigger,
-        "alarm_scheduler": alarm_scheduler,
-        "intent_parser": intent_parser
+        "controller": controller,
     }
 
 
@@ -84,10 +79,7 @@ def test_chat_window_dnd_handlers(mock_gui_components, tmp_path):
     c = mock_gui_components
     bubble = MagicMock()
     
-    chat_win = ChatWindow(
-        c["config"], c["evaluator"], bubble, c["alarm_manager"],
-        c["alarm_trigger"], c["alarm_scheduler"], c["intent_parser"]
-    )
+    chat_win = ChatWindow(c["config"], c["controller"], bubble)
     
     # Mock a drag enter event
     drag_event = MagicMock()
@@ -129,10 +121,7 @@ def test_chat_window_dnd_handlers(mock_gui_components, tmp_path):
 def test_floating_bubble_dnd_handlers(mock_gui_components, tmp_path):
     c = mock_gui_components
     
-    bubble = FloatingBubble(
-        c["config"], c["evaluator"], c["alarm_manager"],
-        c["alarm_trigger"], c["alarm_scheduler"], c["intent_parser"]
-    )
+    bubble = FloatingBubble(c["config"], c["controller"])
     
     # Initially drag is not active
     assert not bubble.drag_active
