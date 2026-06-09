@@ -92,6 +92,8 @@ def _help_text() -> str:
         "  /memory add <text>    Manually add a memory\n"
         "  /memory edit <id> <text>  Edit a memory by ID\n"
         "  /memory delete <id>   Delete a memory by ID\n"
+        "  /memory stats         Show memory usage statistics\n"
+        "  /memory ui            Open memory management panel (GUI only)\n"
         "  /memory on            Enable memory\n"
         "  /memory off           Disable memory\n"
     )

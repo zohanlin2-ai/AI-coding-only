@@ -253,16 +253,68 @@ class MemoryManager:
             self._save_index_locked(index_data)
             logger.info("Successfully added memory: %s -> %s", memory_id, summary)
 
-        # Conflict detection + organization trigger (outside lock, background)
-        threading.Thread(
-            target=self._detect_and_resolve_conflict,
-            args=(category, keywords, summary),
-            daemon=True,
-        ).start()
-        self._maybe_trigger_organization()
-        self.start_background_organization()
+        # Conflict detection + organization trigger (outside lock, background).
+        # Skip for system-generated memories (organization pass) to prevent
+        # feedback loops where the merged entry retriggers another pass.
+        if source != "organization":
+            threading.Thread(
+                target=self._detect_and_resolve_conflict,
+                args=(category, keywords, summary),
+                daemon=True,
+            ).start()
+            self._maybe_trigger_organization()
+            self.start_background_organization()
 
         return unit
+
+    def _mark_as_outdated(self, memory_id: str) -> bool:
+        """
+        Mark a memory unit as 'outdated' (system-driven demotion, e.g. after
+        organization merging).  Unlike delete_memory(), this is reversible and
+        counts toward outdated_memories rather than deleted_memories.
+        Caller must NOT hold the file lock.
+        """
+        lock = FileLock(self.lock_path)
+        with lock:
+            index_data = self._get_index_locked()
+            found = False
+            for file_info in index_data.get("files", []):
+                filepath = self.memories_dir / file_info["filename"]
+                if not filepath.exists():
+                    continue
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        file_data = json.load(f)
+                except Exception:
+                    continue
+
+                for unit in file_data.get("memories", []):
+                    if unit["id"] == memory_id and unit["status"] == "active":
+                        unit["status"] = "outdated"
+                        tz = datetime.datetime.now().astimezone().tzinfo
+                        unit["updated_at"] = datetime.datetime.now(tz).replace(microsecond=0).isoformat()
+                        index_data["active_memories"] = max(0, index_data.get("active_memories", 0) - 1)
+                        index_data["outdated_memories"] = index_data.get("outdated_memories", 0) + 1
+                        found = True
+                        break
+
+                if found:
+                    temp_path = filepath.with_suffix(".tmp")
+                    try:
+                        with open(temp_path, "w", encoding="utf-8") as f:
+                            json.dump(file_data, f, ensure_ascii=False, indent=2)
+                        temp_path.replace(filepath)
+                        file_info["size_bytes"] = filepath.stat().st_size
+                    except Exception as e:
+                        logger.error("Failed to write outdated memory file: %s", e)
+                        if temp_path.exists():
+                            temp_path.unlink()
+                        return False
+                    break
+
+            if found:
+                self._save_index_locked(index_data)
+            return found
 
     def delete_memory(self, memory_id: str) -> bool:
         """Mark memory as deleted by ID."""
@@ -776,10 +828,10 @@ class MemoryManager:
                 if not merged_summary:
                     continue
 
-                # Mark originals outdated
-                merged_keywords = list({kw for u in cluster for kw in u["keywords"]}[:5])
+                # Mark originals as outdated (system demotion, not user deletion)
+                merged_keywords = list({kw for u in cluster for kw in u["keywords"]})[:5]
                 for unit in cluster:
-                    self.delete_memory(unit["id"])  # marks deleted for now to keep counts clean
+                    self._mark_as_outdated(unit["id"])
 
                 # Add merged entry
                 merged_confidence = sum(u.get("confidence", 0.7) for u in cluster) / len(cluster)
