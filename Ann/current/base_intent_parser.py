@@ -30,12 +30,13 @@ class ModuleResult:
     Standardized result returned by a module's execute() method.
 
     Attributes:
-        reply:    The text response to display to the user.
-        articles: Optional list of news article dicts (for news card rendering in GUI).
-        marker:   Optional control marker such as '[EXIT]', '[RESTART]', '[UPDATE]'.
+        reply:  The text response to display to the user.
+        data:   Optional dict for structured module output.
+                Use domain-specific keys, e.g. {"articles": [...]} for news.
+        marker: Optional control marker such as '[EXIT]', '[RESTART]', '[UPDATE]'.
     """
     reply: str
-    articles: list = field(default_factory=list)
+    data: dict = field(default_factory=dict)
     marker: str | None = None
 
 

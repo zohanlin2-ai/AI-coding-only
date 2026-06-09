@@ -69,12 +69,12 @@ class TestModuleResult:
     def test_defaults(self):
         r = ModuleResult(reply="hello")
         assert r.reply == "hello"
-        assert r.articles == []
+        assert r.data == {}
         assert r.marker is None
 
     def test_custom_fields(self):
-        r = ModuleResult(reply="ok", articles=[{"title": "A"}], marker="[EXIT]")
-        assert r.articles == [{"title": "A"}]
+        r = ModuleResult(reply="ok", data={"articles": [{"title": "A"}]}, marker="[EXIT]")
+        assert r.data["articles"] == [{"title": "A"}]
         assert r.marker == "[EXIT]"
 
 

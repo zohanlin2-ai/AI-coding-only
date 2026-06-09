@@ -317,7 +317,7 @@ class CoreController:
                 self.conversation.append({"role": "assistant", "content": clean_reply})
             return ControllerResult(
                 reply=clean_reply,
-                articles=module_result.articles,
+                articles=module_result.data.get("articles", []),
                 marker=marker or module_result.marker,
             )
 

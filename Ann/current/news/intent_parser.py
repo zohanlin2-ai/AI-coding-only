@@ -164,5 +164,5 @@ class NewsIntentParser(BaseIntentParser):
         user_text = context["user_text"]
         reply = news_manager.handle_intent(user_text, parsed)
         articles = list(news_manager.last_fetched_articles)
-        return ModuleResult(reply=reply, articles=articles)
+        return ModuleResult(reply=reply, data={"articles": articles})
 
