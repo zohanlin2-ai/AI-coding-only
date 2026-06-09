@@ -429,7 +429,7 @@ class SecurityEngine(threading.Thread):
         self.config = config
         self._stop_event = threading.Event()
         self.ollama_client = OllamaClient(config.get("llm", {}).get("base_url", "http://localhost:11434"))
-        self.llm_model = config.get("llm", {}).get("model", "gemma:2b")
+        self.llm_model = config.get("llm", {}).get("model", "gemma4:e4b")
         
         # Sliding windows for R-002 file operations
         # Tracks timestamp list of operations per (host, user)

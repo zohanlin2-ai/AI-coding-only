@@ -275,7 +275,7 @@ Install the required packages from the dependency manifest:
 ```bash
 pip install -r current/requirements.txt
 ```
-This installs `PyQt6` (for GUI), `pygame` (for audio alarms), `ollama` (for API integration), `requests` (for HTTP APIs), `pyyaml` (for configuration parsing), `pytest` (for unit testing), and all news module dependencies (`feedparser`, `newspaper3k`, `readability-lxml`, `beautifulsoup4`, and `httpx`).
+This installs `PyQt6` (for GUI), `pygame` (for audio alarms), `requests` and `httpx` (for the Ollama HTTP API and other HTTP calls), `pyyaml` (for configuration parsing), `filelock` (for concurrent memory persistence), `pytest` (for unit testing), and all news module dependencies (`feedparser`, `newspaper3k`, `readability-lxml`, `beautifulsoup4`, and `googlenewsdecoder`). Ann talks to Ollama directly over HTTP, so the standalone `ollama` Python package is not required.
 
 ### 3. Running Ann
 You can run Ann in two modes. The launcher automatically monitors and updates the core:
