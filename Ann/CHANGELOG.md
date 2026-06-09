@@ -2,6 +2,19 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.2.5] - 2026-06-09
+
+### Added
+- **Memory Phase 2 — Usage Statistics** (`/memory stats`): new `get_stats()` method on `MemoryManager` reads active, outdated, deleted, and total counts plus file count and storage size from the index. Exposed via `/memory stats` in `handle_memory_command()` for both CLI and GUI.
+- **Memory Phase 2 — Semantic Embedding Retrieval**: `retrieve_memories()` now attempts to obtain an Ollama embedding vector (`/api/embeddings`) for the user query and each candidate memory summary, computing cosine similarity (no numpy dependency). When embeddings are available, scoring blends cosine similarity (0.50) + keyword overlap (0.25) + recency/confidence (0.25), and all active memories are evaluated regardless of keyword overlap. Falls back silently to the original keyword-only formula when the endpoint is unavailable.
+- **Memory Phase 2 — Conflict Detection**: after every `add_memory()` call, a background thread calls the LLM to check whether the new summary directly contradicts any existing active memory in the same category with overlapping keywords. Conflicting entries are automatically marked `outdated` so they no longer appear in retrieval. Skips quietly on any LLM or network failure.
+- **Memory Phase 2 — Auto Organization**: every 20 active memories, `add_memory()` sets `needs_organization=True` in the index and launches a background organization pass. The pass clusters same-category memories sharing ≥2 keywords (confidence ≥0.7, group of ≥3), asks the LLM to merge each cluster into one concise summary, and replaces the originals with a single consolidated entry. `last_organized` timestamp is recorded in the index after each pass.
+- **Memory Phase 2 — Memory Management UI** (`/memory ui`): new `memory_dialog.py` provides a dark-mode `MemoryDialog` (QDialog) with a scrollable list of active memories, category filter dropdown, per-row inline edit (pencil → save), and delete with confirmation. In GUI mode, `/memory ui` opens the dialog immediately (no LLM call). In CLI mode, `/memory ui` returns a message directing the user to GUI mode.
+
+### Changed
+- `core_controller.py` — `handle_memory_command()` help string updated: `stats` and `ui` added to command list.
+- `assistant_gui.py` — `send_message()`: `/memory ui` branch added before the generic `handle_memory_command()` delegation.
+
 ## [0.2.4] - 2026-06-09
 
 ### Added

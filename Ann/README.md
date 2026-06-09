@@ -145,9 +145,9 @@ class MyModule(BaseIntentParser):
 ```python
 @dataclass
 class ModuleResult:
-    reply: str                  # Required: text to display to the user
-    articles: list = []         # Optional: news card list (news module only)
-    marker: str | None = None   # Optional: control marker e.g. '[EXIT]', '[RESTART]'
+    reply: str                      # Required: text to display to the user
+    data: dict = {}                 # Optional: generic payload dict; e.g. {"articles": [...]} for news cards
+    marker: str | None = None       # Optional: control marker e.g. '[EXIT]', '[RESTART]'
 ```
 
 > [!WARNING]
@@ -318,12 +318,16 @@ For full specifications, caching policies, and architecture, see [news_module_sp
 Ann integrates a local conversational memory system designed in [AI_Memory_System_Design_v2.md](./AI_Memory_System_Design_v2.md) to persist user context across CLI and GUI sessions:
 - **Two-Phase Background Extraction**: Facts stated by the user are extracted on input (Phase 1), and commitments/conclusions are extracted after response generation (Phase 2) using separate background threads.
 - **Concurrent Safe Persistence**: Stored under `memory/` directory via daily JSON file slices and managed registry index with strict `filelock` synchronization.
-- **On-Demand Context Injection**: Prompts are dynamically augmented by retrieving and ranking the top 5 most relevant active memories based on keyword overlap and date recency weights.
+- **Semantic Retrieval with Keyword Fallback**: When the active Ollama model supports embeddings, retrieval blends cosine similarity (50%), keyword overlap (25%), and recency/confidence (25%) to find the most semantically relevant memories. Falls back to keyword-only scoring when embeddings are unavailable.
+- **Conflict Detection**: When a new memory is added, a background thread checks for direct contradictions with existing same-category memories and automatically marks conflicting entries as `outdated`.
+- **Auto Organization**: Every 20 active memories, similar memory clusters are automatically merged into a single consolidated entry by the LLM, keeping the memory store concise.
 - **Commands Control**: Full user override control using `/memory` slash commands:
   - `/memory list` — Lists all currently remembered active context.
   - `/memory add <content>` — Manually registers a new context fact.
   - `/memory edit <id> <new_content>` — Modifies a specific memory by its ID.
   - `/memory delete <id>` — Discards a specific context memory.
+  - `/memory stats` — Shows active/total/deleted counts, file count, and storage size.
+  - `/memory ui` — Opens the visual memory management dialog (GUI mode only).
   - `/memory off` / `/memory on` — Globally pauses/resumes the memory layer.
 
 ### 🛡️ Security Mode
@@ -373,6 +377,7 @@ The recommended layout for deployment and development:
 │   ├── assistant_gui.py     # Ann AI assistant — GUI (PyQt6/PySide6)
 │   ├── alarm_handler.py     # Shared alarm intent dispatch (CLI + GUI)
 │   ├── memory_manager.py    # AI Memory System core logic and thread manager
+│   ├── memory_dialog.py     # Memory management UI dialog (QDialog, GUI only)
 │   ├── ollama_client.py     # Unified Ollama API client with vision routing
 │   ├── file_handler.py      # File generation & export intent handler
 │   ├── moral_evaluator.py   # Moral/safety risk classifier
