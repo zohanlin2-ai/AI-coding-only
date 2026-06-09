@@ -926,6 +926,13 @@ class ChatWindow(QWidget):
         if user_input_lower.startswith("/memory"):
             self.input_field.clear()
             self.add_message(user_text, is_user=True)
+            # /memory ui opens the visual management dialog
+            parts = user_input_lower.split()
+            if len(parts) >= 2 and parts[1] == "ui":
+                from memory_dialog import MemoryDialog
+                dlg = MemoryDialog(self.controller.memory_manager, parent=self)
+                dlg.exec()
+                return
             reply = handle_memory_command(user_text, self.controller.memory_manager)
             self.add_message(reply, is_user=False)
             return

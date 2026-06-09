@@ -124,6 +124,9 @@ def handle_memory_command(user_input: str, memory_manager) -> str:
         success = memory_manager.edit_memory(mem_id, summary=new_summary)
         return f"已成功編輯記憶 {mem_id}。" if success else f"找不到記憶 {mem_id}。"
 
+    if cmd == "ui":
+        return "Memory UI is only available in GUI mode. Launch Ann without --cli to use it."
+
     if cmd == "stats":
         s = memory_manager.get_stats()
         status = "開啟" if s["enabled"] else "關閉"
@@ -145,7 +148,7 @@ def handle_memory_command(user_input: str, memory_manager) -> str:
         memory_manager.toggle(True)
         return "記憶功能已開啟。"
 
-    return "未知的記憶指令。可用指令: /memory list | add | edit | delete | stats | off | on"
+    return "未知的記憶指令。可用指令: /memory list | add | edit | delete | stats | ui | off | on"
 
 
 # ---------------------------------------------------------------------------
