@@ -32,8 +32,9 @@ if HAS_QT:
     # Ensure QApplication is initialized (needed for widget creation)
     app = QApplication.instance() or QApplication(sys.argv)
     
-    # Add parent path to import assistant_gui
-    sys.path.insert(0, str(Path(__file__).parent.parent))
+    # Add paths for imports
+    sys.path.insert(0, str(Path(__file__).parent.parent))        # Ann/current/
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))  # Ann/ (for launcher.py)
     from assistant_gui import ChatWindow
     import assistant
     import launcher
@@ -45,30 +46,22 @@ def mock_gui_components():
         "llm": {"model": "test-model", "base_url": "http://localhost:11434"},
         "alarm": {"sound_path": "test.wav", "volume": 0.5}
     }
-    evaluator = MagicMock()
-    alarm_manager = MagicMock()
-    alarm_trigger = MagicMock()
-    alarm_scheduler = MagicMock()
-    intent_parser = MagicMock()
-    
+    controller = MagicMock()
+    controller.alarm_manager = MagicMock()
+    controller.alarm_trigger = MagicMock()
+    controller.alarm_scheduler = MagicMock()
+
     return {
         "config": config,
-        "evaluator": evaluator,
-        "alarm_manager": alarm_manager,
-        "alarm_trigger": alarm_trigger,
-        "alarm_scheduler": alarm_scheduler,
-        "intent_parser": intent_parser
+        "controller": controller,
     }
 
 
 def test_gui_conversational_restart(mock_gui_components):
     c = mock_gui_components
     bubble = MagicMock()
-    
-    chat_win = ChatWindow(
-        c["config"], c["evaluator"], bubble, c["alarm_manager"],
-        c["alarm_trigger"], c["alarm_scheduler"], c["intent_parser"]
-    )
+
+    chat_win = ChatWindow(c["config"], c["controller"], bubble)
     
     # Verify input starts enabled
     assert chat_win.send_btn.isEnabled()
