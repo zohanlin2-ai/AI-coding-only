@@ -125,6 +125,7 @@ class MyModule(BaseIntentParser):
 | `call_llm` | `Callable[[str], str]` | Synchronous function to call Ollama directly, accepts a single prompt string |
 | `alarm_manager` | `AlarmManager \| None` | Alarm manager instance |
 | `news_manager` | `NewsManager \| None` | News manager instance |
+| `controller` | `CoreController` | The `CoreController` instance itself (needed by plugins that must mutate shared state, e.g. model switching) |
 
 > [!NOTE]
 > If your module needs its own initialized object (e.g. a database connection or API client), initialize it in the module's `__init__` and store it as `self.xxx`. **Do not** pass it through `context` — `context` only provides globally shared resources.
@@ -336,6 +337,12 @@ Ann supports a conversational security monitoring mode backed by the `realtime-s
 - Phase 1 uses mock data; Phase 2 will read from the real security daemon's `alerts.jsonl` / SQLite store.
 For details, see the [Daemon Architecture Guide](./realtime-security-daemon/nist-csf-mitre-attack-realtime-daemon-guide-enhanced.md), [Dashboard UI Spec](./realtime-security-daemon/nist-csf-mitre-attack-realtime-ui-spec.md), and [Network Packet Monitor UI Spec](./realtime-security-daemon/network-packet-monitor-ui-spec.md) in the [`realtime-security-daemon/`](./realtime-security-daemon/) directory.
 
+### 🤖 Model Management Module
+Ann supports querying and switching the active Ollama model through natural conversation:
+- **Query current model**: Ask "what model are you using?" to see the active model.
+- **List available models**: Ask "what models are available?" to list all installed Ollama models with the active one highlighted.
+- **Switch model**: Say "switch to llama3" to change models immediately. The switch takes effect in-session for all modules and is persisted to `config.yml` for future sessions. Fuzzy matching resolves partial names when unambiguous.
+
 ### 🔄 Conversational System Commands
 Ann supports executing system actions directly through natural conversation, featuring warm LLM response generation prior to execution:
 - **Exit Program**: Commands like "goodbye", "close the window", "exit", "close the app" trigger a warm goodbye, append `[EXIT]`, disable inputs, and shut down after a 1.5 seconds delay.
@@ -370,6 +377,7 @@ The recommended layout for deployment and development:
 │   ├── file_handler.py      # File generation & export intent handler
 │   ├── moral_evaluator.py   # Moral/safety risk classifier
 │   ├── security_plugin.py   # Security mode intent parser plugin
+│   ├── model_handler.py     # Model query & switching intent parser plugin
 │   ├── security_dashboard.py# Security Dashboard widget (QStackedWidget view)
 │   ├── version_check.py     # GitHub API version check helper
 │   ├── alarms/              # Alarm storage and scheduler

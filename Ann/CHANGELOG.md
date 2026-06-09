@@ -2,6 +2,15 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.2.4] - 2026-06-09
+
+### Added
+- **Model Management Plugin** (`current/model_handler.py`): new `ModelIntentParser` plugin for LLM-backed model query and switching. Classifies intents as `query_current` / `query_available` / `switch_model` / `none` via Ollama, with a broad keyword pre-filter and a regex fallback for switch detection. Switching updates all registered parser instances in-session and persists the new model name to `config.yml`.
+
+### Changed
+- `core_controller.py` — `setup_modules()`: registers `ModelIntentParser` after `SecurityIntentParser`.
+- `core_controller.py` — `post_message()`: added `"controller"` key to the context dict so plugins can access the `CoreController` instance directly.
+
 ## [0.2.3] - 2026-06-05
 
 ### Added
