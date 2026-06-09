@@ -346,6 +346,7 @@ Ann supports querying and switching the active Ollama model through natural conv
 - **Query current model**: Ask "what model are you using?" to see the active model.
 - **List available models**: Ask "what models are available?" to list all installed Ollama models with the active one highlighted.
 - **Switch model**: Say "switch to llama3" to change models immediately. The switch takes effect in-session for all modules and is persisted to `config.yml` for future sessions. Fuzzy matching resolves partial names when unambiguous.
+- **Graceful startup resolution**: At launch Ann resolves the effective model with fallback — it uses the `config.yml` model if installed, otherwise the first model Ollama has available. If no model is available at all (Ollama not running, or none pulled), Ann still starts and notifies you (a CLI banner / a GUI `⚠️ No LLM` badge and chat notice) so you can keep using the LLM-free slash commands; type `/help` to see them.
 
 ### 🔄 Conversational System Commands
 Ann supports executing system actions directly through natural conversation, featuring warm LLM response generation prior to execution:

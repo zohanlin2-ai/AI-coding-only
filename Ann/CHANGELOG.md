@@ -2,6 +2,13 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.2.6] - 2026-06-09
+
+### Added
+- **Graceful model resolution at startup** (`current/ollama_client.py` → `OllamaClient.resolve_model()`): determines the effective chat model with graceful degradation — (1) use the model from `config.yml` if it is installed, (2) otherwise fall back to the first model Ollama lists as available, (3) if no model is available at all (Ollama not running or no models pulled), return `None`. `CoreController.__init__()` calls this once, stores the result on `self.llm_model`, exposes a `self.llm_available` flag, and writes the resolved name back into the shared config dict so secondary consumers (SecurityDaemon, network monitor) use the same model.
+- **LLM-free degradation notice**: when no LLM is available, Ann still launches so the LLM-free slash commands (`/help`, `/version`, `/model`, `/models`, `/switch`, `/memory`, …) remain usable. The CLI prints a startup banner warning; the GUI shows a persistent `⚠️ No LLM` badge in the title bar plus an initial chat notice directing the user to `/help`.
+- Unit tests for `resolve_model()` covering preferred-available, fallback-to-first, and none-available cases (`current/tests/test_model_routing.py`).
+
 ## [0.2.5] - 2026-06-09
 
 ### Added
