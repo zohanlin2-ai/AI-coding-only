@@ -246,9 +246,12 @@ def main() -> None:
                                 print("\nAnn: 偵測到安全監控 Daemon 正在執行，正在先將其關閉...")
                                 daemon.stop()
                             awaiting_update_confirm = False
+                            pending_version = None
+                            if user_lower == "/y":
+                                print("\nAnn: Sounds good! Updating now — see you on the other side! 🚀\n")
+                                sys.exit(EXIT_UPDATE)
                             llm_msg = build_update_confirm_llm_message(pending_version, user_input)
                             controller.conversation.append({"role": "user", "content": llm_msg})
-                            pending_version = None
                             try:
                                 messages = [
                                     {"role": "system", "content": SYSTEM_PROMPT},

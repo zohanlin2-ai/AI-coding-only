@@ -976,19 +976,22 @@ class ChatWindow(QWidget):
                 if daemon.running:
                     self.add_message("偵測到安全監控 Daemon 正在執行，正在先將其關閉...", is_user=False)
                     daemon.stop()
-                llm_message = build_update_confirm_llm_message(self.pending_version, user_text)
-                self.controller.conversation.append({"role": "user", "content": llm_message})
                 self.awaiting_update_confirm = False
                 self.pending_version = None
+                self.send_btn.setEnabled(False)
+                self.input_field.setEnabled(False)
+                if user_input_lower == "/y":
+                    self.title_label.setText("Updating...")
+                    self.add_message("Sounds good! Updating now — see you on the other side! 🚀", is_user=False)
+                    QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_UPDATE))
+                    return
+                llm_message = build_update_confirm_llm_message(self.pending_version, user_text)
+                self.controller.conversation.append({"role": "user", "content": llm_message})
                 messages_with_system = [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     *self.controller.conversation,
                 ]
-                self.send_btn.setEnabled(False)
-                self.input_field.setEnabled(False)
                 self.title_label.setText("Ann is typing...")
-                # Use ControllerWorker but intercept via a quick direct LLM call
-                # (no routing needed for this confirmation message)
                 try:
                     reply = self.controller.ollama_client.chat(
                         self.controller.llm_model, messages_with_system
