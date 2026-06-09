@@ -252,7 +252,15 @@ class MemoryManager:
             index_data["total_size_bytes"] = sum(f.get("size_bytes", 0) for f in index_data["files"])
             self._save_index_locked(index_data)
             logger.info("Successfully added memory: %s -> %s", memory_id, summary)
-            return unit
+
+        # Conflict detection runs outside the lock in a background thread
+        threading.Thread(
+            target=self._detect_and_resolve_conflict,
+            args=(category, keywords, summary),
+            daemon=True,
+        ).start()
+
+        return unit
 
     def delete_memory(self, memory_id: str) -> bool:
         """Mark memory as deleted by ID."""
@@ -470,6 +478,125 @@ class MemoryManager:
         mode = "embedding+keyword" if use_embeddings else "keyword"
         logger.info("Retrieved %d memories (%s) for: %.60s", len(retrieved), mode, user_input)
         return retrieved
+
+    # ------------------------------------------------------------------
+    # Conflict detection
+    # ------------------------------------------------------------------
+
+    def _detect_and_resolve_conflict(self, category: str, keywords: list[str], summary: str) -> None:
+        """
+        Check existing active memories in the same category for potential
+        contradictions with the new *summary*.  If the LLM judges a conflict,
+        the old memory is marked 'outdated'.
+
+        Runs synchronously inside add_memory() (which is already called from
+        background threads during extraction).  Skips quietly on any error so
+        as never to block memory writing.
+        """
+        import requests
+
+        kw_set = set(keywords)
+
+        lock = FileLock(self.lock_path)
+        with lock:
+            index_data = self._get_index_locked()
+            candidates = []
+            for file_info in index_data.get("files", []):
+                filepath = self.memories_dir / file_info["filename"]
+                if not filepath.exists():
+                    continue
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        file_data = json.load(f)
+                except Exception:
+                    continue
+                for unit in file_data.get("memories", []):
+                    if unit["status"] != "active":
+                        continue
+                    if unit["category"] != category:
+                        continue
+                    if not kw_set.intersection(set(unit["keywords"])):
+                        continue
+                    candidates.append(unit)
+
+        if not candidates:
+            return
+
+        # Ask the LLM whether any candidate conflicts with the new summary.
+        prompt = (
+            "You are a conflict detector for a memory system.\n"
+            "New memory to add: \"{new}\"\n\n"
+            "Existing memories in the same category:\n{existing}\n\n"
+            "For each existing memory that DIRECTLY CONTRADICTS the new one, "
+            "output its ID on a separate line, prefixed with 'CONFLICT:'. "
+            "If no conflicts exist, output exactly: NONE"
+        ).format(
+            new=summary,
+            existing="\n".join(f"- {u['id']}: {u['summary']}" for u in candidates),
+        )
+
+        try:
+            resp = requests.post(
+                f"{self.base_url}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": "You are a conflict detector. Output only as instructed."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "stream": False,
+                },
+                timeout=20,
+            )
+            resp.raise_for_status()
+            content = resp.json()["message"]["content"]
+        except Exception as e:
+            logger.debug("Conflict detection LLM call failed (%s); skipping", e)
+            return
+
+        conflict_ids = re.findall(r"CONFLICT:\s*(M\.\d+)", content)
+        if not conflict_ids:
+            return
+
+        tz = datetime.datetime.now().astimezone().tzinfo
+        now_str = datetime.datetime.now(tz).replace(microsecond=0).isoformat()
+
+        lock = FileLock(self.lock_path)
+        with lock:
+            index_data = self._get_index_locked()
+            for file_info in index_data.get("files", []):
+                filepath = self.memories_dir / file_info["filename"]
+                if not filepath.exists():
+                    continue
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        file_data = json.load(f)
+                except Exception:
+                    continue
+
+                changed = False
+                for unit in file_data.get("memories", []):
+                    if unit["id"] in conflict_ids and unit["status"] == "active":
+                        unit["status"] = "outdated"
+                        unit["updated_at"] = now_str
+                        index_data["active_memories"] = max(0, index_data.get("active_memories", 0) - 1)
+                        index_data["outdated_memories"] = index_data.get("outdated_memories", 0) + 1
+                        changed = True
+                        logger.info("Conflict resolved: marked %s as outdated (superseded by new memory)", unit["id"])
+
+                if changed:
+                    temp_path = filepath.with_suffix(".tmp")
+                    try:
+                        with open(temp_path, "w", encoding="utf-8") as f:
+                            json.dump(file_data, f, ensure_ascii=False, indent=2)
+                        temp_path.replace(filepath)
+                        file_info["size_bytes"] = filepath.stat().st_size
+                    except Exception as e:
+                        logger.error("Failed to write conflict-resolved memory file: %s", e)
+                        if temp_path.exists():
+                            temp_path.unlink()
+
+            self._save_index_locked(index_data)
 
     # ------------------------------------------------------------------
     # Embedding helpers
