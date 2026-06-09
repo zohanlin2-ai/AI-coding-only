@@ -253,12 +253,14 @@ class MemoryManager:
             self._save_index_locked(index_data)
             logger.info("Successfully added memory: %s -> %s", memory_id, summary)
 
-        # Conflict detection runs outside the lock in a background thread
+        # Conflict detection + organization trigger (outside lock, background)
         threading.Thread(
             target=self._detect_and_resolve_conflict,
             args=(category, keywords, summary),
             daemon=True,
         ).start()
+        self._maybe_trigger_organization()
+        self.start_background_organization()
 
         return unit
 
@@ -672,6 +674,136 @@ class MemoryManager:
         except Exception as e:
             logger.error("Failed to parse LLM response as JSON memories: %s", e)
         return None
+
+    # ------------------------------------------------------------------
+    # Auto organization
+    # ------------------------------------------------------------------
+
+    # Trigger organization when active memory count reaches a multiple of this.
+    _ORGANIZE_EVERY = 20
+
+    def _maybe_trigger_organization(self) -> None:
+        """Flag needs_organization=True in the index when threshold is reached."""
+        lock = FileLock(self.lock_path)
+        with lock:
+            data = self._get_index_locked()
+            active = data.get("active_memories", 0)
+            if active > 0 and active % self._ORGANIZE_EVERY == 0:
+                data["needs_organization"] = True
+                self._save_index_locked(data)
+                logger.info("Organization threshold reached (%d active memories); flagging index", active)
+
+    def start_background_organization(self) -> None:
+        """
+        Launch an organization pass if the index flag is set.
+        Called from add_memory() after the index is updated.
+        """
+        lock = FileLock(self.lock_path)
+        with lock:
+            data = self._get_index_locked()
+            needs = data.get("needs_organization", False)
+        if needs:
+            threading.Thread(target=self._run_organization, daemon=True).start()
+
+    def _run_organization(self) -> None:
+        """
+        Merge highly similar memory clusters (same category, ≥3 shared keywords,
+        confidence ≥ 0.7) into a single consolidated entry.  Replaces the old
+        entries (marked outdated) with one merged entry.
+        """
+        import requests
+        import datetime as _dt
+
+        logger.info("Auto-organization: starting pass")
+
+        # Load all active memories
+        all_units = self.list_memories()
+        if len(all_units) < 3:
+            return
+
+        # Group by category
+        by_category: dict[str, list[dict]] = {}
+        for unit in all_units:
+            by_category.setdefault(unit["category"], []).append(unit)
+
+        for category, units in by_category.items():
+            if len(units) < 3:
+                continue
+
+            # Find clusters: pairs sharing ≥ 3 keywords
+            clusters: list[list[dict]] = []
+            used_ids: set[str] = set()
+
+            for i, u1 in enumerate(units):
+                if u1["id"] in used_ids:
+                    continue
+                cluster = [u1]
+                kw1 = set(u1["keywords"])
+                for u2 in units[i + 1:]:
+                    if u2["id"] in used_ids:
+                        continue
+                    if len(kw1.intersection(set(u2["keywords"]))) >= 2 and u2.get("confidence", 0) >= 0.7:
+                        cluster.append(u2)
+                if len(cluster) >= 3:
+                    clusters.append(cluster)
+                    used_ids.update(u["id"] for u in cluster)
+
+            for cluster in clusters:
+                summaries = "\n".join(f"- {u['id']}: {u['summary']}" for u in cluster)
+                prompt = (
+                    f"Merge the following related memories about '{category}' into one concise summary sentence.\n"
+                    f"Output only the merged sentence, nothing else.\n\n{summaries}"
+                )
+                try:
+                    resp = requests.post(
+                        f"{self.base_url}/api/chat",
+                        json={
+                            "model": self.model,
+                            "messages": [
+                                {"role": "system", "content": "You are a memory consolidator. Output only the merged sentence."},
+                                {"role": "user", "content": prompt},
+                            ],
+                            "stream": False,
+                        },
+                        timeout=30,
+                    )
+                    resp.raise_for_status()
+                    merged_summary = resp.json()["message"]["content"].strip()
+                except Exception as e:
+                    logger.warning("Organization merge LLM call failed: %s", e)
+                    continue
+
+                if not merged_summary:
+                    continue
+
+                # Mark originals outdated
+                merged_keywords = list({kw for u in cluster for kw in u["keywords"]}[:5])
+                for unit in cluster:
+                    self.delete_memory(unit["id"])  # marks deleted for now to keep counts clean
+
+                # Add merged entry
+                merged_confidence = sum(u.get("confidence", 0.7) for u in cluster) / len(cluster)
+                self.add_memory(
+                    category=category,
+                    keywords=merged_keywords,
+                    summary=merged_summary,
+                    details=f"Merged from: {', '.join(u['id'] for u in cluster)}",
+                    confidence=min(merged_confidence, 1.0),
+                    source="organization",
+                )
+                logger.info("Organization: merged %d memories -> new entry", len(cluster))
+
+        # Clear the flag
+        lock = FileLock(self.lock_path)
+        with lock:
+            data = self._get_index_locked()
+            data["needs_organization"] = False
+            data["last_organized"] = _dt.datetime.now().isoformat()
+            self._save_index_locked(data)
+
+        logger.info("Auto-organization: pass complete")
+
+    # ------------------------------------------------------------------
 
     def start_background_extraction_phase_1(self, user_input: str) -> None:
         """Phase 1: On user input, start background thread to extract facts."""
