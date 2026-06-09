@@ -776,7 +776,7 @@ class NetworkPacketMonitorWindow(QWidget):
             def run(self) -> None:
                 from ollama_client import OllamaClient
                 base_url = self.config.get("llm", {}).get("base_url", "http://localhost:11434")
-                model = self.config.get("llm", {}).get("model", "gemma4:e4b")
+                model = self.config.get("llm", {}).get("model", "gemma:2b")
                 client = OllamaClient(base_url)
                 
                 prompt = (
