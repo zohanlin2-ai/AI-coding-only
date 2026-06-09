@@ -37,13 +37,11 @@ from alarm_handler import (  # noqa: E402
 )
 from core_controller import CoreController, ControllerResult, handle_memory_command, SYSTEM_PROMPT  # noqa: E402
 from slash_commands import handle_slash_command  # noqa: E402
+from system_commands import match_system_command  # noqa: E402
 from version_check import check_for_update  # noqa: E402
 
 EXIT_UPDATE = 42
 EXIT_RESTART = 3
-
-_EXIT_CMDS = {"exit", "close", "terminate", "close the window", "shut down", "再見", "關閉程式", "關閉"}
-_RESTART_CMDS = {"restart", "reboot", "重啟", "重新啟動"}
 
 
 # ---------------------------------------------------------------------------
@@ -225,13 +223,10 @@ def main() -> None:
                         continue
 
                     # ---- System commands ------------------------------------
-                    if user_lower in _EXIT_CMDS:
-                        print("\nAnn: 再見！有需要隨時找我。\n")
-                        sys.exit(0)
-
-                    if user_lower in _RESTART_CMDS:
-                        print("\nAnn: 好的，我現在重新啟動，稍後見！\n")
-                        sys.exit(EXIT_RESTART)
+                    sys_cmd = match_system_command(user_lower)
+                    if sys_cmd:
+                        print(f"\nAnn: {sys_cmd.reply}\n")
+                        sys.exit(sys_cmd.exit_code)
 
                     # ---- Update confirmation flow ----------------------------
                     if awaiting_update_confirm:

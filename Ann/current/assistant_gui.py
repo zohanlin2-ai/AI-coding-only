@@ -31,6 +31,7 @@ from alarm_handler import (
 from assistant import load_config, BASE_DIR, EXIT_UPDATE, EXIT_RESTART
 from core_controller import CoreController, ControllerResult, handle_memory_command, SYSTEM_PROMPT
 from slash_commands import handle_slash_command
+from system_commands import match_system_command
 from file_handler import parse_markdown_blocks
 
 # Set up logging for GUI
@@ -938,26 +939,16 @@ class ChatWindow(QWidget):
             return
 
         # ---- System commands (fast, synchronous) ------------------------
-        exit_cmds = {"exit", "close", "terminate", "close the window", "shut down", "再見", "關閉程式", "關閉"}
-        if user_input_lower in exit_cmds:
+        sys_cmd = match_system_command(user_input_lower)
+        if sys_cmd:
             self.input_field.clear()
             self.add_message(user_text, is_user=True)
             self.send_btn.setEnabled(False)
             self.input_field.setEnabled(False)
-            self.title_label.setText("Goodbye...")
-            self.add_message("再見！有需要隨時找我。", is_user=False)
-            QTimer.singleShot(1500, QApplication.quit)
-            return
-
-        restart_cmds = {"restart", "reboot", "重啟", "重新啟動"}
-        if user_input_lower in restart_cmds:
-            self.input_field.clear()
-            self.add_message(user_text, is_user=True)
-            self.send_btn.setEnabled(False)
-            self.input_field.setEnabled(False)
-            self.title_label.setText("Restarting...")
-            self.add_message("好的，我現在重新啟動，稍後見！", is_user=False)
-            QTimer.singleShot(1500, lambda: QApplication.exit(EXIT_RESTART))
+            self.title_label.setText(sys_cmd.gui_title)
+            self.add_message(sys_cmd.reply, is_user=False)
+            exit_code = sys_cmd.exit_code
+            QTimer.singleShot(1500, lambda: QApplication.exit(exit_code))
             return
 
         # ---- Update confirmation flow ------------------------------------
