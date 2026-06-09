@@ -115,3 +115,21 @@ Selected Sources: ['Google News 台灣', 'Google News 科技', 'Google News 財�
 Fetched Articles Count: 545
 Filtered Articles Count: 59
 Matched Titles Example: ['Fifa bans fans from taking water bottles into World Cup stadiums', 'Podcast: What is it actually like to play at a World Cup?', "The stories behind Scotland's World Cup bogeymen", 'Video vault and Leeds litter picking - inside the mind of Bielsa', 'A higher ceiling than Messi? What next for Lamine Yamal?']
+
+--- Debug Session: 2026-06-08 14:13:40.287256 ---
+User Input: 足球新聞
+Parsed Dict: {'intent': 'query_news', 'category': None, 'source': None, 'keywords': ['足球']}
+Cleaned Keywords: ['足球']
+Selected Sources: ['Google News 台灣', 'Google News 科技', 'Google News 財經', 'Google News 國際', 'Google News 政治', 'Google News 體育', 'Google News 健康', 'Google News 娛樂', 'Google News 國際體育', 'Google News 國際科技', 'BBC Sport Football']
+Fetched Articles Count: 427
+Filtered Articles Count: 70
+Matched Titles Example: ['Who am I? Guess World Cup star No 1', "Why Olise can be one of France's very best - Clichy", '全世界球迷都在玩的墨西哥「人浪」，你真的了解嗎？ - Yahoo新聞', 'Four Observations from Germany’s hard-fought 2-1 win over USA - Bavarian Football Works', '世足／史上最盛大！首次3國舉辦世界盃 48隊104場本週正式開踢 - Yahoo運動']
+
+--- Debug Session: 2026-06-08 14:13:55.316126 ---
+User Input: 科技新聞
+Parsed Dict: {'intent': 'query_news', 'category': 'technology', 'source': None, 'keywords': []}
+Cleaned Keywords: []
+Selected Sources: ['Google News 科技', 'Google News 國際科技']
+Fetched Articles Count: 91
+Filtered Articles Count: 91
+Matched Titles Example: ['在美高談AI國防、在台大砍預算 民進黨駐美處戳破鄭麗文雙面劇本 - 自由時報', '台股跌市場恐慌？瑤池金母破AI疑慮看5萬點 - Yahoo新聞', '黃仁勳談股災：大家應該高興 現在能以折扣價買進 - Yahoo新聞', 'iPhone內建天氣預報超不準？降雨機率95%卻大太陽 專家揭原因 - ETtoday新聞雲', '小米空氣淨化器6開箱！過濾細菌、花粉、病毒、甲醛汙染源 過敏族殺菌高CP - udn科技玩家']

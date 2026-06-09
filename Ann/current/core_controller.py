@@ -213,6 +213,9 @@ class CoreController:
         from security_plugin import SecurityIntentParser
         self.router.register(SecurityIntentParser(self.llm_base_url, self.llm_model))
 
+        from model_handler import ModelIntentParser
+        self.router.register(ModelIntentParser(self.llm_base_url, self.llm_model))
+
     # ------------------------------------------------------------------
     # LLM helper (synchronous — call from a worker thread in GUI)
     # ------------------------------------------------------------------
@@ -297,6 +300,7 @@ class CoreController:
             "call_llm": self.call_llm,
             "alarm_manager": self.alarm_manager,
             "news_manager": self.news_manager,
+            "controller": self,
         }
 
         # ---- 4. Intent routing ------------------------------------------
