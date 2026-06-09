@@ -676,6 +676,17 @@ class ChatWindow(QWidget):
         self.security_badge.hide()
         title_layout.addWidget(self.security_badge)
 
+        # No-LLM indicator (shown only when no Ollama model is available)
+        self.llm_badge = QLabel("⚠️ No LLM")
+        self.llm_badge.setStyleSheet(
+            "color: #F6AD55; font-size: 11px; font-weight: bold; "
+            "font-family: 'Segoe UI'; border: 1px solid #DD6B2044; "
+            "border-radius: 6px; padding: 2px 6px; background: #3D2A15;"
+        )
+        if getattr(controller, "llm_available", True):
+            self.llm_badge.hide()
+        title_layout.addWidget(self.llm_badge)
+
         # Minimize/Shrink button
         self.shrink_btn = QPushButton("▼")
         self.shrink_btn.setFixedSize(28, 28)
@@ -780,6 +791,13 @@ class ChatWindow(QWidget):
             self.add_message(f"Hello! I am Ann, your safety-conscious assistant. 偵測到新版本 {new_tag}。請問您現在需要更新嗎？[y/n]", is_user=False)
         else:
             self.add_message("Hello! I am Ann, your safety-conscious assistant. How can I help you today?", is_user=False)
+
+        # No-LLM notice — Ann still runs so LLM-free slash commands stay usable.
+        if not getattr(controller, "llm_available", True):
+            self.add_message(
+                "⚠️ 目前沒有可用的 LLM，請盡量使用指令對話。輸入 /help 可查看可用指令。",
+                is_user=False,
+            )
 
     # Window Dragging
     def mousePressEvent(self, event) -> None:

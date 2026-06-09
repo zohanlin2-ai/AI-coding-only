@@ -68,6 +68,35 @@ class OllamaClient:
             logger.error("Failed to get installed models from Ollama: %s", e)
             return []
 
+    def resolve_model(self, preferred: str) -> str | None:
+        """
+        Resolve the effective chat model at startup, with graceful degradation:
+
+          1. If *preferred* is installed in Ollama, use it.
+          2. Otherwise, fall back to the first model Ollama lists as available.
+          3. If no model is available at all (Ollama not running, or no models
+             pulled), return None so the caller can warn the user and run in
+             LLM-free command mode.
+
+        Args:
+            preferred: The model name requested in config.yml.
+
+        Returns:
+            The resolved model name, or None if no LLM is available.
+        """
+        installed = self.get_installed_models()
+        if not installed:
+            logger.warning("No Ollama models available; Ann will run in LLM-free command mode.")
+            return None
+        if preferred in installed:
+            return preferred
+        fallback = installed[0]
+        logger.warning(
+            "Preferred model %r not installed; falling back to first available model %r.",
+            preferred, fallback,
+        )
+        return fallback
+
     def check_model_vision_support(self, model_name: str) -> bool:
         """Queries /api/show to check if a model has vision capabilities (clip/projector family)."""
         # Hardcoded heuristic checks first to avoid redundant API overhead

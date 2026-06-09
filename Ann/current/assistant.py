@@ -152,8 +152,14 @@ def main() -> None:
                 print("         To enable the floating GUI interface, please run: pip install PyQt6")
             print(f"\n{'='*50}")
             print(f"  Ann AI Assistant (CLI)  v{version}")
-            print(f"  Model: {config['llm']['model']}")
+            if controller.llm_available:
+                print(f"  Model: {config['llm']['model']}")
+            else:
+                print("  Model: (none available)")
             print(f"{'='*50}")
+            if not controller.llm_available:
+                print("  ⚠️  目前沒有可用的 LLM，請盡量使用指令對話。")
+                print("      輸入 /help 可查看免 LLM 的可用指令。")
             print("  Commands: 'exit' to quit | 'update' to update\n")
 
             awaiting_update_confirm = False

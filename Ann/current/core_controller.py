@@ -171,10 +171,19 @@ class CoreController:
 
         llm_cfg = config["llm"]
         self.llm_base_url: str = llm_cfg.get("base_url", "http://localhost:11434")
-        self.llm_model: str = llm_cfg["model"]
 
         from ollama_client import OllamaClient
         self.ollama_client = OllamaClient(self.llm_base_url)
+
+        # Resolve the effective model with graceful degradation:
+        #   preferred (config) → first available → none (LLM-free command mode).
+        # The resolved name is written back into the shared config dict so that
+        # later config readers (SecurityDaemon, network monitor) use the same model.
+        preferred_model: str = llm_cfg["model"]
+        resolved_model = self.ollama_client.resolve_model(preferred_model)
+        self.llm_available: bool = resolved_model is not None
+        self.llm_model: str = resolved_model or preferred_model
+        llm_cfg["model"] = self.llm_model
 
         from moral_evaluator import MoralEvaluator
         self.evaluator = MoralEvaluator(base_dir / "moral_module_spec.md")

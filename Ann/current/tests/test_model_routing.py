@@ -86,6 +86,26 @@ def test_find_first_vision_model(mock_client):
             mock_get_tags.assert_called_once()
 
 
+def test_resolve_model_preferred_available(mock_client):
+    # Preferred model is installed → it is used as-is.
+    with patch.object(mock_client, "get_installed_models",
+                      return_value=["gemma4:e4b", "llama3:latest"]):
+        assert mock_client.resolve_model("gemma4:e4b") == "gemma4:e4b"
+
+
+def test_resolve_model_falls_back_to_first(mock_client):
+    # Preferred not installed → fall back to the first available model.
+    with patch.object(mock_client, "get_installed_models",
+                      return_value=["llama3:latest", "qwen2:latest"]):
+        assert mock_client.resolve_model("gemma4:e4b") == "llama3:latest"
+
+
+def test_resolve_model_none_available(mock_client):
+    # No models at all (Ollama down or empty) → None signals LLM-free mode.
+    with patch.object(mock_client, "get_installed_models", return_value=[]):
+        assert mock_client.resolve_model("gemma4:e4b") is None
+
+
 def test_chat_payload_image_encoding(mock_client, tmp_path):
     # Create a dummy image file
     img_file = tmp_path / "dummy.png"
