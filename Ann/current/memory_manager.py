@@ -398,24 +398,36 @@ class MemoryManager:
         return {w for w in words if w not in stop_words}
 
     def retrieve_memories(self, user_input: str, limit: int = 5) -> list[dict]:
-        """Search and rank memories based on input query keywords overlap and recency."""
+        """
+        Search and rank memories relevant to *user_input*.
+
+        Scoring strategy:
+        - If Ollama embeddings are available, semantic cosine similarity
+          (weight 0.5) is combined with keyword overlap (0.25) and recency +
+          confidence (0.25).  All active memories are evaluated.
+        - If embeddings are unavailable, falls back to keyword-only scoring:
+          overlap (0.4) + recency (0.3) + confidence (0.3).  Memories with
+          zero keyword overlap are skipped.
+        """
         if not self.enabled:
             return []
 
         search_keywords = self.extract_search_keywords(user_input)
-        if not search_keywords:
+
+        # Try embedding for the query (non-blocking on failure)
+        query_embedding = self._get_embedding(user_input)
+        use_embeddings = query_embedding is not None
+
+        if not use_embeddings and not search_keywords:
             return []
 
         lock = FileLock(self.lock_path)
         candidate_units = []
-        
+
         with lock:
             index_data = self._get_index_locked()
-            # Sort files to load today and recent files first
-            # Files sorted by name (YYYY-MM-DD_memory.json) desc
             files = sorted(index_data.get("files", []), key=lambda x: x["filename"], reverse=True)
-            
-            # Load active memories and score them
+
             for idx, file_info in enumerate(files):
                 filepath = self.memories_dir / file_info["filename"]
                 if not filepath.exists():
@@ -426,30 +438,75 @@ class MemoryManager:
                 except Exception:
                     continue
 
-                # Recency score based on file age index
-                # Today and last 3 days get index 0, 1, 2, 3
                 recency_weight = max(0.0, 1.0 - (idx * 0.15))
 
                 for unit in file_data.get("memories", []):
                     if unit["status"] != "active" or unit.get("confidence", 1.0) < 0.60:
                         continue
 
-                    # Keyword overlap count
-                    overlap = len(search_keywords.intersection(set(unit["keywords"])))
+                    confidence = unit.get("confidence", 0.5)
+                    overlap = len(search_keywords.intersection(set(unit["keywords"]))) if search_keywords else 0
+
+                    if use_embeddings:
+                        mem_embedding = self._get_embedding(unit["summary"])
+                        if mem_embedding is not None:
+                            cos_sim = self._cosine_similarity(query_embedding, mem_embedding)
+                            # Blend: semantic 0.50, keyword 0.25, recency+conf 0.25
+                            score = (cos_sim * 0.50) + (min(overlap, 3) / 3 * 0.25) + ((recency_weight * 0.5 + confidence * 0.5) * 0.25)
+                            if score > 0.30:  # discard clearly irrelevant results
+                                candidate_units.append((score, unit))
+                            continue
+                        # embedding call failed for this unit — fall through to keyword
+
+                    # Keyword-only path
                     if overlap == 0:
                         continue
-
-                    # Scoring formula based on spec principle:
-                    # score = overlap_count * 0.4 + recency_weight * 0.3 + confidence * 0.3
-                    score = (overlap * 0.4) + (recency_weight * 0.3) + (unit.get("confidence", 0.5) * 0.3)
+                    score = (overlap * 0.4) + (recency_weight * 0.3) + (confidence * 0.3)
                     candidate_units.append((score, unit))
 
-        # Sort candidate memories by score desc
         candidate_units.sort(key=lambda x: x[0], reverse=True)
         retrieved = [unit for _, unit in candidate_units[:limit]]
-        
-        logger.info("Retrieved %d memories for query keyword overlap: %s", len(retrieved), list(search_keywords))
+
+        mode = "embedding+keyword" if use_embeddings else "keyword"
+        logger.info("Retrieved %d memories (%s) for: %.60s", len(retrieved), mode, user_input)
         return retrieved
+
+    # ------------------------------------------------------------------
+    # Embedding helpers
+    # ------------------------------------------------------------------
+
+    def _get_embedding(self, text: str) -> list[float] | None:
+        """
+        Request an embedding vector from Ollama for *text*.
+        Returns None (and logs a warning) if the model or endpoint does not
+        support embeddings — callers must handle None gracefully.
+        """
+        import requests
+        try:
+            resp = requests.post(
+                f"{self.base_url}/api/embeddings",
+                json={"model": self.model, "prompt": text},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            embedding = resp.json().get("embedding")
+            if embedding and isinstance(embedding, list) and len(embedding) > 0:
+                return embedding
+        except Exception as e:
+            logger.debug("Embedding not available (%s); falling back to keyword search", e)
+        return None
+
+    @staticmethod
+    def _cosine_similarity(a: list[float], b: list[float]) -> float:
+        """Cosine similarity between two equal-length vectors without numpy."""
+        dot = sum(x * y for x, y in zip(a, b))
+        norm_a = sum(x * x for x in a) ** 0.5
+        norm_b = sum(x * x for x in b) ** 0.5
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        return dot / (norm_a * norm_b)
+
+    # ------------------------------------------------------------------
 
     def _call_ollama_json(self, messages: list[dict]) -> list[dict] | None:
         """Call Ollama and ensure a JSON array is returned."""
