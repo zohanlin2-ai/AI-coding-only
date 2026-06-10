@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4×4 Rubik's Cube Simulator & Solver</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        background: #1a1a2e;
+        color: #eee;
+        font-family: 'Segoe UI', sans-serif;
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+        overflow: hidden;
+      }
+      #header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 18px;
+        background: #16213e;
+        border-bottom: 1px solid #0f3460;
+        flex-shrink: 0;
+      }
+      #header h1 { font-size: 1.1rem; letter-spacing: 1px; }
+      #main {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+      #canvas-container {
+        flex: 1;
+        position: relative;
+      }
+      #canvas-container canvas { display: block; }
+      #panel {
+        width: 220px;
+        background: #16213e;
+        border-left: 1px solid #0f3460;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px;
+        overflow-y: auto;
+        flex-shrink: 0;
+      }
+      .btn {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 600;
+        transition: opacity 0.15s;
+      }
+      .btn:hover { opacity: 0.85; }
+      .btn-primary { background: #e94560; color: #fff; }
+      .btn-secondary { background: #0f3460; color: #eee; }
+      .btn-success { background: #27ae60; color: #fff; }
+      .btn-warning { background: #f39c12; color: #fff; }
+      #status-box {
+        background: #0f3460;
+        border-radius: 6px;
+        padding: 10px;
+        font-size: 0.8rem;
+        min-height: 60px;
+        line-height: 1.5;
+      }
+      #tutorial-box {
+        background: #0f3460;
+        border-radius: 6px;
+        padding: 10px;
+        font-size: 0.78rem;
+        flex: 1;
+        overflow-y: auto;
+        line-height: 1.6;
+      }
+      #tutorial-box h3 { margin-bottom: 6px; font-size: 0.85rem; color: #e94560; }
+      .step { padding: 3px 0; cursor: pointer; }
+      .step.active { color: #f39c12; font-weight: bold; }
+      .step.done { color: #27ae60; }
+      #move-display {
+        font-size: 0.75rem;
+        color: #aaa;
+        word-break: break-all;
+      }
+      .section-label {
+        font-size: 0.72rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 4px;
+      }
+      #speed-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+      }
+      #speed-control input { flex: 1; }
+    </style>
+  </head>
+  <body>
+    <div id="header">
+      <h1>4×4 Rubik's Cube</h1>
+      <span id="move-count" style="font-size:0.85rem;color:#aaa;">Moves: 0</span>
+    </div>
+    <div id="main">
+      <div id="canvas-container"></div>
+      <div id="panel">
+        <div class="section-label">Controls</div>
+        <button class="btn btn-warning" id="btn-scramble">Scramble</button>
+        <button class="btn btn-success" id="btn-solve">Solve</button>
+        <button class="btn btn-secondary" id="btn-reset">Reset</button>
+        <button class="btn btn-secondary" id="btn-pause" style="display:none">Pause</button>
+
+        <div class="section-label">Speed</div>
+        <div id="speed-control">
+          <span>Slow</span>
+          <input type="range" id="speed-slider" min="100" max="800" value="400" step="50">
+          <span>Fast</span>
+        </div>
+
+        <div class="section-label">Status</div>
+        <div id="status-box">Ready. Drag to rotate view.<br>Click Scramble to begin.</div>
+
+        <div class="section-label">Tutorial Steps</div>
+        <div id="tutorial-box">
+          <h3>Reduction Method</h3>
+          <div class="step" id="step-0">1. Solve Centers</div>
+          <div class="step" id="step-1">2. Pair Edges</div>
+          <div class="step" id="step-2">3. Solve as 3×3</div>
+          <div class="step" id="step-3">4. Fix Parity (if needed)</div>
+        </div>
+
+        <div class="section-label">Move Sequence</div>
+        <div id="move-display">—</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

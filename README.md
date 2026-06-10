@@ -67,6 +67,11 @@ This repository is used to store various projects developed with AI assistance.
 - **Key Features**: Separated runtime processes (`launcher.py` and `assistant.py`), pure GitHub REST API-based self-updating (no local git dependencies required), automatic unit-testing (`pytest` in staging), rollback mechanism on verification failure, and a protected moral module (`moral_module_spec.md` designed by OpenAI and audited by Claude) evaluating user prompts and agent decisions.
 - **Status**: Design and architecture version 0.1.0 uploaded.
 
+### 13. [4×4 Rubik's Cube Simulator & Solver (Rubik_s_cube_4x4)](./Rubik_s_cube_4x4)
+- **Description**: An interactive 3D 4×4 Rubik's Cube (Rubik's Revenge) simulator and step-by-step tutorial solver built with TypeScript, Vite, and Three.js.
+- **Key Features**: Three.js 3D rendering with drag-to-rotate (mouse + touch), animated Reduction Method solver (Centers → Edge Pairing → 3×3 LBL → Parity Fix), adjustable playback speed, tutorial panel highlighting the active stage, pause/resume, and a Vitest suite verifying all outer and wide move inverses.
+- **Status**: Initial version uploaded.
+
 ---
 *Generated and maintained in strict adherence to AI-coding-only SKILL specifications.*
 
