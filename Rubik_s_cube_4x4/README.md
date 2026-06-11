@@ -39,15 +39,17 @@ npm test         # run tests
 src/
 ├── cube/
 │   ├── State.ts      # 6×16 sticker representation
-│   └── Moves.ts      # All moves (outer + wide/inner layers) + scramble
+│   └── Moves.ts      # Geometry-derived move engine (outer + wide/inner) + scramble
 ├── solver/
-│   └── Solver.ts     # Reduction method solver (Centers → Edges → 3×3 → Parity)
+│   ├── Solver.ts     # Orchestrates the reduction: Centers → Edges → Parity → 3×3
+│   ├── Reduce4.ts    # 4×4 reduction: centre solving + edge pairing
+│   ├── Cube3.ts      # Standalone, verified 3×3 engine
+│   └── Lbl3.ts       # Layer-by-layer 3×3 solver
 ├── ui/
-│   ├── Renderer.ts   # Three.js 3D cube renderer with drag controls
+│   ├── Renderer.ts   # Three.js renderer with animated layer turns + drag controls
 │   └── Tutorial.ts   # Step-by-step move player with speed control
 └── main.ts           # App entry point & UI wiring
-tests/
-└── cube.test.ts      # Unit tests for state and move correctness
+tests/                # Vitest: move/geometry correctness, centres, full end-to-end solve
 ```
 
 ## Solving Method
