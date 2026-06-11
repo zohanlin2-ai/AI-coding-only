@@ -61,4 +61,4 @@ The solver uses the **Reduction Method**:
 
 ## Status
 
-Initial version — v0.1.0
+v0.2.0 — solver fully working (solves any scramble), with real 3D turn animation.

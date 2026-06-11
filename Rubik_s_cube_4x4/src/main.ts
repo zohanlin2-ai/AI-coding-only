@@ -7,6 +7,8 @@ import { TutorialPlayer } from './ui/Tutorial.js';
 let state = new CubeState();
 let moveCount = 0;
 let currentStepIndex = -1;
+let turnDuration = 500; // ms per turn, controlled live by the speed slider
+let runId = 0; // bumped to abort an in-flight scramble/solve
 
 const container = document.getElementById('canvas-container')!;
 const renderer = new Renderer(container);
@@ -25,6 +27,19 @@ function setStatus(msg: string): void {
   statusBox.innerHTML = msg;
 }
 
+function setMoveCount(n: number): void {
+  moveCount = n;
+  moveCountEl.textContent = `Moves: ${moveCount}`;
+}
+
+function resetStepHighlights(): void {
+  currentStepIndex = -1;
+  for (let i = 0; i < 4; i++) {
+    const el = document.getElementById(`step-${i}`);
+    if (el) el.className = 'step';
+  }
+}
+
 function updateStepHighlight(stepIndex: number): void {
   if (stepIndex === currentStepIndex) return;
   currentStepIndex = stepIndex;
@@ -37,17 +52,16 @@ function updateStepHighlight(stepIndex: number): void {
 }
 
 const player = new TutorialPlayer(
-  (stepIndex, move) => {
+  async (stepIndex, move) => {
     state = applyMove(state, move as MoveCode);
-    renderer.updateState(state);
-    moveCount++;
-    moveCountEl.textContent = `Moves: ${moveCount}`;
+    await renderer.animateMove(move as MoveCode, state, turnDuration);
+    setMoveCount(moveCount + 1);
     updateStepHighlight(stepIndex);
   },
   () => {
     setStatus(state.isSolved()
       ? '✓ Solved! All steps complete.'
-      : 'Steps complete. Small deviations may remain (heuristic solver).');
+      : 'Steps complete.');
     btnPause.style.display = 'none';
     btnSolve.style.display = '';
     for (let i = 0; i < 4; i++) {
@@ -58,35 +72,47 @@ const player = new TutorialPlayer(
   updateStepHighlight
 );
 
-btnScramble.addEventListener('click', () => {
+btnScramble.addEventListener('click', async () => {
   player.reset();
+  const myRun = ++runId;
   const result = scramble(new CubeState(), 40);
-  state = result.state;
-  moveCount = 0;
-  moveCountEl.textContent = 'Moves: 0';
-  renderer.updateState(state);
+  const target = result.state;
+
+  setMoveCount(0);
+  setStatus('Scrambling...');
   moveDisplay.textContent = result.moves.join(' ');
-  setStatus('Scrambled! Click Solve to see the solution.');
-  for (let i = 0; i < 4; i++) {
-    const el = document.getElementById(`step-${i}`);
-    if (el) el.className = 'step';
-  }
-  currentStepIndex = -1;
+  resetStepHighlights();
   btnPause.style.display = 'none';
   btnSolve.style.display = '';
+
+  // Animate the scramble move-by-move, starting from a solved cube.
+  state = new CubeState();
+  renderer.updateState(state);
+  for (const m of result.moves) {
+    if (myRun !== runId) return; // aborted by another action
+    state = applyMove(state, m);
+    await renderer.animateMove(m, state, turnDuration);
+    setMoveCount(moveCount + 1);
+  }
+  state = target;
+  setStatus('Scrambled! Click Solve to see the solution.');
 });
 
 btnSolve.addEventListener('click', () => {
+  if (renderer.isAnimating() || player.isPlaying()) return;
   if (state.isSolved()) {
     setStatus('Already solved!');
     return;
   }
+  ++runId; // claim control away from any scramble loop
   const steps = solve(state);
   player.load(steps);
   const allMoves = player.getAllMoves();
   moveDisplay.textContent = allMoves.join(' ') || '(no moves needed)';
   setStatus(`Solving... ${allMoves.length} moves across ${steps.length} stages.`);
+  setMoveCount(0);
   btnPause.style.display = '';
+  btnPause.textContent = 'Pause';
   btnSolve.style.display = 'none';
   player.play();
 });
@@ -104,25 +130,21 @@ btnPause.addEventListener('click', () => {
 });
 
 btnReset.addEventListener('click', () => {
+  ++runId; // abort any running scramble/solve
   player.reset();
   state = new CubeState();
-  moveCount = 0;
-  moveCountEl.textContent = 'Moves: 0';
+  setMoveCount(0);
   renderer.updateState(state);
   moveDisplay.textContent = '—';
   setStatus('Reset to solved state.');
-  for (let i = 0; i < 4; i++) {
-    const el = document.getElementById(`step-${i}`);
-    if (el) el.className = 'step';
-  }
-  currentStepIndex = -1;
+  resetStepHighlights();
   btnPause.style.display = 'none';
   btnSolve.style.display = '';
   btnPause.textContent = 'Pause';
 });
 
 speedSlider.addEventListener('input', () => {
-  // slider max=800 is slow, min=100 is fast — invert
-  const ms = 900 - parseInt(speedSlider.value);
-  player.setSpeed(ms);
+  // slider: higher value = faster turn = shorter duration (live)
+  turnDuration = 900 - parseInt(speedSlider.value);
 });
+turnDuration = 900 - parseInt(speedSlider.value);

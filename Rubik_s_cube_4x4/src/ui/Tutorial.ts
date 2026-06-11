@@ -1,25 +1,24 @@
 import { SolveStep } from '../solver/Solver.js';
 import { MoveCode } from '../cube/Moves.js';
 
-export type StepCallback = (stepIndex: number, move: MoveCode, moveIndex: number) => void;
+// Plays a move and resolves when its turn animation finishes.
+export type PlayMove = (stepIndex: number, move: MoveCode, moveIndex: number) => Promise<void>;
 
 export class TutorialPlayer {
   private steps: SolveStep[] = [];
   private flatMoves: { move: MoveCode; stepIndex: number }[] = [];
   private cursor = 0;
   private playing = false;
-  private timer: ReturnType<typeof setTimeout> | null = null;
-  private speed = 400; // ms per move
-  private onStep: StepCallback;
+  private playMove: PlayMove;
   private onDone: () => void;
   private onStepChange: (stepIndex: number) => void;
 
   constructor(
-    onStep: StepCallback,
+    playMove: PlayMove,
     onDone: () => void,
     onStepChange: (stepIndex: number) => void
   ) {
-    this.onStep = onStep;
+    this.playMove = playMove;
     this.onDone = onDone;
     this.onStepChange = onStepChange;
   }
@@ -35,33 +34,29 @@ export class TutorialPlayer {
   }
 
   play(): void {
+    if (this.playing) return;
     this.playing = true;
-    this.tick();
+    void this.run();
   }
 
   pause(): void {
     this.playing = false;
-    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
-  }
-
-  setSpeed(ms: number): void {
-    this.speed = ms;
   }
 
   isPlaying(): boolean { return this.playing; }
   isDone(): boolean { return this.cursor >= this.flatMoves.length; }
 
-  private tick(): void {
-    if (!this.playing || this.cursor >= this.flatMoves.length) {
-      this.playing = false;
-      if (this.cursor >= this.flatMoves.length) this.onDone();
-      return;
+  private async run(): Promise<void> {
+    while (this.playing && this.cursor < this.flatMoves.length) {
+      const { move, stepIndex } = this.flatMoves[this.cursor];
+      this.onStepChange(stepIndex);
+      await this.playMove(stepIndex, move, this.cursor);
+      this.cursor++;
     }
-    const { move, stepIndex } = this.flatMoves[this.cursor];
-    this.onStep(stepIndex, move, this.cursor);
-    this.onStepChange(stepIndex);
-    this.cursor++;
-    this.timer = setTimeout(() => this.tick(), this.speed);
+    if (this.cursor >= this.flatMoves.length) {
+      this.playing = false;
+      this.onDone();
+    }
   }
 
   reset(): void {
