@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.0] - 2026-06-11
+
+### Fixed
+- **Move engine geometry**: rewrote `Moves.ts` from first principles (each move is a
+  real rigid rotation), fixing a bug where turning a layer corrupted sticker colors.
+  Verified at the sticker level against an independent physical cubie model.
+- Coherent clockwise sign convention across all six faces.
+
+### Added
+- **Real turn animation**: `Renderer.animateMove` rotates the actual cubie layer in
+  3D (engine and renderer share one geometry), with a live "Turn Speed" slider that
+  drives both scramble and solve.
+- **Working solver** (previously a non-functional heuristic). Solves any scramble:
+  - `Cube3` + `Lbl3` — verified 3×3 engine and layer-by-layer solver (200/200).
+  - `Reduce4` — centres (4 faces by clean 3-cycles + a 70-state BFS for the last two),
+    edge pairing (slice-flip with verified setup search), and a parity trial that
+    applies the correct centre-preserving OLL/PLL parity algorithms.
+  - End-to-end: solves arbitrary 4×4 scrambles, ~0.4s each.
+- Geometric regression tests (move correctness, cube geometry, centres, full solve).
+
 ## [0.1.0] - 2026-06-10
 
 ### Added
