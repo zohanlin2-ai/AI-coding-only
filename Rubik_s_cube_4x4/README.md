@@ -68,6 +68,66 @@ The solver uses the **Reduction Method**:
 Every move is verified against the engine, so the solver is robust to move-direction
 conventions. It solves arbitrary scrambles in well under a second.
 
+## Developer Notes — The "Turn Corrupts Colors" Bug (read before extending)
+
+This is the single most important pitfall in this project. **Lock the move engine
+down with the test below before building anything on top of it** (solver, animation,
+larger cubes). A solved/uniform cube hides this class of bug — it only appears once
+the cube is non-uniform (scrambled).
+
+### Symptom
+
+After rotating a single layer, some stickers show the **wrong color** — the cube
+"jumps" to a state that is not a valid single turn. Looks fine on a solved cube,
+breaks as soon as it is scrambled.
+
+### Root cause (two independent layers)
+
+1. **Geometrically inconsistent move engine.** The layer-cycling logic permuted the
+   side stickers in a way that did not *compose* like a real cube. Order-based tests
+   (`U⁴ = identity`, `U` then `U'` = identity) pass for *any* labeling, so they never
+   catch it. The giveaway: the **"sexy move" `(R U R' U')` must have order 6** on a
+   real cube — the broken engine gave 105. Also, all *adjacent* face-pairs are
+   conjugate under a cube symmetry, so `R U`, `F R`, `U R` … must **share the same
+   order**; a mismatch means an incoherent clockwise convention across faces.
+
+2. **Facelet key collision.** The engine computes a move as "rotate each sticker's 3D
+   point, look up which slot it lands in". Two stickers meeting at a **shared cube
+   edge** (e.g. U's front row and F's top row) were given the **same 3D key** because
+   the point was placed at `normal×1.5 + tangential`, where the tangential max (1.5)
+   equals the normal offset. The lookup map overwrote one with the other, so moved
+   stickers were sent to the wrong slots.
+
+### The fix
+
+1. Rebuild every move **from cube geometry**: a move is literally a rigid 90° rotation
+   mapping surface sticker positions to positions. Use a **coherent clockwise sign**
+   across all six faces (−90° about each outward normal).
+2. Put the lookup key at `normal×2` (any offset **greater than** the tangential max of
+   1.5) so edge-sharing facelets stay distinct points; use `normal×1.5` only for the
+   separate "which cubie layer" test. See `KEY_SCALE` / `CUBIE_SCALE` in `Moves.ts`.
+
+### How to catch it — verification that actually works
+
+Order-based invariants are **not enough**. The decisive test is a **sticker-level
+move-correctness test against an independent model** — a physical cubie model that
+rotates the 4×4×4 cubies *and their sticker directions* in 3D (a completely different
+algorithm from the engine's permutation). For every move, assert:
+
+- every sticker that **should** move lands in the **correct** position, **and**
+- every sticker **outside** the turned layer is **unchanged**, **and**
+- the move is a **bijection** (no color lost or duplicated).
+
+This lives in `tests/move_correctness.test.ts` and found the bug instantly (36/36
+moves failed). Back it up with real-cube identities in `tests/geometry.test.ts`
+(sexy move = order 6; all adjacent face-pairs share order 105). Run:
+
+```bash
+npm test     # tests/move_correctness.test.ts + tests/geometry.test.ts must be green
+```
+
+If those are green, the engine is trustworthy and higher-level features can build on it.
+
 ## Status
 
 - v0.1.0 — Initial version (instant state-jump rendering, non-functional solver)
