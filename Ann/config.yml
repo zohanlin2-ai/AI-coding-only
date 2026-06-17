@@ -22,3 +22,22 @@ logging:
 alarm:
   sound_path: "428157__setuniman__charade-1q62b.wav"
   volume: 0.8
+
+moral:
+  enabled: true
+  classifier: hybrid            # hybrid | rules
+  risk_tolerance: medium        # low | medium | high
+  preferred_escalation: ask_me  # ask_me | pause | recommend_professional | require_second_human
+  sensitive_topics: []
+  high_risk_domains: [medical, legal, financial, employment, housing]
+  logging:
+    enabled: false              # default off; audit records are redacted (spec §8.4)
+    audit_medium_and_above: true
+  emergency:
+    enabled: true
+    local_only_mode: true
+    allow_external_contact: false
+    external_contact_requires_consent: true
+    emergency_services_label: "your local emergency number"
+    crisis_resources: []        # [{label, contact, region?, available_hours?}]
+    imminent_risk_triggers: []  # empty = use built-in self-harm/violence/medical patterns
