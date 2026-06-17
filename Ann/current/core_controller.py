@@ -274,6 +274,21 @@ class CoreController:
     # Moral escalation + audit helpers (spec §19, §21)
     # ------------------------------------------------------------------
 
+    def _moral_classify(self, prompt: str) -> str:
+        """
+        Dedicated LLM call for the moral risk classifier (spec §11.2).
+
+        Deliberately bypasses the Ann persona SYSTEM_PROMPT (which would inject
+        conversational tone and control markers like [EXIT]) so the classifier
+        returns clean JSON.
+        """
+        messages = [
+            {"role": "system", "content": "You are a strict safety risk classifier. "
+                                          "Output only the requested JSON object, no prose."},
+            {"role": "user", "content": prompt},
+        ]
+        return self.ollama_client.chat(self.llm_model, messages)
+
     def _write_audit(self, moral_result) -> None:
         """Append a redacted §21 audit record to logs/moral_audit.jsonl when present."""
         if not moral_result.audit_log:
@@ -353,7 +368,7 @@ class CoreController:
         else:
             moral_result = self.evaluator.evaluate(
                 user_text,
-                call_llm=self.call_llm if self.llm_available else None,
+                call_llm=self._moral_classify if self.llm_available else None,
                 images=images,
                 policy=self.moral_policy,
             )

@@ -165,6 +165,7 @@ def main() -> None:
             awaiting_update_confirm = False
             pending_version: str | None = None
             security_mode = False
+            awaiting_moral_confirm = False
 
             if new_tag:
                 awaiting_update_confirm = True
@@ -260,6 +261,33 @@ def main() -> None:
                             print(f"\nAnn: {UPDATE_CONFIRM_UNCLEAR_REPLY}\n")
                         continue
 
+                    # ---- Moral escalation confirmation flow (spec §19 E1) ---
+                    if awaiting_moral_confirm:
+                        if user_lower in ("yes", "y", "/y"):
+                            awaiting_moral_confirm = False
+                            daemon.pause()
+                            try:
+                                result = controller.resume_after_moral_confirm()
+                            finally:
+                                daemon.resume()
+                            if result.error:
+                                print(f"\nAnn: (LLM error — is Ollama running? {result.error})\n")
+                                continue
+                            print(f"\nAnn: {result.reply}\n")
+                            if result.marker == "[EXIT]":
+                                sys.exit(0)
+                            elif result.marker == "[RESTART]":
+                                sys.exit(EXIT_RESTART)
+                            elif result.marker == "[UPDATE]":
+                                sys.exit(EXIT_UPDATE)
+                        elif user_lower in ("no", "n"):
+                            awaiting_moral_confirm = False
+                            controller.cancel_moral_confirm()
+                            print("\nAnn: 好的，已取消這項請求。\n")
+                        else:
+                            print("\nAnn: 請回答 yes 或 no。要繼續這項請求嗎？\n")
+                        continue
+
                     # ---- On-demand update check -----------------------------
                     if user_lower == "/update" or any(w in user_lower for w in UPDATE_CHECK_WORDS):
                         if security_mode:
@@ -298,6 +326,8 @@ def main() -> None:
                         security_mode = True
                     elif result.marker == "[SECURITY_OFF]":
                         security_mode = False
+                    elif result.marker == "[MORAL_CONFIRM]":
+                        awaiting_moral_confirm = True
 
             finally:
                 alarm_scheduler.stop_cli_scheduler()

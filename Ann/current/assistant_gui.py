@@ -64,14 +64,22 @@ class ControllerWorker(QThread):
         user_text: str,
         attachment_text: str = "",
         images: list | None = None,
+        resume_moral: bool = False,
     ):
         super().__init__()
         self.controller = controller
         self.user_text = user_text
         self.attachment_text = attachment_text
         self.images = images or []
+        self.resume_moral = resume_moral
 
     def run(self) -> None:
+        # Continue a request the user confirmed after an E1 moral escalation.
+        if self.resume_moral:
+            self.status_update.emit("typing")
+            self.finished.emit(self.controller.resume_after_moral_confirm())
+            return
+
         # Emit fine-grained status before blocking on Ollama
         if (
             self.controller.news_manager
@@ -633,6 +641,7 @@ class ChatWindow(QWidget):
         self.pending_version = None
         self.update_worker = None
         self._security_mode = False
+        self.awaiting_moral_confirm = False
 
         # 閒置自動縮回計時器（3 分鐘）
         self.inactivity_timer = QTimer(self)
@@ -1034,6 +1043,29 @@ class ChatWindow(QWidget):
                 self.add_message(UPDATE_CONFIRM_UNCLEAR_REPLY, is_user=False)
             return
 
+        # ---- Moral escalation confirmation flow (spec §19 E1) -----------
+        if self.awaiting_moral_confirm:
+            self.input_field.clear()
+            self.add_message(user_text, is_user=True)
+            if user_input_lower in ("yes", "y", "/y"):
+                self.awaiting_moral_confirm = False
+                from security_daemon import SecurityDaemon
+                SecurityDaemon(self.config).pause()
+                self.send_btn.setEnabled(False)
+                self.input_field.setEnabled(False)
+                self.title_label.setText("Ann is typing...")
+                self.worker = ControllerWorker(self.controller, user_text, resume_moral=True)
+                self.worker.status_update.connect(self.on_status_update)
+                self.worker.finished.connect(self.handle_controller_result)
+                self.worker.start()
+            elif user_input_lower in ("no", "n"):
+                self.awaiting_moral_confirm = False
+                self.controller.cancel_moral_confirm()
+                self.add_message("好的，已取消這項請求。", is_user=False)
+            else:
+                self.add_message("請回答 yes 或 no。要繼續這項請求嗎？", is_user=False)
+            return
+
         # ---- On-demand update check -------------------------------------
         if user_input_lower == "/update" or any(w in user_input_lower for w in UPDATE_CHECK_WORDS):
             self.input_field.clear()
@@ -1183,6 +1215,9 @@ class ChatWindow(QWidget):
                 self.exit_security_mode()
                 self.bubble.set_security_mode(False)
                 return
+            elif result.marker == "[MORAL_CONFIRM]":
+                self.awaiting_moral_confirm = True
+                self.add_message(result.reply, is_user=False, is_refusal=True)
             else:
                 self.add_message(result.reply, is_user=False, articles=result.articles)
 
