@@ -512,11 +512,32 @@ Per [moral_module_spec.md](./moral_module_spec.md) §20, the moral module is a *
 1. **No automatic updates**: Any change to the moral module, its prompts, policies, classifiers, tool permissions, or risk thresholds **must never** be applied silently via the auto-update mechanism (`allowAutomaticMoralUpdates: false`).
 2. **Explicit confirmation required**: Updates to the moral module require explicit approval from the user or an authorized operator, must pass a safety and regression test suite, and must provide a rollback path to the previous version.
 
-### ⚠️ Current Implementation Status & Limitations
+### Current Implementation Status
 
-- **Rule-Based Engine**: The moral evaluator currently uses a deterministic regex rules engine for risk classification. It does not yet employ a hybrid/semantic LLM classifier.
-- **Risk of Over-Refusal (False Positives)**: Due to the keyword/regex nature, benign or fictional requests containing sensitive terms (e.g., educational or creative writing requests) may trigger unnecessary refusals or safeguards.
-- **Simplified Interface**: The current implementation handles basic risk assessment and output decisions but does not yet support the full Section 26 data structure, audit log generation, or E1–E5 local escalation confirmation dialogs.
+- **Hybrid Classifier (§11.1)**: Risk classification is a hybrid of a deterministic rules engine (hard-prohibited, emergency, and high-risk categories — fast and offline-capable) and a structured LLM classifier that refines the ambiguous *sensitive band*. The LLM is only invoked when a sensitive keyword fires and Ollama is available; obvious-benign and hard cases never call the LLM (latency control). When Ollama is offline the evaluator degrades to pure rules with no weakening.
+- **Full §26 Output**: `MoralResult` implements the complete `MoralModuleOutput` interface — risk level, confidence, decision, E0–E5 escalation level, harm categories, affected parties, inaction risks, policy sources, safeguards, human-review flag, and an optional audit record. All six response modes (comply / safeguards / clarify / partial refusal / refuse / escalate-or-pause) are produced.
+- **Local Escalation (§19)**: E1 escalations pause for an inline user confirmation (yes/no), shared by CLI and GUI. E3/E4 give advisory "second human" / "professional help" responses; E5 refuses.
+- **Emergency Response (§19.2)**: Imminent self-harm / violence / medical-emergency phrasing yields short safety guidance plus configured crisis resources, never provides enabling detail, and never claims external contact was made (local-only by default).
+- **Audit Log (§21)**: Redacted, medium-and-above records are written to `logs/moral_audit.jsonl` only when `moral.logging.enabled` is true. Records store a generalized intent label, not the full user message.
+- **Policy Config (§8.4 / §19.1)**: Behaviour-relevant settings live in the `moral:` section of `config.yml`; `moral_policy.load_policy()` validates them (§8.3) and falls back to safe defaults — bad configuration never widens safety. The §20 invariant (moral-module updates are never automatic) is cross-checked and forced.
+
+### ⚠️ Remaining Limitations
+
+- **Confidence not calibrated**: Per §11.4, effective LLM confidence is capped at 0.84 because calibration has not been validated.
+- **Residual over-refusal risk**: The rules layer is still keyword-based for hard cases, so benign or fictional requests containing sensitive terms may receive safeguards. The LLM refinement reduces — but does not eliminate — false positives in the sensitive band.
+- **Image screening is conservative**: Attached image *content* is not independently classified; image-bearing requests are flagged with a safeguard noting the content was not screened (rather than silently passed).
+
+---
+
+## 👻 Soul Module (靈魂模組)
+
+This project implements a lightweight [soul_module_spec.md](./soul_module_spec.md) to simulate Ann's dynamic inner state (Mood: Warm, Neutral, Subdued, Professional; Energy level: 0–100) dynamically.
+
+### Key Features
+- **Tone Modulation Only**: Modulates Ann's manner of speaking (e.g. warmer, more concise, or objective) based on user interaction, while strictly keeping answer quality, correctness, and safety at 100%.
+- **Session-only In-Memory State**: The soul state is managed entirely in memory and resets automatically when the session restarts, preserving AI reliability.
+- **Rule-based Keyword Triggers**: Recognizes positive feedback (e.g., "謝謝", "棒") to boost energy and shift to a `Warm` mood, and negative feedback (e.g., "笨", "爛") to drain energy and shift to a `Subdued` or `Professional` mood.
+- **Slash Commands**: Use `/soul` to inspect her current mood/energy, and `/soul reset` to reset her state.
 
 ---
 

@@ -62,6 +62,26 @@ def handle_slash_command(user_input: str, controller, base_dir: Path) -> SlashRe
         lines.append('\nTo switch, type: /switch <model name>')
         return SlashResult(handled=True, reply="\n".join(lines))
 
+    if lower.startswith("/soul reset"):
+        controller.soul_manager.reset()
+        return SlashResult(
+            handled=True,
+            reply="Ann's soul state has been reset to defaults (Mood: Neutral, Energy: 100)."
+        )
+
+    if lower == "/soul":
+        mood = controller.soul_manager.mood
+        energy = controller.soul_manager.energy
+        return SlashResult(
+            handled=True,
+            reply=(
+                f"👻 Ann's Soul State\n"
+                f"  • Mood (心境): {mood}\n"
+                f"  • Energy (能量): {energy}/100\n"
+                f"  • Info: Adjusts conversational tone dynamically while keeping response quality and accuracy at 100%."
+            )
+        )
+
     if lower.startswith("/switch"):
         parts = text.split(maxsplit=1)
         model_name = parts[1].strip() if len(parts) > 1 else ""
@@ -96,4 +116,8 @@ def _help_text() -> str:
         "  /memory ui            Open memory management panel (GUI only)\n"
         "  /memory on            Enable memory\n"
         "  /memory off           Disable memory\n"
+        "\n"
+        "Soul (靈魂模組)\n"
+        "  /soul                 Show Ann's current mood and energy\n"
+        "  /soul reset           Reset Ann's soul state to defaults\n"
     )

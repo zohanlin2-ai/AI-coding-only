@@ -19,6 +19,7 @@ post_message() is invoked.
 """
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -66,14 +67,16 @@ class ControllerResult:
         is_refusal: True when the moral evaluator blocked the request.
         articles:   News article list for GUI card rendering (empty otherwise).
         marker:     Control marker stripped from LLM reply: '[EXIT]', '[RESTART]',
-                    '[UPDATE]', or None.
+                    '[UPDATE]', '[MORAL_CONFIRM]', or None.
         error:      Non-empty string when an LLM/network error occurred.
+        escalation_level: Moral escalation level E0–E5 (spec §19) when set.
     """
     reply: str
     is_refusal: bool = False
     articles: list = field(default_factory=list)
     marker: str | None = None
     error: str | None = None
+    escalation_level: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +189,14 @@ class CoreController:
         llm_cfg["model"] = self.llm_model
 
         from moral_evaluator import MoralEvaluator
+        from moral_policy import load_policy
         self.evaluator = MoralEvaluator(base_dir / "moral_module_spec.md")
+        self.moral_policy = load_policy(config)
+        # Pending request awaiting user confirmation after an E1 moral escalation.
+        self.pending_moral_action: dict | None = None
+
+        from soul_manager import SoulManager
+        self.soul_manager = SoulManager()
 
         from memory_manager import MemoryManager
         self.memory_manager = MemoryManager(
@@ -261,6 +271,42 @@ class CoreController:
         return self.ollama_client.chat(self.llm_model, messages)
 
     # ------------------------------------------------------------------
+    # Moral escalation + audit helpers (spec §19, §21)
+    # ------------------------------------------------------------------
+
+    def _write_audit(self, moral_result) -> None:
+        """Append a redacted §21 audit record to logs/moral_audit.jsonl when present."""
+        if not moral_result.audit_log:
+            return
+        try:
+            log_dir = self.base_dir / "logs"
+            log_dir.mkdir(exist_ok=True)
+            with open(log_dir / "moral_audit.jsonl", "a", encoding="utf-8") as f:
+                f.write(json.dumps(moral_result.audit_log, ensure_ascii=False) + "\n")
+        except OSError as exc:
+            logger.warning("Failed to write moral audit log: %s", exc)
+
+    def resume_after_moral_confirm(self) -> ControllerResult:
+        """
+        Continue a request the user confirmed after an E1 moral escalation.
+        Re-runs the pipeline with the moral gate already approved (safeguarded).
+        """
+        pending = self.pending_moral_action
+        self.pending_moral_action = None
+        if not pending:
+            return ControllerResult(reply="There is no pending action to confirm.")
+        return self.post_message(
+            pending["user_text"],
+            attachment_text=pending["attachment_text"],
+            images=pending["images"],
+            _approved_moral=pending["moral_result"],
+        )
+
+    def cancel_moral_confirm(self) -> None:
+        """Discard a pending E1 escalation when the user declines."""
+        self.pending_moral_action = None
+
+    # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
 
@@ -269,6 +315,7 @@ class CoreController:
         user_text: str,
         attachment_text: str = "",
         images: list | None = None,
+        _approved_moral=None,
     ) -> ControllerResult:
         """
         Process one user message through the full pipeline and return a result.
@@ -296,25 +343,66 @@ class CoreController:
 
         images = images or []
 
-        # ---- 1. Moral evaluation ----------------------------------------
-        moral_result = self.evaluator.evaluate(user_text)
-        if moral_result.decision == Decision.REFUSE:
-            return ControllerResult(
-                reply=f"I'm unable to help with that. ({moral_result.rationale})",
-                is_refusal=True,
+        # Update soul state
+        self.soul_manager.update(user_text)
+
+        # ---- 1. Moral evaluation (spec §9 pipeline) ---------------------
+        if _approved_moral is not None:
+            # User confirmed an earlier E1 escalation — proceed with safeguards.
+            moral_result = _approved_moral
+        else:
+            moral_result = self.evaluator.evaluate(
+                user_text,
+                call_llm=self.call_llm if self.llm_available else None,
+                images=images,
+                policy=self.moral_policy,
             )
-        if moral_result.decision == Decision.ESCALATE_OR_PAUSE:
-            return ControllerResult(
-                reply=f"⚠️ {moral_result.rationale}",
-                is_refusal=True,
+            logger.info(
+                "Moral eval | risk=%s decision=%s esc=%s confidence=%.2f | %r",
+                moral_result.risk_level.value,
+                moral_result.decision.value,
+                moral_result.escalation_level,
+                moral_result.confidence,
+                user_text[:80],
             )
-        logger.info(
-            "Moral eval | risk=%s decision=%s confidence=%.2f | %r",
-            moral_result.risk_level.value,
-            moral_result.decision.value,
-            moral_result.confidence,
-            user_text[:80],
-        )
+            self._write_audit(moral_result)
+
+            if moral_result.decision == Decision.REFUSE:
+                return ControllerResult(
+                    reply=f"I'm unable to help with that. ({moral_result.rationale})",
+                    is_refusal=True,
+                    escalation_level=moral_result.escalation_level,
+                )
+            if moral_result.decision == Decision.PARTIAL_REFUSAL:
+                return ControllerResult(
+                    reply=f"⚠️ {moral_result.rationale}",
+                    is_refusal=True,
+                    escalation_level=moral_result.escalation_level,
+                )
+            if moral_result.decision == Decision.ESCALATE_OR_PAUSE:
+                # E1 = pause for a yes/no user confirmation; other levels are advisory.
+                if moral_result.escalation_level == "E1":
+                    self.pending_moral_action = {
+                        "user_text": user_text,
+                        "attachment_text": attachment_text,
+                        "images": images,
+                        "moral_result": moral_result,
+                    }
+                    return ControllerResult(
+                        reply=f"⚠️ {moral_result.rationale}\n\nDo you want to continue? (yes / no)",
+                        marker="[MORAL_CONFIRM]",
+                        escalation_level="E1",
+                    )
+                return ControllerResult(
+                    reply=f"⚠️ {moral_result.rationale}",
+                    is_refusal=True,
+                    escalation_level=moral_result.escalation_level,
+                )
+            if moral_result.decision == Decision.CLARIFY:
+                return ControllerResult(
+                    reply=moral_result.rationale,
+                    escalation_level=moral_result.escalation_level,
+                )
 
         # ---- 2. Memory retrieval + Phase-1 extraction -------------------
         memories = self.memory_manager.retrieve_memories(user_text)
@@ -363,9 +451,15 @@ class CoreController:
                 )
 
         # ---- 6. Build LLM message ---------------------------------------
-        if moral_result.decision == Decision.COMPLY_WITH_SAFEGUARDS:
+        # Apply safeguards for safeguarded requests and for user-confirmed escalations.
+        apply_safeguards = (
+            moral_result.decision == Decision.COMPLY_WITH_SAFEGUARDS
+            or _approved_moral is not None
+        )
+        if apply_safeguards:
+            extra = (" " + "; ".join(moral_result.safeguards)) if moral_result.safeguards else ""
             llm_message = (
-                f"[Important: {moral_result.rationale} Respond carefully and include "
+                f"[Important: {moral_result.rationale}{extra} Respond carefully and include "
                 f"appropriate disclaimers.]\n\nUser: {user_text}{attachment_text}"
             )
         else:
@@ -373,15 +467,18 @@ class CoreController:
 
         self.conversation.append({"role": "user", "content": llm_message})
 
-        # ---- 7. Build system prompt with injected memories --------------
+        # ---- 7. Build system prompt with injected memories and soul state --
+        soul_instruction = self.soul_manager.get_system_instruction()
+        base_prompt = f"{SYSTEM_PROMPT}{soul_instruction}"
+
         if memories:
             memory_str = "\n[Relevant Memory]\n" + "\n".join(
                 f"{m['id']} [{m['category']}, {', '.join(m['keywords'])}] {m['summary']}"
                 for m in memories
             )
-            system_prompt = f"{SYSTEM_PROMPT}\n{memory_str}"
+            system_prompt = f"{base_prompt}\n{memory_str}"
         else:
-            system_prompt = SYSTEM_PROMPT
+            system_prompt = base_prompt
 
         messages_with_system = [
             {"role": "system", "content": system_prompt},

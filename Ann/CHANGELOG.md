@@ -2,6 +2,16 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.2.7] - 2026-06-17
+
+### Added
+- **AI Soul Module (靈魂模組)**: Simulated in-memory dynamic inner state (Mood: Warm, Neutral, Subdued, Professional; Energy: 0–100) to adjust Ann's tone of voice without changing or degrading answer quality.
+- **Session-only In-Memory State**: Managed in memory via a new `SoulManager` class (`current/soul_manager.py`) with no persistence to disk, resetting to defaults on session restart.
+- **Rule-based Sentiment Recognition**: Updates mood/energy based on positive/negative keyword matching (e.g. praising or criticizing).
+- **Interactive Slash Commands**: Added `/soul` to display current mood/energy and `/soul reset` to reset states.
+- **Specification Documentation**: Created `soul_module_spec.md` and updated `README.md`.
+- **Automated Tests**: Unit tests checking state transitions, energy bounds, and slash commands (`current/tests/test_soul_manager.py`).
+
 ## [0.2.6] - 2026-06-09
 
 ### Added
