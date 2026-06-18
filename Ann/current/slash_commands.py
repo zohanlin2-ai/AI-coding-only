@@ -90,7 +90,43 @@ def handle_slash_command(user_input: str, controller, base_dir: Path) -> SlashRe
         reply = _switch_model(controller, config_path, model_name)
         return SlashResult(handled=True, reply=reply)
 
+    if lower == "/moral" or lower.startswith("/moral "):
+        return SlashResult(handled=True, reply=_handle_moral_command(text, base_dir))
+
     return SlashResult(handled=False)
+
+
+def _handle_moral_command(text: str, base_dir: Path) -> str:
+    """Handle '/moral stats' and '/moral flag [note]' (spec §11.5 governance)."""
+    from moral_metrics import (
+        format_report,
+        latest_request_id,
+        load_audit_records,
+        load_corrections,
+        record_correction,
+        summarize,
+    )
+
+    logs_dir = base_dir / "logs"
+    parts = text.split(maxsplit=2)
+    sub = parts[1].lower() if len(parts) > 1 else "stats"
+    records = load_audit_records(logs_dir)
+
+    if sub == "stats":
+        return format_report(summarize(records, load_corrections(logs_dir)))
+
+    if sub == "flag":
+        rid = latest_request_id(records)
+        if not rid:
+            return "No audited decision to flag yet. (Enable moral.logging in config.yml.)"
+        note = parts[2].strip() if len(parts) > 2 else ""
+        record_correction(logs_dir, rid, note)
+        return (
+            f"Flagged decision {rid} as a false positive. "
+            "Thanks — this feeds the §11.5 over-refusal/over-escalation monitoring."
+        )
+
+    return "Usage: /moral stats | /moral flag [note]"
 
 
 def _help_text() -> str:
@@ -120,4 +156,8 @@ def _help_text() -> str:
         "Soul (靈魂模組)\n"
         "  /soul                 Show Ann's current mood and energy\n"
         "  /soul reset           Reset Ann's soul state to defaults\n"
+        "\n"
+        "Moral Governance (道德治理)\n"
+        "  /moral stats          Show moral decision metrics (spec §11.5)\n"
+        "  /moral flag [note]    Flag the latest decision as a false positive\n"
     )
