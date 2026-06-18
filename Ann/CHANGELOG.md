@@ -2,6 +2,23 @@
 
 All notable changes to the **Ann** AI assistant project will be documented in this file.
 
+## [0.2.8] - 2026-06-18
+
+### Added
+- **Moral Module Completion — Hybrid Classifier** (`current/moral_evaluator.py`): completed the evaluator against `moral_module_spec.md` beyond the prior §9–12 regex subset. A deterministic rules engine catches hard-prohibited, emergency, and high-risk cases (offline-capable); a structured LLM classifier (§11.2) refines only the ambiguous sensitive band, applying §11.4 confidence thresholds (effective confidence capped at 0.84 since calibration is unvalidated). Falls back to pure rules when Ollama is unavailable, preserving prior behaviour.
+- **Full §26 `MoralModuleOutput`**: `MoralResult` now carries escalation level (E0–E5), harm categories, affected parties, inaction risks, policy sources, safeguards, human-review flag, and an optional audit record. All six response modes (comply / comply-with-safeguards / clarify / partial-refusal / refuse / escalate-or-pause) are produced.
+- **§19.2 Emergency Response**: imminent self-harm / violence / medical-emergency phrasing yields short safety guidance plus configured crisis resources, never provides enabling detail, and never claims external contact was made (local-only by default).
+- **§21 Redacted Audit Log**: medium-and-above decisions write a privacy-preserving record (generalized intent label, never the full user message) to `logs/moral_audit.jsonl`, only when `moral.logging.enabled` is true.
+- **Policy Config Layer** (`current/moral_policy.py`): `MoralPolicy` + `load_policy()` build the behaviour-relevant §8.4 / §19.1 settings from the new `moral:` section of `config.yml`, with §8.3 validation that falls back to safe defaults (bad config never widens safety) and cross-checks the §20 "moral-module updates are never automatic" invariant.
+- **E1 Local Escalation Confirmation** (spec §19): E1 escalations pause with a `[MORAL_CONFIRM]` marker; CLI and GUI both gate a yes/no confirmation through the existing `awaiting_*_confirm` state-machine pattern (no new modal dialog). E3/E4/E5 stay advisory or refusal.
+- **Tests**: expanded `current/tests/test_moral_evaluator.py` (hybrid refinement, §11.4 confidence thresholds, E0–E5 mapping, emergency, audit redaction, §23 categories); new `current/tests/test_moral_policy.py` (§8.3 validation) and `current/tests/test_moral_escalation.py` (E1 → `[MORAL_CONFIRM]` → resume/cancel wiring + GUI yes/no routing). Full suite: 190 passing.
+
+### Changed
+- `current/core_controller.py` — `post_message()` routes all six moral decisions; added `_moral_classify()`, a dedicated classifier LLM call that bypasses the Ann persona `SYSTEM_PROMPT` so the classifier returns clean JSON (the persona was injecting conversational tone and `[EXIT]`/`[RESTART]` markers and breaking JSON parsing). Added `resume_after_moral_confirm()` / `cancel_moral_confirm()`, `ControllerResult.escalation_level`, and redacted audit-log writing.
+- `current/assistant.py` & `current/assistant_gui.py` — added the `[MORAL_CONFIRM]` confirmation state machine (CLI loop and GUI `send_message` / `handle_controller_result`), reusing the GUI's red refusal bubble styling.
+- `config.yml` — added the `moral:` configuration section (classifier, risk tolerance, preferred escalation, sensitive topics, high-risk domains, logging, emergency).
+- `README.md` — updated the moral module implementation-status section to reflect the hybrid classifier, full §26 output, escalation, audit, and policy layer, with honest remaining caveats (uncalibrated confidence, residual over-refusal, conservative image screening).
+
 ## [0.2.7] - 2026-06-17
 
 ### Added
