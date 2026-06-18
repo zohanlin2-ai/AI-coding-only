@@ -10,3 +10,4 @@ beautifulsoup4>=4.12.2
 httpx>=0.24.1
 googlenewsdecoder>=0.1.7
 filelock>=3.12.0
+pypdf>=4.0.0

@@ -44,6 +44,7 @@ ALLOWED_TEXT_EXTENSIONS = [
     '.sh', '.ts', '.sql', '.toml', '.env', '.xml',
 ]
 ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.bmp']
+ALLOWED_DOC_EXTENSIONS = ['.pdf']
 
 
 class ControllerWorker(QThread):
@@ -843,7 +844,8 @@ class ChatWindow(QWidget):
                 file_path = Path(url.toLocalFile())
                 if file_path.is_file():
                     suffix = file_path.suffix.lower()
-                    if suffix in ALLOWED_TEXT_EXTENSIONS or suffix in ALLOWED_IMAGE_EXTENSIONS:
+                    if (suffix in ALLOWED_TEXT_EXTENSIONS or suffix in ALLOWED_IMAGE_EXTENSIONS
+                            or suffix in ALLOWED_DOC_EXTENSIONS):
                         self.add_attachment(file_path)
                     else:
                         logging.info("Dropped unsupported file format: %s", suffix)
@@ -1093,14 +1095,19 @@ class ChatWindow(QWidget):
                 attachment_text += f"\n\n[Attached Image: {file_path.name}]\n"
             else:
                 try:
-                    try:
-                        content = file_path.read_text(encoding='utf-8')
-                    except UnicodeDecodeError:
+                    if suffix in ALLOWED_DOC_EXTENSIONS:
+                        from doc_qa.pdf_loader import extract_text
+                        content = extract_text(file_path)
+                        lang = ""
+                    else:
                         try:
-                            content = file_path.read_text(encoding='utf-8-sig')
+                            content = file_path.read_text(encoding='utf-8')
                         except UnicodeDecodeError:
-                            content = file_path.read_text(encoding='latin-1')
-                    lang = suffix[1:] if suffix.startswith('.') else ""
+                            try:
+                                content = file_path.read_text(encoding='utf-8-sig')
+                            except UnicodeDecodeError:
+                                content = file_path.read_text(encoding='latin-1')
+                        lang = suffix[1:] if suffix.startswith('.') else ""
                     attachment_text += f"\n\n[Attached File: {file_path.name}]\n```{lang}\n{content}\n```\n"
                 except Exception as e:
                     attachment_text += f"\n\n[Error reading attached file {file_path.name}: {str(e)}]\n"
@@ -1481,7 +1488,8 @@ class FloatingBubble(QWidget):
                 file_path = Path(url.toLocalFile())
                 if file_path.is_file():
                     suffix = file_path.suffix.lower()
-                    if suffix in ALLOWED_TEXT_EXTENSIONS or suffix in ALLOWED_IMAGE_EXTENSIONS:
+                    if (suffix in ALLOWED_TEXT_EXTENSIONS or suffix in ALLOWED_IMAGE_EXTENSIONS
+                            or suffix in ALLOWED_DOC_EXTENSIONS):
                         self.chat_window.add_attachment(file_path)
                     else:
                         logging.info("Dropped unsupported file format in bubble: %s", suffix)
