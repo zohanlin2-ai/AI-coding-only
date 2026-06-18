@@ -15,7 +15,10 @@ fi
 
 root=$(git rev-parse --show-toplevel)
 echo "[pre-commit] Ann files staged — running pytest..."
-( cd "$root/Ann/current" && python -m pytest tests/ -q )
+# -p no:faulthandler silences a benign, non-fatal SEH access-violation dump that
+# this msys2/mingw Python + PyQt6 build emits on import. Tests still pass; the
+# dump is suppressed only here, not in manual `pytest` runs.
+( cd "$root/Ann/current" && python -m pytest tests/ -q -p no:faulthandler )
 if [ $? -ne 0 ]; then
     echo "[pre-commit] pytest failed — commit aborted. Use 'git commit --no-verify' to override."
     exit 1
