@@ -1,0 +1,23 @@
+#!/bin/sh
+# Ann pre-commit hook — run Ann's pytest suite when Ann files are staged.
+#
+# Self-gating: this repository is a multi-project mono-repo, so a commit that
+# does not touch Ann/ skips this hook entirely (exits 0 immediately). Only
+# commits that stage files under Ann/ trigger the test run.
+#
+# Install:  sh Ann/scripts/install-hooks.sh
+# Override: git commit --no-verify
+
+staged_ann=$(git diff --cached --name-only --diff-filter=ACM | grep '^Ann/')
+if [ -z "$staged_ann" ]; then
+    exit 0
+fi
+
+root=$(git rev-parse --show-toplevel)
+echo "[pre-commit] Ann files staged — running pytest..."
+( cd "$root/Ann/current" && python -m pytest tests/ -q )
+if [ $? -ne 0 ]; then
+    echo "[pre-commit] pytest failed — commit aborted. Use 'git commit --no-verify' to override."
+    exit 1
+fi
+exit 0
