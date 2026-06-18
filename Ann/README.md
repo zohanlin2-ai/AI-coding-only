@@ -314,6 +314,9 @@ For complete specs, see [file_generation_spec.md](./file_generation_spec.md).
 Ann supports conversational news queries using local Ollama model to parse search intents, retrieve and parse RSS feeds (e.g. Google News, Reuters), filter articles by keywords/categories, and generate concise article summarizations (3–5 sentences) upon request.
 For full specifications, caching policies, and architecture, see [news_module_spec.md](./news_module_spec.md).
 
+### 📑 Document Q&A Module (RAG)
+When you attach a **large** document (drag-and-drop), Ann indexes it into a session-only `DocumentStore` (`current/doc_qa/`) instead of relying solely on dumping the full text into the prompt: the document is split into chunks, each embedded via Ollama's `/api/embeddings` (reusing the same approach as the Memory module), and retrieved by cosine similarity when you ask about it. If embeddings are unavailable (Ollama offline or a model without embedding support), retrieval gracefully falls back to keyword overlap. The `DocQAIntentParser` only activates when a document is loaded, so normal chat and news/file requests are unaffected. Small attachments keep the previous full-text behaviour. The store is in-memory and resets on restart.
+
 ### 🧠 Memory Module
 Ann integrates a local conversational memory system designed in [AI_Memory_System_Design_v2.md](./AI_Memory_System_Design_v2.md) to persist user context across CLI and GUI sessions:
 - **Two-Phase Background Extraction**: Facts stated by the user are extracted on input (Phase 1), and commitments/conclusions are extracted after response generation (Phase 2) using separate background threads.

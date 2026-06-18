@@ -53,6 +53,10 @@ SYSTEM_PROMPT = (
 )
 
 
+# Attachments larger than this are indexed into the DocumentStore for retrieval
+# (RAG) instead of relying solely on the full-text dump into the prompt.
+_DOC_INDEX_THRESHOLD = 1500
+
 # ---------------------------------------------------------------------------
 # ControllerResult — typed return value from post_message()
 # ---------------------------------------------------------------------------
@@ -214,6 +218,9 @@ class CoreController:
         # News manager — set inside setup_modules()
         self.news_manager = None
 
+        # Document store (RAG) — set inside setup_modules()
+        self.document_store = None
+
     # ------------------------------------------------------------------
     # Setup helpers
     # ------------------------------------------------------------------
@@ -240,6 +247,15 @@ class CoreController:
         from file_handler import FileIntentParser
         file_parser = FileIntentParser(self.llm_base_url, self.llm_model)
         self.router.register(file_parser)
+
+        # ---- Document Q&A (RAG) — registered before news so it wins doc-
+        #      questions ("summarize" etc.) only when a document is loaded -----
+        from doc_qa.document_store import DocumentStore
+        from doc_qa.doc_qa_handler import DocQAIntentParser
+        self.document_store = DocumentStore(self.llm_base_url, self.llm_model)
+        self.router.register(
+            DocQAIntentParser(self.llm_base_url, self.llm_model, self.document_store)
+        )
 
         from news.news_manager import NewsManager
         self.news_manager = NewsManager(
@@ -432,8 +448,14 @@ class CoreController:
             "call_llm": self.call_llm,
             "alarm_manager": self.alarm_manager,
             "news_manager": self.news_manager,
+            "document_store": self.document_store,
             "controller": self,
         }
+
+        # Index a large attachment for retrieval so DocQA can answer over it.
+        # Small attachments are left to the normal full-dump path (unchanged).
+        if self.document_store is not None and len(attachment_text) > _DOC_INDEX_THRESHOLD:
+            self.document_store.add_document("attachment", attachment_text)
 
         # ---- 4. Intent routing ------------------------------------------
         module_result = self.router.route(user_text, context)
