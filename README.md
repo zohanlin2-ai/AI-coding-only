@@ -72,6 +72,11 @@ This repository is used to store various projects developed with AI assistance.
 - **Key Features**: Three.js 3D rendering with drag-to-rotate (mouse + touch), animated Reduction Method solver (Centers → Edge Pairing → 3×3 LBL → Parity Fix), adjustable playback speed, tutorial panel highlighting the active stage, pause/resume, and a Vitest suite verifying all outer and wide move inverses.
 - **Status**: Initial version uploaded.
 
+### 14. [AI_UI](./AI_UI)
+- **Description**: A standalone specification for converting UI sketches into editable HTML component editors.
+- **Key Features**: Covers component data, canvas editing, keyboard and D-pad controls, boundary rules, PNG/JSON export, and overlapping-component selection behavior.
+- **Status**: Initial version uploaded.
+
 ---
 *Generated and maintained in strict adherence to AI-coding-only SKILL specifications.*
 
